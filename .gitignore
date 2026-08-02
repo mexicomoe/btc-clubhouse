@@ -1,0 +1,11 @@
+node_modules/
+.DS_Store
+
+# Real club data — member names and scores. Kept locally, never published.
+# The tests run on demo stand-ins under test/fixtures/*_demo.tsv, which carry
+# the same numbers with the names replaced.
+BtC_Clubhouse_Scoring.xlsx
+TGIF Winter 2025-26 Leaderboard.xls
+Hole by Hole Excel Export -- Spreadsheet Composer.xlsx
+test/fixtures/december_gross.tsv
+test/fixtures/tgif_low_net.tsv
