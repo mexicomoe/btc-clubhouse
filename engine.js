@@ -31,13 +31,12 @@
   };
 
   /* ---- Contest thresholds (December calibration; section 12 under review) ----
-     Graded first-match: Call/Agony/Damage/Long/Shorty use `<=`; Bounce uses `>=`. */
+     Graded first-match: Agony/Damage/Long/Shorty use `<=`, Bounce uses `>=`.
+     Watch the Birdie is not graded — each pick pays its own value. */
   const DEFAULT_CONTESTS = {
-    callYourNumber: [
-      { threshold: 1, strokes: -2.0 }, { threshold: 2, strokes: -1.5 },
-      { threshold: 3, strokes: -1.0 }, { threshold: 4, strokes: -0.5 },
-      { threshold: 99, strokes: 0 },
-    ],
+    // Paid per nominated hole, so both picks can pay. One value today; making a
+    // hard hole worth more than an easy one is a change here, not in the code.
+    watchTheBirdie: { perPick: -1.0 },
     agonyAlley: [
       { threshold: 12, strokes: -2.5 }, { threshold: 13, strokes: -1.5 },
       { threshold: 14, strokes: -0.5 }, { threshold: 15, strokes: 0 },
@@ -97,6 +96,30 @@
     return 0;
   }
 
+  /**
+   * What one nominated hole pays for a net birdie. Flat today; `byHole` is the
+   * hook for making a hard hole worth more than an easy one, with `perPick` as
+   * the fallback, and needs no change here to start working.
+   */
+  function pickValue(hole, config) {
+    const byHole = config.byHole && config.byHole[hole];
+    return byHole == null ? config.perPick : byHole;
+  }
+
+  /**
+   * The par 4s a player may nominate for Watch the Birdie, one list per nine.
+   * Derived from the course's par, never hardcoded — at Aberdeen this is
+   * front 1, 2, 5, 6, 9 and back 10, 11, 12, 14, 15.
+   */
+  function birdiePickHoles(course) {
+    const front = [], back = [];
+    for (let i = 0; i < HOLES; i++) {
+      if (course.par[i] !== 4) continue;
+      (i < 9 ? front : back).push(i + 1);
+    }
+    return { front, back };
+  }
+
   /* ---- Score one card ---- */
   function scorePlayer(card, course, contests) {
     course = course || ABERDEEN_TEE_IV;
@@ -119,13 +142,30 @@
       }
     }
 
-    // 1 · Call Your Number (needs all 18)
-    let callYourNumber;
-    if (holesPlayed < HOLES || gross == null) {
-      callYourNumber = { strokes: 0, detail: "needs 18 holes", live: false };
+    // 1 · Watch the Birdie — two par 4s nominated before the round, one per nine.
+    // A net birdie or better on a nominated hole pays; both picks can pay.
+    let watchTheBirdie;
+    const picks = card.picks;
+    if (picks == null || picks.front == null || picks.back == null) {
+      watchTheBirdie = { strokes: 0, detail: "no picks made", live: false };
     } else {
-      const off = Math.abs(gross - card.predicted);
-      callYourNumber = { strokes: gradeAtMost(off, contests.callYourNumber), detail: "off by " + off, live: true };
+      const legal = birdiePickHoles(course);
+      if (!legal.front.includes(picks.front)) {
+        throw new Error(card.name + ": front-nine pick must be a par 4 — " + legal.front.join(", "));
+      }
+      if (!legal.back.includes(picks.back)) {
+        throw new Error(card.name + ": back-nine pick must be a par 4 — " + legal.back.join(", "));
+      }
+      // Each pick is settled on its own — an unplayed nominated hole just
+      // doesn't pay, and a per-hole value can differ from its partner's.
+      let birdieStrokes = 0, paid = 0;
+      for (const h of [picks.front, picks.back]) {
+        if (played(h - 1) && over(h - 1) <= -1) {
+          birdieStrokes += pickValue(h, contests.watchTheBirdie);
+          paid++;
+        }
+      }
+      watchTheBirdie = { strokes: birdieStrokes, detail: paid + " of 2 picks", live: true };
     }
 
     // 2 · Agony Alley (needs the stretch holes)
@@ -158,7 +198,7 @@
     }
     const bounceBack = { strokes: gradeAtLeast(bounces, contests.bounceBack), detail: bounces + " bounce-back" + (bounces === 1 ? "" : "s"), live: true };
 
-    const allContests = { callYourNumber, agonyAlley, damageControl, goLong, getShorty, bounceBack };
+    const allContests = { watchTheBirdie, agonyAlley, damageControl, goLong, getShorty, bounceBack };
     let earned = sum(Object.values(allContests).map((c) => c.strokes));
     if (-earned > contests.maxContestStrokes) earned = -contests.maxContestStrokes;
 
@@ -192,19 +232,20 @@
 
   /* ---- Section 11 round: the leaderboard's initial data (31 July) ---- */
   const SAMPLE_ROUND = [
-    { name: "Alex",   courseHandicap: 18, predicted: 92,  gross: [5,5,3,6,5,5,6,3,5,7,5,5,4,4,6,6,3,7] },
-    { name: "Boyd",  courseHandicap: 21, predicted: 94,  gross: [6,5,4,7,6,5,7,4,5,6,6,5,4,5,7,4,4,6] },
-    { name: "Chip", courseHandicap: 15, predicted: 89,  gross: [6,5,4,8,6,5,5,4,5,5,6,3,5,6,6,5,4,6] },
-    { name: "Dex",  courseHandicap: 23, predicted: 95,  gross: [5,5,4,6,6,6,7,3,5,4,4,6,3,6,6,6,6,5] },
-    { name: "Emmet",  courseHandicap: 14, predicted: 94,  gross: [6,5,3,7,7,6,5,3,5,4,5,5,3,5,6,7,3,6] },
-    { name: "Finn",  courseHandicap: 26, predicted: 102, gross: [5,6,6,7,5,4,7,4,7,6,7,5,3,5,5,6,4,7] },
-    { name: "Grady", courseHandicap: 34, predicted: 111, gross: [7,6,4,9,7,7,7,5,5,6,7,7,3,8,6,7,3,9] },
-    { name: "Hoyt",  courseHandicap: 20, predicted: 97,  gross: [7,5,4,8,8,4,8,4,6,5,6,7,4,7,5,5,4,6] },
+    { name: "Alex",  courseHandicap: 18, picks: { front: 1, back: 10 }, gross: [5,5,3,6,5,5,6,3,5,7,5,5,4,4,6,6,3,7] },
+    { name: "Boyd",  courseHandicap: 21, picks: { front: 2, back: 11 }, gross: [6,5,4,7,6,5,7,4,5,6,6,5,4,5,7,4,4,6] },
+    { name: "Chip",  courseHandicap: 15, picks: { front: 5, back: 12 }, gross: [6,5,4,8,6,5,5,4,5,5,6,3,5,6,6,5,4,6] },
+    { name: "Dex",   courseHandicap: 23, picks: { front: 6, back: 14 }, gross: [5,5,4,6,6,6,7,3,5,4,4,6,3,6,6,6,6,5] },
+    { name: "Emmet", courseHandicap: 14, picks: { front: 9, back: 15 }, gross: [6,5,3,7,7,6,5,3,5,4,5,5,3,5,6,7,3,6] },
+    { name: "Finn",  courseHandicap: 26, picks: { front: 1, back: 10 }, gross: [5,6,6,7,5,4,7,4,7,6,7,5,3,5,5,6,4,7] },
+    { name: "Grady", courseHandicap: 34, picks: { front: 2, back: 11 }, gross: [7,6,4,9,7,7,7,5,5,6,7,7,3,8,6,7,3,9] },
+    { name: "Hoyt",  courseHandicap: 20, picks: { front: 5, back: 12 }, gross: [7,5,4,8,8,4,8,4,6,5,6,7,4,7,5,5,4,6] },
   ];
 
   const api = {
     ABERDEEN_TEE_IV, DEFAULT_CONTESTS, SAMPLE_ROUND,
     courseHandicap, resolveCourseHandicap, strokesOnHole, netOnHole, cappedNetByHole,
+    birdiePickHoles,
     scorePlayer, scoreField, computeLeaderboard,
   };
   globalThis.ClubhouseEngine = api;

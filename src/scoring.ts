@@ -25,8 +25,17 @@ export interface PlayerCard {
   courseHandicap?: number;
   /** Gross score per hole (18 entries). `null` = hole not played; never 0. */
   gross: (number | null)[];
-  /** The gross total the player predicted before the round (Call Your Number). */
-  predicted: number;
+  /**
+   * Watch the Birdie: the two par 4s nominated before the round, one per nine
+   * (hole numbers, 1-based). Omit and the contest simply doesn't score.
+   */
+  picks?: BirdiePicks;
+}
+
+/** One nominated par 4 on each nine. Both must be par 4s or scoring throws. */
+export interface BirdiePicks {
+  front: number;
+  back: number;
 }
 
 export interface ContestResult {
@@ -47,7 +56,7 @@ export interface PlayerResult {
   netUncapped: number | null;
   holesPlayed: number;
   contests: {
-    callYourNumber: ContestResult;
+    watchTheBirdie: ContestResult;
     agonyAlley: ContestResult;
     damageControl: ContestResult;
     goLong: ContestResult;
@@ -65,6 +74,8 @@ export const resolveCourseHandicap: (card: PlayerCard, course: CourseConfig) => 
 export const strokesOnHole: (strokeIndex: number, courseHcp: number) => number = E.strokesOnHole;
 export const netOnHole: (gross: number | null, par: number, strokeIndex: number, courseHcp: number) => number | null = E.netOnHole;
 export const cappedNetByHole: (card: PlayerCard, course: CourseConfig) => (number | null)[] = E.cappedNetByHole;
+/** The par 4s nominatable on each nine, derived from the course's par. */
+export const birdiePickHoles: (course: CourseConfig) => { front: number[]; back: number[] } = E.birdiePickHoles;
 export const scorePlayer: (card: PlayerCard, course: CourseConfig, contests: ContestConfig) => PlayerResult = E.scorePlayer;
 export const scoreField: (cards: PlayerCard[], course: CourseConfig, contests: ContestConfig) => PlayerResult[] = E.scoreField;
 export const computeLeaderboard: (players?: PlayerCard[], course?: CourseConfig, contests?: ContestConfig) => PlayerResult[] = E.computeLeaderboard;

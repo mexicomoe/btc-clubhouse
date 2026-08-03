@@ -18,7 +18,7 @@
  * from the eighteen hole values so a bad export is caught rather than believed.
  */
 
-import type { PlayerCard } from "./scoring.ts";
+import type { PlayerCard, BirdiePicks } from "./scoring.ts";
 
 export type HoleMode = "net" | "gross" | "unknown";
 
@@ -174,12 +174,13 @@ function numOrNull(v: string | undefined): number | null {
  * The engine recomputes net from gross via the stroke index, so this is only
  * valid for gross holes — net-hole cards must not be double-subtracted.
  */
-export function grossCardToPlayer(card: ImportedCard, predicted: number): PlayerCard {
+export function grossCardToPlayer(card: ImportedCard, picks?: BirdiePicks): PlayerCard {
   if (card.mode !== "gross") {
     throw new Error(`${card.name}: expected gross holes, got ${card.mode}.`);
   }
   if (card.handicap == null) {
     throw new Error(`${card.name}: gross scoring needs a course handicap from the name.`);
   }
-  return { name: card.name, courseHandicap: card.handicap, gross: card.holes, predicted };
+  // Picks come from setup, not the export — Golf Genius knows nothing about them.
+  return { name: card.name, courseHandicap: card.handicap, gross: card.holes, picks };
 }

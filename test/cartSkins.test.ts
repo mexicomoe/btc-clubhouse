@@ -14,7 +14,7 @@ import type { PlayerCard } from "../src/scoring.ts";
 import { cartSkins, type CartEntry } from "../src/skins.ts";
 
 function card(name: string, handicapIndex: number, gross: number[]): PlayerCard {
-  return { name, handicapIndex, gross, predicted: 0 }; // predicted is irrelevant to skins
+  return { name, handicapIndex, gross }; // skins read only net-per-hole; no picks needed
 }
 
 // cart | player card. Predicted omitted — Cart Skins reads only net-per-hole.

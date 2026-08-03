@@ -17,7 +17,7 @@ import { readFileSync } from "node:fs";
 
 import { parseScores, grossCardToPlayer, splitName } from "../src/importScores.ts";
 import { ABERDEEN_TEE_IV, DEFAULT_CONTESTS } from "../src/courseConfig.ts";
-import { scorePlayer } from "../src/scoring.ts";
+import { scorePlayer, type BirdiePicks } from "../src/scoring.ts";
 
 const read = (name: string) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), "utf8");
 
@@ -60,23 +60,27 @@ test("December export: hole columns detected as GROSS", () => {
 
 // The payoff: import → engine → the section 9 finals, end to end.
 test("December import feeds the engine and reproduces section 9", () => {
-  const predicted: Record<string, number> = {
-    "Abe Whitfield": 92, "Ben Castellan": 91, "Cy Ashford": 93, "Dan Pemberton": 94,
-    "Eli Marsden": 91, "Gus Thornbury": 95, "Hal Brightwater": 94, "Ike Calloway": 92,
+  // Picks are a setup input, not part of the export — same demo picks as the
+  // section 9 unit test, so the finals must agree with it exactly.
+  const picks: Record<string, BirdiePicks> = {
+    "Abe Whitfield": { front: 1, back: 10 }, "Ben Castellan":   { front: 2, back: 11 },
+    "Cy Ashford":    { front: 5, back: 12 }, "Dan Pemberton":   { front: 6, back: 14 },
+    "Eli Marsden":   { front: 9, back: 15 }, "Gus Thornbury":   { front: 1, back: 10 },
+    "Hal Brightwater": { front: 2, back: 11 }, "Ike Calloway":  { front: 5, back: 12 },
   };
   const expectedFinal: Record<string, number> = {
-    "Abe Whitfield": 65.0, "Ben Castellan": 67.0, "Cy Ashford": 69.0, "Dan Pemberton": 69.5,
-    "Eli Marsden": 69.5, "Gus Thornbury": 70.0, "Hal Brightwater": 71.0, "Ike Calloway": 75.5,
+    "Abe Whitfield": 67.0, "Ben Castellan": 67.5, "Cy Ashford": 71.0, "Dan Pemberton": 70.5,
+    "Eli Marsden": 70.5, "Gus Thornbury": 71.5, "Hal Brightwater": 73.0, "Ike Calloway": 76.0,
   };
 
   const { cards } = parseScores(read("december_demo.tsv"));
   for (const card of cards) {
-    const player = grossCardToPlayer(card, predicted[card.name]);
+    const player = grossCardToPlayer(card, picks[card.name]);
     const result = scorePlayer(player, ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
     assert.equal(result.final, expectedFinal[card.name], `${card.name} FINAL`);
   }
   // Gus's cap survives the round-trip through the parser.
-  const gus = grossCardToPlayer(cards.find((c) => c.name === "Gus Thornbury")!, 95);
+  const gus = grossCardToPlayer(cards.find((c) => c.name === "Gus Thornbury")!, picks["Gus Thornbury"]);
   assert.equal(scorePlayer(gus, ABERDEEN_TEE_IV, DEFAULT_CONTESTS).net, 76);
 });
 

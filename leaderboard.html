@@ -129,7 +129,7 @@
 const E = window.ClubhouseEngine;
 
 const CONTEST_NAMES = {
-  callYourNumber: "Call Your Number", agonyAlley: "Agony Alley",
+  watchTheBirdie: "Watch the Birdie", agonyAlley: "Agony Alley",
   damageControl: "Damage Control", goLong: "Go Long",
   getShorty: "Get Shorty", bounceBack: "Bounce Back",
 };
@@ -212,7 +212,7 @@ function showPlayer(name){
     `</div>` +
     `<div class="section-label">The contests</div>`;
 
-  for(const key of ["callYourNumber","agonyAlley","damageControl","goLong","getShorty","bounceBack"]){
+  for(const key of ["watchTheBirdie","agonyAlley","damageControl","goLong","getShorty","bounceBack"]){
     const c = r.contests[key];
     const cls = !c.live ? "none" : c.strokes<0 ? "good" : c.strokes>0 ? "penalty" : "none";
     const shown = !c.live ? "—" : fmtStrokes(c.strokes);

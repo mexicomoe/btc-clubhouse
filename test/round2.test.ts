@@ -8,13 +8,18 @@
  *
  * These use the current ladders, including the retuned Bounce Back (section 12):
  * 3+/2/1 → −1.5/−1.0/−0.5. Nothing here is computed by the test.
+ *
+ * Call Your Number is gone; Watch the Birdie has replaced it. As in section 9,
+ * the club recorded no picks for this round — the contest postdates it — so the
+ * picks below are demo inputs rotating through the legal par 4s (front 1, 2, 5,
+ * 6, 9 · back 10, 11, 12, 14, 15). Real picks would move these finals.
  */
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { ABERDEEN_TEE_IV, DEFAULT_CONTESTS } from "../src/courseConfig.ts";
-import { scorePlayer, type PlayerCard } from "../src/scoring.ts";
+import { scorePlayer, type PlayerCard, type BirdiePicks } from "../src/scoring.ts";
 import { cartSkins, teamSkins, type CartEntry, type TeamEntry } from "../src/skins.ts";
 
 interface Reference {
@@ -26,24 +31,24 @@ interface Reference {
   final: number;
 }
 
-// name | course hcp | predicted | 18 gross | expected: gross, net, off, final
+// name | course hcp | picks | 18 gross | expected: gross, net, off, final
 const REFERENCE: Reference[] = [
-  ref("Dex",  23, 95, [5,5,4,6,6,6,7,3,5,4,4,6,3,6,6,6,6,5], 93, 70, 6.50, 63.50),
-  ref("Alex",   18, 92, [5,5,3,6,5,5,6,3,5,7,5,5,4,4,6,6,3,7], 90, 72, 6.50, 65.50),
-  ref("Finn",  26, 102,[5,6,6,7,5,4,7,4,7,6,7,5,3,5,5,6,4,7], 99, 73, 6.00, 67.00),
-  ref("Boyd",  21, 94, [6,5,4,7,6,5,7,4,5,6,6,5,4,5,7,4,4,6], 96, 75, 6.50, 68.50),
-  ref("Emmet",  14, 94, [6,5,3,7,7,6,5,3,5,4,5,5,3,5,6,7,3,6], 91, 77, 1.50, 75.50),
-  ref("Grady", 34, 111,[7,6,4,9,7,7,7,5,5,6,7,7,3,8,6,7,3,9], 113,79, 2.00, 77.00),
-  ref("Chip", 15, 89, [6,5,4,8,6,5,5,4,5,5,6,3,5,6,6,5,4,6], 94, 79, 0.50, 78.50),
-  ref("Hoyt",  20, 97, [7,5,4,8,8,4,8,4,6,5,6,7,4,7,5,5,4,6], 103,82, 2.50, 79.50),
+  ref("Dex",   23, { front: 6, back: 14 }, [5,5,4,6,6,6,7,3,5,4,4,6,3,6,6,6,6,5], 93, 70, 5.00, 65.00),
+  ref("Alex",  18, { front: 1, back: 10 }, [5,5,3,6,5,5,6,3,5,7,5,5,4,4,6,6,3,7], 90, 72, 5.00, 67.00),
+  ref("Finn",  26, { front: 1, back: 10 }, [5,6,6,7,5,4,7,4,7,6,7,5,3,5,5,6,4,7], 99, 73, 5.00, 68.00),
+  ref("Boyd",  21, { front: 2, back: 11 }, [6,5,4,7,6,5,7,4,5,6,6,5,4,5,7,4,4,6], 96, 75, 5.00, 70.00),
+  ref("Emmet", 14, { front: 9, back: 15 }, [6,5,3,7,7,6,5,3,5,4,5,5,3,5,6,7,3,6], 91, 77, 0.50, 76.50),
+  ref("Chip",  15, { front: 5, back: 12 }, [6,5,4,8,6,5,5,4,5,5,6,3,5,6,6,5,4,6], 94, 79, 1.50, 77.50),
+  ref("Grady", 34, { front: 2, back: 11 }, [7,6,4,9,7,7,7,5,5,6,7,7,3,8,6,7,3,9], 113,79, 0.50, 78.50),
+  ref("Hoyt",  20, { front: 5, back: 12 }, [7,5,4,8,8,4,8,4,6,5,6,7,4,7,5,5,4,6], 103,82, 2.50, 79.50),
 ];
 
 function ref(
-  name: string, courseHandicap: number, predicted: number, gross: number[],
+  name: string, courseHandicap: number, picks: BirdiePicks, gross: number[],
   grossTotal: number, net: number, strokesOff: number, final: number,
 ): Reference {
   return {
-    card: { name, courseHandicap, predicted, gross },
+    card: { name, courseHandicap, picks, gross },
     courseHandicap, gross: grossTotal, net, strokesOff, final,
   };
 }
@@ -59,13 +64,18 @@ for (const r of REFERENCE) {
   });
 }
 
-// The result the brief calls out: a 113 finishing ahead of a 94.
-test("section 11 · Grady's 113 beats Chip's 94 on net", () => {
+// The point the brief calls out: nineteen shots of gross difference disappear
+// into the handicap, and the contests — not the gross — decide who finishes
+// ahead. Which of the two edges it IS pick-dependent (under Call Your Number
+// Grady led; with these demo Birdie picks Chip does), so this pins the net
+// parity, which no choice of picks can move.
+test("section 11 · a 113 and a 94 come out level on net", () => {
   const grady = scorePlayer(REFERENCE.find((r) => r.card.name === "Grady")!.card, ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
   const chip = scorePlayer(REFERENCE.find((r) => r.card.name === "Chip")!.card, ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
   assert.equal(grady.gross, 113);
   assert.equal(chip.gross, 94);
-  assert.ok(grady.final! < chip.final!, "lower FINAL wins");
+  assert.equal(grady.net, chip.net, "same net off a 19-shot gross gap");
+  assert.equal(grady.net, 79);
 });
 
 // carts 1,1,2,2,3,3,4,4 in the order Alex, Boyd, Chip, Dex, Emmet, Finn, Grady, Hoyt

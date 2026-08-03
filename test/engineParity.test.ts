@@ -18,10 +18,10 @@ import { computeLeaderboard } from "../src/scoring.ts";
 const E = (globalThis as { ClubhouseEngine: any }).ClubhouseEngine;
 const html = readFileSync(new URL("../leaderboard.html", import.meta.url), "utf8");
 
-// The section-11 finals, re-derived for the retuned Bounce Back ladder (tenths).
+// The section-11 finals, with Watch the Birdie in place of Call Your Number.
 const EXPECTED: Record<string, string> = {
-  Dex: "63.50", Alex: "65.50", Finn: "67.00", Boyd: "68.50",
-  Emmet: "75.50", Grady: "77.00", Chip: "78.50", Hoyt: "79.50",
+  Dex: "65.00", Alex: "67.00", Finn: "68.00", Boyd: "70.00",
+  Emmet: "76.50", Chip: "77.50", Grady: "78.50", Hoyt: "79.50",
 };
 
 test("engine.js reproduces the section 11 leaderboard", () => {

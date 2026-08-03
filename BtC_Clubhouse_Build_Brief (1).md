@@ -18,7 +18,7 @@ This is **not** the spectator game. Beat the Crowd has two products sharing one 
 
 **So this is a viewer, not a scorer.** Do not build hole-by-hole score entry — it would duplicate a system that already works and that nobody wants to use twice. The phone is a leaderboard.
 
-The one exception is **Call Your Number**, collected once before the round.
+The one exception is **Watch the Birdie**, whose two hole picks are collected once before the round.
 
 ---
 
@@ -41,7 +41,7 @@ A single-page web app, installable to a phone home screen, that **works with no 
 ## 2. Scoring — complete and exact
 
 ### Setup per event
-Course par by hole, stroke index by hole, slope, course rating. Per player: name, handicap index, cart number, and their predicted gross score.
+Course par by hole, stroke index by hole, slope, course rating. Per player: name, handicap index, cart number, and their two Watch the Birdie hole picks.
 
 **Course handicap** = `ROUND(index × slope ÷ 113 + (rating − par), 0)`
 *Verified against Golf Genius on 8 real players: exact match on all 8.*
@@ -52,7 +52,7 @@ Course par by hole, stroke index by hole, slope, course rating. Per player: name
 
 **The cap is net double bogey.** No hole can ever score worse than two over par net — the same cap Golf Genius applies when it posts a score. Apply it before anything else is computed. It stops a single 11 deciding a contest for the whole field, and it means "net doubles or worse" and "net doubles" are the same thing.
 
-**Do not cap the gross total.** Call Your Number compares against what the player actually shot. Keep both figures: capped net for scoring, true net for reconciling against Golf Genius.
+**Do not cap the gross total.** Keep both figures: capped net for scoring, true net for reconciling against Golf Genius.
 
 ### The final score
 
@@ -70,9 +70,12 @@ All thresholds must live in a config object, not in code. They are calibrated fr
 
 **Every value in the game is a multiple of 0.1.** No hundredths — they look wrong on a golf scoreboard. If a proposed threshold produces 0.75, round it to a tenth rather than allowing the third decimal in.
 
-**1 · Call Your Number** — how close the gross total came to their prediction.
-`within 1 → −2.0 · within 2 → −1.5 · within 3 → −1.0 · within 4 → −0.5 · 5+ → 0`
-Requires all 18 holes. Reward closeness, never beating it — otherwise everyone predicts 110.
+**1 · Watch the Birdie** — two par 4s nominated before the round, one on each nine.
+`−1.0 per nominated hole birdied` — a net birdie or better. Both picks pay, so up to −2.0.
+
+Paid **per pick**, not by counting them, so a hard hole can later be made worth more than an easy one without touching code. The legal picks are derived from the course's par, never hardcoded — at Aberdeen that is front **1, 2, 5, 6, 9** and back **10, 11, 12, 14, 15**. Reject a pick that is not a par 4 on the right nine. An unplayed nominated hole scores 0. Works on a partial round.
+
+*Replaced Call Your Number, which rewarded hitting a predicted number rather than playing well — a man could profit from a bad score.*
 
 **2 · Agony Alley** — net total across the course's hardest stretch (holes 4-5-6 at Aberdeen, par 13).
 `≤12 → −2.5 · 13 → −1.5 · 14 → −0.5 · 15 → 0 · 16 → +1.0 · 17+ → +1.5`
@@ -123,7 +126,7 @@ Lowest cart average wins the hole. **Tied holes carry over** — the next hole i
 
 | Case | Behaviour |
 |---|---|
-| Player quits after 12 holes | Everything still scores. Contests needing all 18 (Call Your Number) return 0 and display "needs 18 holes". |
+| Player quits after 12 holes | Everything still scores. A contest that can't be judged returns 0 and says why — Agony Alley needs its stretch holes, Go Long and Get Shorty need their par 5s and par 3s, and an unplayed Watch the Birdie pick simply doesn't pay. |
 | Nine-hole event | Same. Show which contests are live. |
 | One-man cart | Averaging handles it. No blind, no special case — measured at 1.13× fair. |
 | A hole scored worse than net double | Capped to net double before anything else runs. |
@@ -136,7 +139,7 @@ Lowest cart average wins the hole. **Tied holes carry over** — the next hole i
 
 ## 4. Screens
 
-**Setup** — course, then players: name, handicap index, cart number, predicted score. Course handicap displays as it's computed. Editable at any point. Done once before the round.
+**Setup** — course, then players: name, handicap index, cart number, and the two Watch the Birdie picks. Offer only the legal par 4s for each nine so an invalid pick cannot be entered. Course handicap displays as it's computed. Editable at any point. Done once before the round.
 
 **Import scores** — a paste box. See section 10 for the exact format. Show what was parsed before committing anything, so a bad paste is caught immediately. Re-pasting replaces the round; it never merges.
 
@@ -167,7 +170,7 @@ No server, no accounts, no sync. Those come later if the product proves out.
 ## 7. What is not decided
 
 - **Thresholds are provisional.** One round, one tee, no single-digit handicaps, no women. They will move. Keep them in config and make them easy to change.
-- **Whether six contests is too many.** The likely launch set is three — Agony Alley, Damage Control, Call Your Number. Build all six; make it trivial to switch them off.
+- **Whether six contests is too many.** The likely launch set is three — Agony Alley, Damage Control, Watch the Birdie. Build all six; make it trivial to switch them off.
 - **Flights.** The club plays in flights and off different tees. Not yet designed.
 - **Scrambles.** Charity events are usually scrambles with no individual hole scores. Team-level scoring is sketched, not specified. This is the one place team aggregation would ever be needed.
 
@@ -200,18 +203,18 @@ slope 117 · course rating 65.3 · Agony Alley = holes 4, 5, 6
 
 **Source data:** `Hole by Hole Excel Export -- Spreadsheet Composer.xlsx`. Hole columns are **gross**. Do not use the TGIF file for these eight — it is a different round, different players, and its hole columns are net.
 
-| Player | Index | Course hcp | Gross | **Predicted** | Net (capped) | Strokes off | FINAL |
+| Player | Index | Course hcp | Gross | **Picks** | Net (capped) | Strokes off | FINAL |
 |---|---|---|---|---|---|---|---|
-| Abe Whitfield | 25.2 | 19 | 92 | 92 | 73 | 8.00 | **65.00** |
-| Ben Castellan | 24.8 | 19 | 93 | 91 | 74 | 7.00 | **67.00** |
-| Cy Ashford | 24.0 | 18 | 93 | 93 | 75 | 6.00 | **69.00** |
-| Dan Pemberton | 26.4 | 21 | 95 | 94 | 74 | 4.50 | **69.50** |
-| Eli Marsden | 23.6 | 18 | 92 | 91 | 74 | 4.50 | **69.50** |
-| Gus Thornbury | 25.4 | 20 | 97 | 95 | 76 | 6.00 | **70.00** |
-| Hal Brightwater | 25.1 | 19 | 95 | 94 | 76 | 5.00 | **71.00** |
-| Ike Calloway | 20.8 | 15 | 94 | 92 | 79 | 3.50 | **75.50** |
+| Abe Whitfield | 25.2 | 19 | 92 | 1 / 10 | 73 | 6.00 | **67.00** |
+| Ben Castellan | 24.8 | 19 | 93 | 2 / 11 | 74 | 6.50 | **67.50** |
+| Dan Pemberton | 26.4 | 21 | 95 | 6 / 14 | 74 | 3.50 | **70.50** |
+| Eli Marsden | 23.6 | 18 | 92 | 9 / 15 | 74 | 3.50 | **70.50** |
+| Cy Ashford | 24.0 | 18 | 93 | 5 / 12 | 75 | 4.00 | **71.00** |
+| Gus Thornbury | 25.4 | 20 | 97 | 1 / 10 | 76 | 4.50 | **71.50** |
+| Hal Brightwater | 25.1 | 19 | 95 | 2 / 11 | 76 | 3.00 | **73.00** |
+| Ike Calloway | 20.8 | 15 | 94 | 5 / 12 | 79 | 3.00 | **76.00** |
 
-**Predicted scores are an input, not something you can compute.** Without them Call Your Number cannot be checked. Expected values: Ike −1.5 · Eli −2.0 · Cy −2.0 · Ben −1.5 · Hal −2.0 · Abe −2.0 · Gus −1.5 · Dan −2.0.
+**The picks are an input, not something you can compute** — and the ones above are invented. See the warning in section 11: the club recorded no Watch the Birdie picks for this round, so these are demo values and every FINAL in the table depends on them. Watch the Birdie paid: Ben −1.0 · Dan −1.0 · Eli −1.0 · Ike −1.0, and nothing to the other four.
 
 **Cart assignments for the skins check:** 1, 1, 2, 2, 3, 3, 4, 4 in the order Ike, Eli, Cy, Ben, Hal, Abe, Gus, Dan.
 
@@ -250,7 +253,8 @@ Verified: Sid Ferndale's 18 holes sum to 72, which matches the Net column. His T
 
 - **No stroke index is needed.** Golf Genius has already applied the strokes. Do not recompute them and do not subtract twice.
 - **Par by hole is still needed** — every contest measures net against par, and the net double bogey cap is par + 2.
-- **Gross comes from the Total column**, and it is the figure Call Your Number compares against.
+- **Gross comes from the Total column**, and it is the figure to reconcile against Golf Genius.
+- **The export carries no Watch the Birdie picks.** They are a setup input and must be married to the imported card by player name.
 - A net 1 on a par 3 is a net 1, **not a hole in one.**
 
 ### Preferred input
@@ -286,16 +290,22 @@ Grady     7  6  4  9  7  7  7  5  5  6  7  7  3  8  6  7  3  9
 Hoyt      7  5  4  8  8  4  8  4  6  5  6  7  4  7  5  5  4  6
 ```
 
-| Player | Course hcp | Gross | Predicted | Net (capped) | Strokes off | FINAL |
+| Player | Course hcp | Gross | Picks | Net (capped) | Strokes off | FINAL |
 |---|---|---|---|---|---|---|
-| Dex | 23 | 93 | 95 | 70 | 6.50 | **63.50** |
-| Alex | 18 | 90 | 92 | 72 | 6.50 | **65.50** |
-| Finn | 26 | 99 | 102 | 73 | 6.00 | **67.00** |
-| Boyd | 21 | 96 | 94 | 75 | 6.50 | **68.50** |
-| Emmet | 14 | 91 | 94 | 77 | 1.50 | **75.50** |
-| Grady | 34 | 113 | 111 | 79 | 2.00 | **77.00** |
-| Chip | 15 | 94 | 89 | 79 | 0.50 | **78.50** |
-| Hoyt | 20 | 103 | 97 | 82 | 2.50 | **79.50** |
+| Dex | 23 | 93 | 6 / 14 | 70 | 5.00 | **65.00** |
+| Alex | 18 | 90 | 1 / 10 | 72 | 5.00 | **67.00** |
+| Finn | 26 | 99 | 1 / 10 | 73 | 5.00 | **68.00** |
+| Boyd | 21 | 96 | 2 / 11 | 75 | 5.00 | **70.00** |
+| Emmet | 14 | 91 | 9 / 15 | 77 | 0.50 | **76.50** |
+| Chip | 15 | 94 | 5 / 12 | 79 | 1.50 | **77.50** |
+| Grady | 34 | 113 | 2 / 11 | 79 | 0.50 | **78.50** |
+| Hoyt | 20 | 103 | 5 / 12 | 82 | 2.50 | **79.50** |
+
+> ⚠️ **The Watch the Birdie picks above are invented, and every FINAL in this table depends on them.**
+>
+> The contest postdates both reference rounds, so the club recorded no picks for either. These were assigned mechanically — rotating through the legal par 4s (front 1, 2, 5, 6, 9 · back 10, 11, 12, 14, 15) in finishing order — and were **not** chosen to produce any particular result. Only one pick paid in this round: Chip's hole 12, a net eagle, for −1.0.
+>
+> Change a single pick and the finals move, and so can the order. **Get the real picks before treating any number here as a reference.** The same warning applies to the section 9 table.
 
 **Cart skins** with carts 1,1,2,2,3,3,4,4 in the order Alex, Boyd, Chip, Dex, Emmet, Finn, Grady, Hoyt: **5, 9, 1, 3** — eighteen, all accounted for.
 
@@ -304,7 +314,7 @@ Hoyt      7  5  4  8  8  4  8  4  6  5  6  7  4  7  5  5  4  6
 - **Handicaps 14 to 34.** Section 9 spans only 15 to 21.
 - **Three players take an Agony Alley penalty** — Chip +1.0, Emmet +1.5, Grady +1.5. Section 9 has one.
 - **Finn scored 10 on Agony Alley**, three under par, hitting the top rung. Nothing in section 9 does.
-- **Grady shot 113 and finished ahead of Chip's 94.** If the engine gets that wrong, it is wrong in a way that matters.
+- **Grady's 113 and Chip's 94 come out level on net, both 79.** Nineteen shots of gross difference vanish into the handicap and the contests decide the order. That net parity is the property worth pinning; which of the two finishes ahead depends on the Birdie picks, and under the invented picks above it is Chip. Under the old Call Your Number it was Grady.
 
 Note these values use the ladders as they stand today, including the retuned **Bounce Back** (`3+ → −1.5 · 2 → −1.0 · 1 → −0.5 · 0 → 0`), which removed the last 0.75 from the game. **Others remain under review** — see section 12 — so re-run this table whenever a threshold changes rather than trusting the numbers above.
 
@@ -316,7 +326,7 @@ Forty-two player-rounds from two groups at one course. Enough to have found thes
 
 | Contest | Issue | Likely change |
 |---|---|---|
-| **Call Your Number** | Six of eight came within three strokes. Club golfers know their game far better than the ladder assumes. | Tighten to `1 → −2.0 · 2 → −1.0 · 3 → −0.5 · 4+ → 0` |
+| **Watch the Birdie** | New, and uncalibrated — no round has been played with real picks. Only 5 of the 16 reference cards would have been paid anything, so −1.0 a pick may be too stingy, or the picks too hard. | Collect real picks for one round before touching the value. |
 | **Damage Control** | Zero net doubles fires 19% (about right) but everything from 3 up collapses to nothing, and 24% of rounds land there. | Spread to `0 → −2.0 · 1 → −1.5 · 2 → −1.0 · 3 → −0.5 · 4+ → 0` |
 | **Agony Alley** | Players believe 12 and 13 are unreachable. **They are wrong** — 12% clear 12, 26% clear 13. | No change |
 | **Go Long / Get Shorty** | Aberdeen rates all four par 5s among its five hardest holes and all four par 3s among its four easiest. Go Long is stroke-starved for high handicaps; Get Shorty is stroke-rich. | Course-specific. Watch, don't fix. |

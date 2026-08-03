@@ -31,9 +31,20 @@ export interface Step {
   strokes: number;
 }
 
-/** Contest thresholds. Call/Agony/Damage/Long/Shorty grade `<=`; Bounce grades `>=`. */
+/**
+ * What one Watch the Birdie pick pays for a net birdie. `perPick` applies to
+ * every nominated hole; `byHole` optionally overrides single holes, so a hard
+ * hole can be made worth more than an easy one.
+ */
+export interface BirdiePayout {
+  perPick: number;
+  byHole?: Record<number, number>;
+}
+
+/** Contest thresholds. Agony/Damage/Long/Shorty grade `<=`; Bounce grades `>=`. */
 export interface ContestConfig {
-  callYourNumber: Step[];
+  /** Not a ladder — paid per pick. */
+  watchTheBirdie: BirdiePayout;
   agonyAlley: Step[];
   damageControl: Step[];
   goLong: Step[];
