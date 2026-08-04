@@ -247,6 +247,7 @@
   <nav class="tabs" data-tabs></nav>
   <div id="setupRows"></div>
   <div class="pad"><button class="big solid" id="addBtn">+ Add player</button></div>
+  <div id="allowanceBox"></div>
   <div id="skinsSwitch"></div>
 </section>
 
@@ -298,7 +299,7 @@ const STORE_KEY = "btc.clubhouse.v1";
 // `handicaps` holds the course handicap the export printed beside a player's
 // name — the one that was in force on the day. It outranks anything derived
 // from today's index, because an index moves and a played round does not.
-let state = { nextId: 1, players: [], scores: {}, handicaps: {}, skinsOn: true, tab: "board" };
+let state = { nextId: 1, players: [], scores: {}, handicaps: {}, skinsOn: true, allowancePercent: 100, tab: "board" };
 
 function load(){
   try {
@@ -312,6 +313,7 @@ function load(){
         scores: s.scores || {},
         handicaps: s.handicaps || {},
         skinsOn: s.skinsOn !== false,          // on unless it was switched off
+        allowancePercent: typeof s.allowancePercent === "number" ? s.allowancePercent : 100,
 
         tab: s.tab === "setup" || s.tab === "import" ? s.tab : "board",
       };
@@ -386,9 +388,26 @@ function contestConfig(){
 
 function courseOf(p){ return E.courseForTee(p.tee || "IV", p.gender || "M"); }
 /** Course handicap as the brief computes it, or null when there's no index yet. */
+/** The handicap he plays off — the event's allowance already taken off it. */
 function chOf(p){
   if(p.index == null || !isFinite(p.index)) return null;
-  return E.courseHandicap(p.index, courseOf(p));
+  return E.courseHandicap(p.index, courseOf(p), state.allowancePercent);
+}
+/** The same figure in full, before the allowance. */
+function fullChOf(p){
+  if(p.index == null || !isFinite(p.index)) return null;
+  return E.fullCourseHandicap(p.index, courseOf(p));
+}
+/** "CH 33 · plays off 28 at 85%", or null when the allowance changes nothing. */
+function allowanceNote(p){
+  if(state.allowancePercent === 100) return null;
+  // A handicap that came off a card already has the event's allowance in it, so
+  // ours was never applied to him. Describing the cut would be a fiction — even
+  // when the two figures happen to agree.
+  if(handicapOf(p).source === "paste") return null;
+  const full = fullChOf(p), plays = chOf(p);
+  if(full == null || full === plays) return null;
+  return "CH " + full + " · plays off " + plays + " at " + state.allowancePercent + "%";
 }
 /** A player is scorable once they have a name, an index and a tee. */
 function isReady(p){ return !!(p.name && p.name.trim()) && p.index != null && isFinite(p.index) && !!p.tee; }
@@ -425,6 +444,9 @@ function cardOf(p){
     // Set only when the export supplied one — the engine prefers it over the
     // index. The tee and gender still decide WHICH holes the strokes fall on.
     courseHandicap: hcp.source === "paste" ? hcp.value : undefined,
+    // Applied only to a handicap worked out from the index. One that came off a
+    // Golf Genius card already has the event's allowance in it.
+    allowancePercent: state.allowancePercent,
     tee: p.tee, gender: p.gender,
     cart: p.cart,
     gross: scoresFor(p),
@@ -562,8 +584,14 @@ function showPlayer(name){
   // "as played" marks a handicap that came off the card rather than from the
   // index, so a figure that disagrees with the setup screen explains itself.
   const asPlayed = card.courseHandicap != null ? " as played" : "";
+  // When the allowance cut the handicap, both figures are shown — the full one
+  // and the one he actually played off — so the difference is never a mystery.
+  const cut = r.courseHandicapFull != null && r.courseHandicapFull !== r.courseHandicap
+    ? "CH " + r.courseHandicapFull + " · plays off " + r.courseHandicap +
+      " at " + r.allowancePercent + "%"
+    : "Course handicap " + r.courseHandicap + asPlayed;
   const teeLine = "Tee " + (course.tee || "IV") + (course.gender === "F" ? " · women's" : "") +
-                  " · Course handicap " + r.courseHandicap + asPlayed +
+                  " · " + cut +
                   (r.gross==null ? "" : " · Gross " + r.gross);
   let html =
     `<div class="detail-head"><div class="name">${esc(r.name)}</div>` +
@@ -637,8 +665,8 @@ function renderSetup(){
       const ch = chOf(p);
       const hcp = handicapOf(p);
       // The index gives one figure and the card another. When they disagree the
-      // played one is what scores, so show both rather than quietly differing
-      // from the leaderboard.
+      // played one is what scores, so the column shows both rather than quietly
+      // differing from the leaderboard.
       const differs = hcp.source === "paste" && ch != null && hcp.value !== ch;
       const picks = (p.front && p.back) ? "picks " + p.front + "/" + p.back : "no picks";
       const bits = [
@@ -647,7 +675,12 @@ function renderSetup(){
         p.cart == null ? "no cart" : "cart " + p.cart,
         picks,
       ];
-      if(differs) bits.push("plays off " + hcp.value + " on this card");
+      const allow = allowanceNote(p);
+      if(allow) bits.push(allow);
+      // A card's own handicap is always named, whether or not it differs from
+      // the index figure — it is the one that scores, and any allowance is
+      // already inside it.
+      if(hcp.source === "paste") bits.push("plays off " + hcp.value + " from the card");
       return `<button class="prow" data-id="${p.id}">` +
         `<span class="pwho"><span class="pname">${esc(p.name || "(no name)")}</span>` +
         `<span class="pmeta">${esc(bits.join(" · "))}</span></span>` +
@@ -661,8 +694,53 @@ function renderSetup(){
       b.addEventListener("click", () => editPlayer(b.dataset.id)));
   }
   document.getElementById("addBtn").disabled = n >= MAX_PLAYERS;
+  drawAllowance();
   drawSkinsSwitch();
   fitBoardNames();
+}
+
+/**
+ * The event's handicap allowance. Club events usually play off 85%, and the
+ * figure moves the field unevenly — at 85% a 38 index gives up five shots and
+ * an 8 index one — so it belongs with the round, not buried in a constant.
+ */
+const COMMON_ALLOWANCES = [100, 95, 90, 85, 80, 75];
+
+function drawAllowance(){
+  const pct = state.allowancePercent;
+  const options = COMMON_ALLOWANCES.concat(COMMON_ALLOWANCES.includes(pct) ? [] : [pct])
+    .sort((a,b) => b - a)
+    .map(v => `<option value="${v}"${v===pct?" selected":""}>${v}%</option>`).join("");
+
+  // What it actually costs the men in this round, worst and least affected.
+  const ready = readyPlayers();
+  let effect;
+  if(pct === 100){
+    effect = "Everyone plays off their full course handicap.";
+  } else if(ready.length === 0){
+    effect = "Applied to every player's course handicap once they are added.";
+  } else {
+    const cuts = ready.map(p => ({ name: displayName(p), lost: (fullChOf(p) || 0) - (chOf(p) || 0) }))
+                      .sort((a,b) => b.lost - a.lost);
+    const most = cuts[0], least = cuts[cuts.length - 1];
+    effect = most.lost === least.lost
+      ? "Costs every man " + most.lost + " shot" + (most.lost===1?"":"s") + "."
+      : "Costs " + esc(most.name) + " " + most.lost + " shot" + (most.lost===1?"":"s") +
+        " and " + esc(least.name) + " " + least.lost + ".";
+  }
+
+  document.getElementById("allowanceBox").innerHTML =
+    `<div class="field"><label for="fAllow">Handicap allowance</label>
+       <select id="fAllow">${options}</select>
+       <div class="cd" style="margin-top:10px;font-size:18px;font-weight:700">${effect}</div>
+     </div>`;
+
+  document.getElementById("fAllow").addEventListener("change", (e) => {
+    state.allowancePercent = Number(e.target.value);
+    save();
+    renderSetup(); renderBoard();
+    if(state.skinsOn) renderSkins();
+  });
 }
 
 /**
@@ -761,7 +839,11 @@ function drawEdit(){
     const v = chOf(editing);
     $("fCh").textContent = v==null ? "–" : v;
     const c = courseOf(editing);
-    $("fChNote").textContent = " · " + c.courseRating.toFixed(1) + "/" + c.slope;
+    const full = fullChOf(editing);
+    // Show the full handicap alongside when the allowance has cut it.
+    const cut = (full != null && full !== v)
+      ? " · full " + full + " at " + state.allowancePercent + "%" : "";
+    $("fChNote").textContent = " · " + c.courseRating.toFixed(1) + "/" + c.slope + cut;
   };
   refreshCh();
 

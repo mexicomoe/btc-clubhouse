@@ -28,8 +28,17 @@ export interface PlayerCard {
   name: string;
   /** Handicap index, from which the course handicap is computed. */
   handicapIndex?: number;
-  /** Course handicap, if already known (Golf Genius prints it). Overrides index. */
+  /**
+   * Course handicap, if already known (Golf Genius prints it). Overrides index —
+   * and carries the event's allowance already, so no allowance is applied to it.
+   */
   courseHandicap?: number;
+  /**
+   * The event's handicap allowance as a percentage: 85 means 85%, 100 (the
+   * default) the full handicap. Applied only to a handicap worked out from
+   * `handicapIndex`, never to one that came off a card.
+   */
+  allowancePercent?: number;
   /** Tee played. With `gender`, decides rating, slope and which stroke index applies. */
   tee?: string;
   /** Men and women play different tees AND a different stroke index. Defaults to "M". */
@@ -65,7 +74,15 @@ export interface ContestResult {
 
 export interface PlayerResult {
   name: string;
+  /** The handicap actually played off — the allowance is already in it. */
   courseHandicap: number;
+  /**
+   * The handicap before the allowance was taken off. Null when it came off a
+   * Golf Genius card, which already has the event's allowance applied.
+   */
+  courseHandicapFull: number | null;
+  /** The allowance used, as a percentage. 100 means the full handicap. */
+  allowancePercent: number;
   gross: number | null;
   /** Net total after the net-double-bogey cap — the scoring anchor. */
   net: number | null;
@@ -133,7 +150,18 @@ export const parseHandicapIndex: (text: string) => ParsedIndex = E.parseHandicap
 /** A handicap index as text, always period-decimal whatever the locale. */
 export const formatHandicapIndex: (value: number | null) => string = E.formatHandicapIndex;
 
-export const courseHandicap: (handicapIndex: number, course: CourseConfig) => number = E.courseHandicap;
+/**
+ * The course handicap a player plays off. `allowancePercent` is a percentage —
+ * 85 means 85%, 100 (the default) the full handicap. The handicap is worked out
+ * in full and then cut, so there are two roundings.
+ */
+export const courseHandicap: (handicapIndex: number, course: CourseConfig, allowancePercent?: number) => number = E.courseHandicap;
+
+/** The same figure before any allowance. */
+export const fullCourseHandicap: (handicapIndex: number, course: CourseConfig) => number = E.fullCourseHandicap;
+
+/** The allowance meaning "no cut" — 100. */
+export const FULL_ALLOWANCE: number = E.FULL_ALLOWANCE;
 export const resolveCourseHandicap: (card: PlayerCard, course: CourseConfig) => number = E.resolveCourseHandicap;
 export const strokesOnHole: (strokeIndex: number, courseHcp: number) => number = E.strokesOnHole;
 export const netOnHole: (gross: number | null, par: number, strokeIndex: number, courseHcp: number) => number | null = E.netOnHole;

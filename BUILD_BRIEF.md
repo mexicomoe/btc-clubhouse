@@ -46,6 +46,14 @@ Course par by hole, stroke index by hole, slope, course rating. Per player: name
 **Course handicap** = `ROUND(index × slope ÷ 113 + (rating − par), 0)`
 *Verified against Golf Genius on 8 real players: exact match on all 8.*
 
+**Handicap allowance.** Club events play off a percentage of that figure — usually 85%, sometimes another. Work the course handicap out in full, then cut it:
+
+> **PLAYS OFF = ROUND(course handicap × allowance)**
+
+Two roundings, and the order is not interchangeable. It is not a small adjustment and it does not fall evenly: at 85% a 38 index off Tee IV goes from 33 shots to 28 while an 8 index off Tee I goes from 10 to 9. **It changes who wins.** Default 100%, set per event on the Setup screen, and show both figures wherever they differ — "CH 33 · plays off 28 at 85%".
+
+**Never apply it twice.** A course handicap printed on a Golf Genius card already has the event's allowance inside it. Use that figure exactly as it stands; cutting it again would take a man from 33 to 28 to 24 and cost him four more shots without a word.
+
 **Handicap strokes on a hole** = `1 if SI ≤ CH` plus `1 more if SI ≤ CH − 18` plus `1 more if SI ≤ CH − 36`
 
 **Net score on a hole** = gross − strokes received, **capped at par + 2**.

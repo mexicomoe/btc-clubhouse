@@ -177,14 +177,38 @@
     return value == null || !Number.isFinite(value) ? "" : String(value);
   }
 
-  /* ---- Handicap and net-score maths ---- */
-  function courseHandicap(handicapIndex, course) {
+  /* ---- Handicap and net-score maths ----
+     Club events play off an allowance — usually 85%, sometimes another figure.
+     The course handicap is worked out in full and THEN cut to the allowance, so
+     there are two roundings and they are not interchangeable. It is not a small
+     adjustment: at 85% a 38 index off Tee IV goes from 33 shots to 28, and an 8
+     index off Tee I from 10 to 9. It changes who wins. */
+  const FULL_ALLOWANCE = 100;
+
+  /** Round to a whole stroke, the same way either side of zero (plus handicaps). */
+  const roundWhole = (v) => (v < 0 ? -1 : 1) * Math.round(Math.abs(v));
+
+  /**
+   * The course handicap a player actually plays off. `allowancePercent` is a
+   * percentage — 85 means 85%, and 100 (the default) means the full handicap.
+   */
+  function courseHandicap(handicapIndex, course, allowancePercent) {
     const par = sum(course.par);
-    return Math.round((handicapIndex * course.slope) / 113 + (course.courseRating - par));
+    const full = Math.round((handicapIndex * course.slope) / 113 + (course.courseRating - par));
+    const pct = allowancePercent == null ? FULL_ALLOWANCE : allowancePercent;
+    return pct === FULL_ALLOWANCE ? full : roundWhole((full * pct) / FULL_ALLOWANCE);
   }
+
+  /** The same figure before any allowance is taken off it. */
+  function fullCourseHandicap(handicapIndex, course) {
+    return courseHandicap(handicapIndex, course, FULL_ALLOWANCE);
+  }
+
   function resolveCourseHandicap(card, course) {
+    // A course handicap that came off a Golf Genius card already has the
+    // event's allowance in it. Applying ours as well would cut it twice.
     if (card.courseHandicap != null) return card.courseHandicap;
-    if (card.handicapIndex != null) return courseHandicap(card.handicapIndex, course);
+    if (card.handicapIndex != null) return courseHandicap(card.handicapIndex, course, card.allowancePercent);
     throw new Error(card.name + ": needs a handicap index or course handicap");
   }
   function strokesOnHole(strokeIndex, courseHcp) {
@@ -386,7 +410,13 @@
     }
 
     return {
-      name: card.name, courseHandicap: ch, gross, net: netTotal, netUncapped,
+      name: card.name, courseHandicap: ch,
+      // The figure before the allowance, when there was one to cut. Null when the
+      // handicap came off a Golf Genius card, which already has it applied.
+      courseHandicapFull: card.courseHandicap != null || card.handicapIndex == null
+        ? null : fullCourseHandicap(card.handicapIndex, course),
+      allowancePercent: card.allowancePercent == null ? 100 : card.allowancePercent,
+      gross, net: netTotal, netUncapped,
       // Capped net per hole — what a match of cards is settled on.
       netByHole: net,
       /** Gross per hole with picked-up holes filled in at par + 4. */
@@ -660,7 +690,8 @@
     parseHandicapIndex, formatHandicapIndex,
     PICKED_UP_OVER_PAR, NET_DOUBLE_OVER_PAR, isPickedUp, grossOnHole, netForHole,
     skinsByGroup, cartSkins, teamSkins, skinStrokes, skinCap, matchOfCards, CARD_MATCH,
-    courseHandicap, resolveCourseHandicap, strokesOnHole, netOnHole, cappedNetByHole,
+    courseHandicap, fullCourseHandicap, FULL_ALLOWANCE,
+    resolveCourseHandicap, strokesOnHole, netOnHole, cappedNetByHole,
     birdiePickHoles,
     scorePlayer, scoreField, computeLeaderboard,
   };
