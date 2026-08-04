@@ -11,8 +11,15 @@ import "../engine.js";
 
 const E = (globalThis as { ClubhouseEngine: any }).ClubhouseEngine;
 
+/** Which set of tees and stroke index a player uses. */
+export type Gender = "M" | "F";
+
 export interface CourseConfig {
   name: string;
+  /** Tee this config was built for, when it came from `courseForTee`. */
+  tee?: string;
+  /** Gender this config was built for — decides rating, slope and stroke index. */
+  gender?: Gender;
   /** Par for holes 1..18. */
   par: number[];
   /** Stroke index (allocation order, 1 = hardest) for holes 1..18. */
@@ -23,6 +30,12 @@ export interface CourseConfig {
   agonyHoles: number[];
   /** Lowest final allowed; `null` = no floor (the Clubhouse default). */
   floor: number | null;
+}
+
+/** Rating and slope for one tee, per gender. Par is 72 from every Aberdeen tee. */
+export interface TeeRating {
+  courseRating: number;
+  slope: number;
 }
 
 /** A single graded step: if the measured value satisfies `threshold`, award `strokes`. */
@@ -55,3 +68,12 @@ export interface ContestConfig {
 
 export const ABERDEEN_TEE_IV: CourseConfig = E.ABERDEEN_TEE_IV;
 export const DEFAULT_CONTESTS: ContestConfig = E.DEFAULT_CONTESTS;
+
+/** Every Aberdeen tee: id → rating and slope for each gender. */
+export const ABERDEEN_TEES: Record<string, Record<Gender, TeeRating>> = E.ABERDEEN_TEES;
+/** Tee ids in display order, back of the course forward. */
+export const TEE_IDS: string[] = E.TEE_IDS;
+export const GENDERS: Gender[] = E.GENDERS;
+
+/** The course a player actually plays: their tee and their stroke index. */
+export const courseForTee: (tee: string, gender?: Gender) => CourseConfig = E.courseForTee;

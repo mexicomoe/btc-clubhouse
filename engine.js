@@ -22,13 +22,65 @@
   const range = (n) => Array.from({ length: n }, (_, i) => i);
   const signed = (n) => (n >= 0 ? "+" + n : "" + n);
 
-  /* ---- Course config (Aberdeen, Tee IV) ---- */
-  const ABERDEEN_TEE_IV = {
-    name: "Aberdeen Golf & Country Club, Tee IV",
-    par:         [4, 4, 3, 5, 4, 4, 5, 3, 4, 4, 4, 4, 3, 4, 4, 5, 3, 5],
-    strokeIndex: [13, 11, 17, 1, 3, 7, 5, 15, 9, 12, 6, 14, 16, 8, 10, 4, 18, 2],
-    slope: 117, courseRating: 65.3, agonyHoles: [4, 5, 6], floor: null,
+  /* ---- Course config: Aberdeen, nine tees, two stroke indexes ----
+     Par is 72 from every tee and the holes don't move, so par and the Agony
+     Alley stretch are shared. Rating and slope change with tee AND gender, and
+     the women play a different stroke index — which changes which holes receive
+     strokes, and so changes every contest, not just the net total. */
+  const ABERDEEN_PAR = [4, 4, 3, 5, 4, 4, 5, 3, 4, 4, 4, 4, 3, 4, 4, 5, 3, 5];
+  const ABERDEEN_SI_MEN = [13, 11, 17, 1, 3, 7, 5, 15, 9, 12, 6, 14, 16, 8, 10, 4, 18, 2];
+  const ABERDEEN_SI_WOMEN = [7, 13, 15, 1, 3, 5, 9, 17, 11, 2, 12, 16, 18, 8, 4, 10, 14, 6];
+
+  /** Tee id → course rating and slope, per gender. */
+  const ABERDEEN_TEES = {
+    "I":      { M: { courseRating: 72.1, slope: 139 }, F: { courseRating: 78.5, slope: 149 } },
+    "I/II":   { M: { courseRating: 70.9, slope: 136 }, F: { courseRating: 77.2, slope: 146 } },
+    "II":     { M: { courseRating: 69.7, slope: 134 }, F: { courseRating: 75.5, slope: 143 } },
+    "II/III": { M: { courseRating: 68.6, slope: 128 }, F: { courseRating: 73.9, slope: 140 } },
+    "III":    { M: { courseRating: 67.9, slope: 124 }, F: { courseRating: 73.0, slope: 138 } },
+    "III/IV": { M: { courseRating: 66.9, slope: 120 }, F: { courseRating: 71.6, slope: 134 } },
+    "IV":     { M: { courseRating: 65.3, slope: 117 }, F: { courseRating: 69.7, slope: 132 } },
+    "IV/V":   { M: { courseRating: 64.3, slope: 114 }, F: { courseRating: 68.9, slope: 126 } },
+    "V":      { M: { courseRating: 63.5, slope: 112 }, F: { courseRating: 67.5, slope: 121 } },
   };
+  /** Tee ids from the back of the course forward — display order for a picker. */
+  const TEE_IDS = ["I", "I/II", "II", "II/III", "III", "III/IV", "IV", "IV/V", "V"];
+
+  const GENDERS = ["M", "F"];
+
+  /** Build the course a given player actually plays: their tee, their index. */
+  function courseForTee(teeId, gender) {
+    const g = gender === "F" ? "F" : "M";
+    const tee = ABERDEEN_TEES[teeId];
+    if (!tee) throw new Error("Unknown tee: " + teeId);
+    return {
+      name: "Aberdeen Golf & Country Club, Tee " + teeId,
+      tee: teeId, gender: g,
+      par: ABERDEEN_PAR,
+      strokeIndex: g === "F" ? ABERDEEN_SI_WOMEN : ABERDEEN_SI_MEN,
+      slope: tee[g].slope,
+      courseRating: tee[g].courseRating,
+      agonyHoles: [4, 5, 6],
+      floor: null,
+    };
+  }
+
+  /** The reference course of sections 9 and 11: men's Tee IV. */
+  const ABERDEEN_TEE_IV = courseForTee("IV", "M");
+
+  /**
+   * Resolve the course to score a card against. A field can be spread over
+   * several tees and both stroke indexes, so `course` may be:
+   *   · omitted    — take the card's own `tee`/`gender`, else men's Tee IV
+   *   · a config   — score everyone against that one course (the old behaviour)
+   *   · a function — called with the card, for any other arrangement
+   */
+  function courseFor(card, course) {
+    if (typeof course === "function") return course(card);
+    if (course) return course;
+    if (card && card.tee) return courseForTee(card.tee, card.gender);
+    return ABERDEEN_TEE_IV;
+  }
 
   /* ---- Contest thresholds (December calibration; section 12 under review) ----
      Graded first-match: Agony/Damage/Long/Shorty use `<=`, Bounce uses `>=`.
@@ -83,8 +135,22 @@
     return Math.min(gross - strokesOnHole(strokeIndex, courseHcp), par + 2);
   }
   function cappedNetByHole(card, course) {
+    course = courseFor(card, course);
     const ch = resolveCourseHandicap(card, course);
     return course.par.map((par, i) => netOnHole(card.gross[i], par, course.strokeIndex[i], ch));
+  }
+
+  /**
+   * Rebuild GROSS hole scores from NET ones. The Golf Genius low-net export has
+   * already applied the strokes (brief section 10), but the engine scores from
+   * gross — so put the strokes back and let it take them off again. That round
+   * trip leaves the net score untouched; it just gives the card the gross
+   * figures the rest of the app shows. Use the handicap Golf Genius itself
+   * used, which is the one printed after the player's name.
+   */
+  function grossFromNet(netHoles, course, courseHcp) {
+    return netHoles.map((n, i) =>
+      n == null ? null : n + strokesOnHole(course.strokeIndex[i], courseHcp));
   }
 
   function gradeAtMost(value, ladder) {
@@ -122,7 +188,7 @@
 
   /* ---- Score one card ---- */
   function scorePlayer(card, course, contests) {
-    course = course || ABERDEEN_TEE_IV;
+    course = courseFor(card, course);
     contests = contests || DEFAULT_CONTESTS;
     const ch = resolveCourseHandicap(card, course);
 
@@ -221,7 +287,8 @@
 
   /** Leaderboard: scored field with competition ranks (equal finals share a rank). */
   function computeLeaderboard(players, course, contests) {
-    const results = scoreField(players || SAMPLE_ROUND, course || ABERDEEN_TEE_IV, contests || DEFAULT_CONTESTS);
+    // `course` passes through untouched so a mixed-tee field resolves per card.
+    const results = scoreField(players || SAMPLE_ROUND, course, contests || DEFAULT_CONTESTS);
     let lastFinal = null, lastRank = 0;
     results.forEach((r, i) => {
       if (r.final !== lastFinal) { lastRank = i + 1; lastFinal = r.final; }
@@ -243,7 +310,8 @@
   ];
 
   const api = {
-    ABERDEEN_TEE_IV, DEFAULT_CONTESTS, SAMPLE_ROUND,
+    ABERDEEN_TEE_IV, ABERDEEN_TEES, TEE_IDS, GENDERS, DEFAULT_CONTESTS, SAMPLE_ROUND,
+    courseForTee, courseFor, grossFromNet,
     courseHandicap, resolveCourseHandicap, strokesOnHole, netOnHole, cappedNetByHole,
     birdiePickHoles,
     scorePlayer, scoreField, computeLeaderboard,

@@ -9,13 +9,15 @@
 <title>Beat the Crowd · Clubhouse</title>
 <style>
   /* Built for men in their 70s–80s reading a dim phone in Florida sun.
-     Everything is big, black-on-white or white-on-black, bold, no thin greys. */
+     Everything is big, black-on-white or white-on-black, bold, no thin greys.
+     Nothing is smaller than 18px and nothing tappable is under 48px. */
   :root {
     --ink: #000;
     --paper: #fff;
     --good: #0a6b2e;      /* strokes earned — dark green, high contrast on white */
     --penalty: #b0140a;   /* the one contest that can add strokes */
     --band: #0b2e13;      /* header band, deep green */
+    --wash: #f0efe9;      /* the only fill that isn't white — still near-black text */
     font-size: 20px;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -33,6 +35,17 @@
   }
   header.band .title { font-size: 30px; font-weight: 800; letter-spacing: .2px; }
   header.band .sub { font-size: 18px; font-weight: 700; margin-top: 2px; color: #fff; }
+
+  /* Tabs — the three places you can be */
+  nav.tabs { display: flex; border-bottom: 3px solid var(--ink); }
+  nav.tabs button {
+    flex: 1 1 0; min-height: 56px; padding: 12px 6px;
+    font: inherit; font-size: 18px; font-weight: 800;
+    background: var(--paper); color: var(--ink);
+    border: 0; border-right: 3px solid var(--ink); cursor: pointer;
+  }
+  nav.tabs button:last-child { border-right: 0; }
+  nav.tabs button[aria-current="true"] { background: var(--ink); color: var(--paper); }
 
   /* Leaderboard rows */
   .row {
@@ -55,8 +68,9 @@
     display: block; font-size: 26px; font-weight: 800; line-height: 1.15;
     white-space: nowrap; overflow: hidden;
   }
-  /* meta stays on one line (auto-fit like the name) so the Net/Gross numbers are
-     never hidden and rows stay compact; it can't collide with the score to its right. */
+  /* Net only, fixed at the 18px floor — never auto-shrunk. Gross lives on the
+     detail screen: it isn't what anyone reads on a scoreboard, and dropping it
+     is what buys this line the room to stay legible. */
   .row .meta {
     display: block; font-size: 18px; font-weight: 700; margin-top: 7px;
     white-space: nowrap; overflow: hidden;
@@ -98,12 +112,98 @@
   .contest { display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-bottom: 2px solid var(--ink); min-height: 60px; }
   .contest .cname { flex: 1 1 auto; }
   .contest .cn { font-size: 21px; font-weight: 800; }
-  .contest .cd { font-size: 17px; font-weight: 700; margin-top: 2px; }
+  .contest .cd { font-size: 18px; font-weight: 700; margin-top: 2px; }
   .contest .cs { flex: 0 0 auto; font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; }
   .cs.good { color: var(--good); }
   .cs.penalty { color: var(--penalty); }
   .cs.none { color: var(--ink); }
   .cd.dim { font-weight: 800; }   /* "needs 18 holes" — kept bold black, not grey */
+
+  /* Shared blocks */
+  .pad { padding: 18px 14px; }
+  .note { font-size: 18px; font-weight: 700; padding: 16px 14px; }
+  .note.warn { background: var(--wash); border-bottom: 3px solid var(--ink); }
+  .big {
+    display: block; width: 100%; min-height: 60px; padding: 14px;
+    font: inherit; font-size: 22px; font-weight: 800;
+    background: var(--paper); color: var(--ink);
+    border: 3px solid var(--ink); border-radius: 10px; cursor: pointer;
+  }
+  .big:active { background: var(--ink); color: var(--paper); }
+  .big.solid { background: var(--ink); color: var(--paper); }
+  .big.solid:active { background: var(--paper); color: var(--ink); }
+  .big.danger { color: var(--penalty); border-color: var(--penalty); }
+  .big.danger:active { background: var(--penalty); color: var(--paper); }
+  .big[disabled] { opacity: .45; cursor: default; }
+  .big + .big { margin-top: 12px; }
+
+  /* Setup list */
+  .prow {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    padding: 14px 12px; min-height: 72px;
+    background: var(--paper); color: var(--ink);
+    border: 0; border-bottom: 3px solid var(--ink);
+    text-align: left; font: inherit; cursor: pointer;
+  }
+  .prow:active { background: var(--ink); color: var(--paper); }
+  .prow .pwho { flex: 1 1 auto; min-width: 0; }
+  .prow .pname { display: block; font-size: 24px; font-weight: 800; white-space: nowrap; overflow: hidden; line-height: 1.15; }
+  /* Setup is a sit-down screen, not an arm's-length one: the detail line wraps
+     onto a second line rather than shrinking, so nothing is ever cut off and
+     nothing drops below the 18px floor. */
+  .prow .pmeta { display: block; font-size: 18px; font-weight: 700; margin-top: 6px; line-height: 1.25; }
+  .prow .pch { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; }
+  .prow .pchn { display: block; font-size: 30px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.05; }
+  .prow .pchl { display: block; font-size: 18px; font-weight: 800; letter-spacing: .3px; }
+
+  /* Forms */
+  .field { padding: 14px; border-bottom: 3px solid var(--ink); }
+  .field > label, .field > .flab {
+    display: block; font-size: 18px; font-weight: 800;
+    text-transform: uppercase; letter-spacing: .4px; margin-bottom: 8px;
+  }
+  input[type="text"], input[type="number"], select, textarea {
+    display: block; width: 100%; min-height: 56px; padding: 12px;
+    font-family: inherit; font-size: 22px; font-weight: 700;
+    color: var(--ink); background: var(--paper);
+    border: 3px solid var(--ink); border-radius: 10px;
+    -webkit-appearance: none; appearance: none;
+  }
+  select {
+    /* a plain caret, drawn in ink so it survives sun and dark mode */
+    background-image: linear-gradient(45deg, transparent 50%, var(--ink) 50%),
+                      linear-gradient(135deg, var(--ink) 50%, transparent 50%);
+    background-position: calc(100% - 22px) 24px, calc(100% - 14px) 24px;
+    background-size: 8px 8px, 8px 8px;
+    background-repeat: no-repeat;
+    padding-right: 44px;
+  }
+  textarea { min-height: 220px; font-size: 18px; font-weight: 600; line-height: 1.35; white-space: pre; overflow-wrap: normal; overflow-x: auto; }
+  .seg { display: flex; gap: 0; }
+  .seg button {
+    flex: 1 1 0; min-height: 56px; font: inherit; font-size: 20px; font-weight: 800;
+    background: var(--paper); color: var(--ink);
+    border: 3px solid var(--ink); cursor: pointer;
+  }
+  .seg button:first-child { border-radius: 10px 0 0 10px; }
+  .seg button:last-child { border-radius: 0 10px 10px 0; }
+  .seg button + button { border-left-width: 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+  .two { display: flex; gap: 12px; }
+  .two > * { flex: 1 1 0; min-width: 0; }
+  .err { font-size: 18px; font-weight: 800; color: var(--penalty); padding: 12px 14px 0; }
+  .chread { font-size: 20px; font-weight: 800; padding: 14px; border-bottom: 3px solid var(--ink); }
+  .chread b { font-size: 30px; }
+
+  /* Import preview */
+  .prev { display: flex; align-items: center; gap: 10px; padding: 12px; border-bottom: 2px solid var(--ink); min-height: 64px; }
+  .prev .pv { flex: 1 1 auto; min-width: 0; }
+  .prev .pvn { font-size: 21px; font-weight: 800; }
+  .prev .pvd { font-size: 18px; font-weight: 700; margin-top: 3px; }
+  .prev .pvt { flex: 0 0 auto; font-size: 18px; font-weight: 800; text-align: right; }
+  .tag { display: inline-block; padding: 4px 9px; border: 2px solid var(--ink); border-radius: 6px; font-size: 18px; font-weight: 800; }
+  .tag.no { color: var(--penalty); border-color: var(--penalty); }
+  .empty { padding: 28px 18px; font-size: 20px; font-weight: 700; }
 </style>
 </head>
 <body>
@@ -111,9 +211,11 @@
 <section id="board" class="screen on">
   <header class="band">
     <div class="title">Leaderboard</div>
-    <div class="sub">Aberdeen G&amp;CC · Tee IV · 31 July</div>
+    <div class="sub" id="boardSub">Aberdeen G&amp;CC</div>
   </header>
+  <nav class="tabs" data-tabs></nav>
   <div id="rows"></div>
+  <div id="boardEmpty"></div>
 </section>
 
 <section id="player" class="screen">
@@ -121,22 +223,89 @@
   <div id="playerBody"></div>
 </section>
 
+<section id="setup" class="screen">
+  <header class="band">
+    <div class="title">Setup</div>
+    <div class="sub" id="setupSub">Players for this round</div>
+  </header>
+  <nav class="tabs" data-tabs></nav>
+  <div id="setupRows"></div>
+  <div class="pad"><button class="big solid" id="addBtn">+ Add player</button></div>
+</section>
+
+<section id="edit" class="screen">
+  <div class="backbar"><button class="back" id="editBack">‹ Setup</button></div>
+  <div id="editBody"></div>
+</section>
+
+<section id="import" class="screen">
+  <header class="band">
+    <div class="title">Import scores</div>
+    <div class="sub">Paste the rows from Golf Genius</div>
+  </header>
+  <nav class="tabs" data-tabs></nav>
+  <div id="importBody"></div>
+</section>
+
 <script src="engine.js"></script>
+<script src="importer.js"></script>
 <script>
 "use strict";
-/* Rendering only — every number comes from engine.js (window.ClubhouseEngine),
-   the single implementation the tests also run. Nothing is scored in here. */
+/* Rendering and setup only — every number comes from engine.js
+   (window.ClubhouseEngine) and every paste is read by importer.js, the single
+   implementations the tests also run. Nothing is scored or parsed in here. */
 const E = window.ClubhouseEngine;
+const IMP = window.ClubhouseImporter;
 
 const CONTEST_NAMES = {
   watchTheBirdie: "Watch the Birdie", agonyAlley: "Agony Alley",
   damageControl: "Damage Control", goLong: "Go Long",
   getShorty: "Get Shorty", bounceBack: "Bounce Back",
 };
+const CONTEST_ORDER = ["watchTheBirdie","agonyAlley","damageControl","goLong","getShorty","bounceBack"];
+const MAX_PLAYERS = 24;
+const HOLES = 18;
 
+/* ---------- persistence: a locked phone must not lose the round ---------- */
+const STORE_KEY = "btc.clubhouse.v1";
+let state = { nextId: 1, players: [], scores: {}, tab: "board" };
+
+function load(){
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if(!raw) return;
+    const s = JSON.parse(raw);
+    if(s && Array.isArray(s.players)){
+      state = {
+        nextId: s.nextId || s.players.length + 1,
+        players: s.players,
+        scores: s.scores || {},
+        tab: s.tab === "setup" || s.tab === "import" ? s.tab : "board",
+      };
+    }
+  } catch(e) { /* corrupt or unavailable storage — start clean rather than die */ }
+}
+function save(){
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+  catch(e) { /* private browsing or full disk — the round still works in memory */ }
+}
+
+/* ---------- small helpers ---------- */
+function esc(s){
+  return String(s == null ? "" : s).replace(/[&<>"']/g, (c) =>
+    ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+}
+function fmtFinal(x){ return x==null ? "—" : x.toFixed(1); }  // golf scores: one decimal, no hundredths
+function fmtStrokes(s){
+  if(s===0) return "0.0";
+  let str = Math.abs(s).toFixed(2);
+  if(str.endsWith("0")) str = str.slice(0,-1);   // 2.00→2.0, 0.50→0.5, 0.75 stays
+  return (s<0 ? "−" : "+") + str;            // real minus sign
+}
 /* Shrink a nowrap element's font down from its max only as far as needed to fit
    on one line within its box, but never below min. */
 function fitText(el, max, min){
+  if(!el) return;
   el.style.fontSize = max + "px";
   let size = max;
   while(size > min && el.scrollWidth > el.clientWidth + 0.5){
@@ -146,13 +315,14 @@ function fitText(el, max, min){
 }
 /* "Christiaan Bezuidenhout" -> "Christiaan B." — first name kept, surname to an initial. */
 function abbreviate(full){
-  const p = full.trim().split(/\s+/);
+  const p = String(full).trim().split(/\s+/);
   return p.length < 2 ? full : p[0] + " " + p[p.length - 1].charAt(0) + ".";
 }
 /* Names never render below 18px (the legibility floor for this audience). Fit the
    full name down to 18; if it still won't fit, shorten the surname to an initial the
    way a clubhouse scoreboard always has, then fit that — still never below 18. */
 function fitName(el, max, min){
+  if(!el) return;
   const full = el.dataset.full || (el.dataset.full = el.textContent.trim());
   el.textContent = full;
   fitText(el, max, min);
@@ -163,32 +333,107 @@ function fitName(el, max, min){
 }
 function fitBoardNames(){
   document.querySelectorAll("#rows .name").forEach(el => fitName(el, 26, 18));
-  document.querySelectorAll("#rows .meta").forEach(el => fitText(el, 18, 13));
+  document.querySelectorAll("#setupRows .pname").forEach(el => fitName(el, 24, 18));
 }
 
-function fmtFinal(x){ return x==null ? "—" : x.toFixed(1); }  // golf scores: one decimal, no hundredths
-function fmtStrokes(s){
-  if(s===0) return "0.0";
-  let str = Math.abs(s).toFixed(2);
-  if(str.endsWith("0")) str = str.slice(0,-1);   // 2.00→2.0, 0.50→0.5, 0.75 stays
-  return (s<0 ? "−" : "+") + str;            // real minus sign
+/* ---------- player records ---------- */
+function blankPlayer(){
+  return { id: "p" + (state.nextId++), name: "", index: null, tee: "IV", gender: "M",
+           cart: null, front: null, back: null };
+}
+function courseOf(p){ return E.courseForTee(p.tee || "IV", p.gender || "M"); }
+/** Course handicap as the brief computes it, or null when there's no index yet. */
+function chOf(p){
+  if(p.index == null || !isFinite(p.index)) return null;
+  return E.courseHandicap(p.index, courseOf(p));
+}
+/** A player is scorable once they have a name, an index and a tee. */
+function isReady(p){ return !!(p.name && p.name.trim()) && p.index != null && isFinite(p.index) && !!p.tee; }
+function scoresFor(p){
+  const s = state.scores[p.id];
+  return Array.isArray(s) && s.length === HOLES ? s : new Array(HOLES).fill(null);
+}
+/** Build the card the engine scores: the player's own tee and stroke index. */
+function cardOf(p){
+  return {
+    name: p.name.trim(),
+    handicapIndex: p.index,
+    tee: p.tee, gender: p.gender,
+    gross: scoresFor(p),
+    picks: (p.front && p.back) ? { front: p.front, back: p.back } : undefined,
+  };
+}
+function readyPlayers(){ return state.players.filter(isReady); }
+
+/* ---------- screen routing ---------- */
+const SCREENS = ["board","player","setup","edit","import"];
+const TAB_LABELS = [["board","Leaderboard"],["setup","Setup"],["import","Import"]];
+
+function show(id){
+  SCREENS.forEach(s => document.getElementById(s).classList.toggle("on", s === id));
+  if(id === "board" || id === "setup" || id === "import"){
+    state.tab = id; save();
+    document.querySelectorAll("nav.tabs").forEach(nav => {
+      nav.querySelectorAll("button").forEach(b =>
+        b.setAttribute("aria-current", String(b.dataset.go === id)));
+    });
+  }
+  window.scrollTo(0,0);
+}
+function buildTabs(){
+  document.querySelectorAll("nav.tabs").forEach(nav => {
+    nav.innerHTML = TAB_LABELS.map(([id,label]) =>
+      `<button data-go="${id}">${label}</button>`).join("");
+    nav.querySelectorAll("button").forEach(b =>
+      b.addEventListener("click", () => { if(b.dataset.go === "import") renderImport();
+                                          if(b.dataset.go === "setup") renderSetup();
+                                          if(b.dataset.go === "board") renderBoard();
+                                          show(b.dataset.go); }));
+  });
 }
 
-const boardEl = document.getElementById("board");
-const playerEl = document.getElementById("player");
-const rowsEl = document.getElementById("rows");
-const bodyEl = document.getElementById("playerBody");
+/* ---------- the leaderboard ---------- */
+let boardCards = [];   // cards behind the rows on screen, for the detail view
 
 function renderBoard(){
-  const results = E.computeLeaderboard();          // defaults to the section 11 round
+  const rowsEl = document.getElementById("rows");
+  const emptyEl = document.getElementById("boardEmpty");
+  const subEl = document.getElementById("boardSub");
+  const ready = readyPlayers();
+
+  let results;
+  if(ready.length === 0){
+    // Nothing set up yet — show the seeded demo round so the screen isn't blank.
+    boardCards = E.SAMPLE_ROUND.slice();
+    results = E.computeLeaderboard();
+    subEl.textContent = "Aberdeen G&CC · demo round";
+    emptyEl.innerHTML =
+      `<div class="note warn">This is a demo round. Add your players on the ` +
+      `<b>Setup</b> tab, then paste the scores on <b>Import</b>.</div>`;
+  } else {
+    boardCards = ready.map(cardOf);
+    // No course argument: every card is scored against its own tee and gender.
+    results = E.computeLeaderboard(boardCards);
+    const withScores = boardCards.filter(c => c.gross.some(g => g != null)).length;
+    subEl.textContent = "Aberdeen G&CC · " + ready.length + " player" + (ready.length===1?"":"s") +
+      (withScores === 0 ? " · no scores yet" : "");
+    emptyEl.innerHTML = withScores === 0
+      ? `<div class="note">No scores imported yet. Paste them on the <b>Import</b> tab.</div>`
+      : "";
+  }
+
   rowsEl.innerHTML = "";
   results.forEach(r=>{
     const b = document.createElement("button");
-    b.className = "row" + (r.rank===1 ? " leader" : "");
+    b.className = "row" + (r.rank===1 && r.final!=null ? " leader" : "");
+    // Net only. Gross is on the detail screen — a scoreboard is read at arm's
+    // length, and the net is the number the final is built from.
+    const partial = r.holesPlayed>0 && r.holesPlayed<HOLES ? " · "+r.holesPlayed+" holes" : "";
+    const meta = r.net==null ? "no card yet" : "Net "+r.net+partial;
     b.innerHTML =
-      `<span class="rank">${r.rank}</span>` +
-      `<span class="who"><span class="name">${r.name}</span>` +
-      `<span class="meta">Net ${r.net} · Gross ${r.gross}${r.holesPlayed<18 ? " · "+r.holesPlayed+" holes" : ""}</span></span>` +
+      `<span class="rank">${r.final==null ? "–" : r.rank}</span>` +
+      `<span class="who"><span class="name">${esc(r.name)}</span>` +
+      `<span class="meta">${esc(meta)}</span></span>` +
       `<span class="final">${fmtFinal(r.final)}</span><span class="chev">›</span>`;
     b.addEventListener("click", ()=>showPlayer(r.name));
     rowsEl.appendChild(b);
@@ -197,49 +442,362 @@ function renderBoard(){
 }
 
 function showPlayer(name){
-  const card = E.SAMPLE_ROUND.find(p=>p.name===name);
-  const r = E.scorePlayer(card, E.ABERDEEN_TEE_IV, E.DEFAULT_CONTESTS);
+  const card = boardCards.find(c => c.name === name);
+  if(!card) return;
+  const r = E.scorePlayer(card, undefined, E.DEFAULT_CONTESTS);
+  const course = E.courseFor(card);
   const off = -r.strokesEarned;                    // positive = strokes taken off the net
+  const teeLine = "Tee " + (course.tee || "IV") + (course.gender === "F" ? " · women's" : "") +
+                  " · Course handicap " + r.courseHandicap +
+                  (r.gross==null ? "" : " · Gross " + r.gross);
   let html =
-    `<div class="detail-head"><div class="name">${r.name}</div>` +
-    `<div class="hcp">Course handicap ${r.courseHandicap} · Gross ${r.gross}</div></div>` +
-    `<div class="equation">` +
-      `<span><span class="lab">Net</span><br><span class="num">${r.net}</span></span>` +
-      `<span class="op">−</span>` +
-      `<span><span class="lab">Strokes off</span><br><span class="num">${off.toFixed(2)}</span></span>` +
-      `<span class="op">=</span>` +
-      `<span><span class="lab">Final</span><br><span class="fin">${fmtFinal(r.final)}</span></span>` +
-    `</div>` +
-    `<div class="section-label">The contests</div>`;
+    `<div class="detail-head"><div class="name">${esc(r.name)}</div>` +
+    `<div class="hcp">${esc(teeLine)}</div></div>`;
 
-  for(const key of ["watchTheBirdie","agonyAlley","damageControl","goLong","getShorty","bounceBack"]){
+  if(r.net == null){
+    html += `<div class="note">No card imported for this player yet.</div>`;
+  } else {
+    html +=
+      `<div class="equation">` +
+        `<span><span class="lab">Net</span><br><span class="num">${r.net}</span></span>` +
+        `<span class="op">−</span>` +
+        `<span><span class="lab">Strokes off</span><br><span class="num">${off.toFixed(2)}</span></span>` +
+        `<span class="op">=</span>` +
+        `<span><span class="lab">Final</span><br><span class="fin">${fmtFinal(r.final)}</span></span>` +
+      `</div>`;
+  }
+  html += `<div class="section-label">The contests</div>`;
+
+  for(const key of CONTEST_ORDER){
     const c = r.contests[key];
     const cls = !c.live ? "none" : c.strokes<0 ? "good" : c.strokes>0 ? "penalty" : "none";
     const shown = !c.live ? "—" : fmtStrokes(c.strokes);
     html +=
       `<div class="contest"><div class="cname">` +
       `<div class="cn">${CONTEST_NAMES[key]}</div>` +
-      `<div class="cd${c.live?"":" dim"}">${c.detail}</div></div>` +
+      `<div class="cd${c.live?"":" dim"}">${esc(c.detail)}</div></div>` +
       `<div class="cs ${cls}">${shown}</div></div>`;
   }
-  bodyEl.innerHTML = html;
-  boardEl.classList.remove("on");
-  playerEl.classList.add("on");
+  document.getElementById("playerBody").innerHTML = html;
+  show("player");
   // Fit only after the screen is visible — a display:none box has no measurable width.
-  fitName(bodyEl.querySelector(".detail-head .name"), 36, 18);
-  window.scrollTo(0,0);
+  fitName(document.querySelector("#playerBody .detail-head .name"), 36, 18);
 }
 
-document.getElementById("backBtn").addEventListener("click", ()=>{
-  playerEl.classList.remove("on");
-  boardEl.classList.add("on");
-  window.scrollTo(0,0);
-});
+/* ---------- setup: the player list ---------- */
+function renderSetup(){
+  const wrap = document.getElementById("setupRows");
+  const sub = document.getElementById("setupSub");
+  const n = state.players.length;
+  sub.textContent = n === 0 ? "No players yet"
+    : n + " player" + (n===1?"":"s") + (n >= MAX_PLAYERS ? " · full" : "");
 
+  if(n === 0){
+    wrap.innerHTML = `<div class="empty">Nobody set up yet. Add the players in this round —
+      eight is typical, up to ${MAX_PLAYERS}.</div>`;
+  } else {
+    wrap.innerHTML = state.players.map(p => {
+      const ch = chOf(p);
+      const picks = (p.front && p.back) ? "picks " + p.front + "/" + p.back : "no picks";
+      const bits = [
+        p.index == null ? "no index" : "idx " + p.index,
+        "Tee " + p.tee + (p.gender === "F" ? " ♀" : ""),
+        p.cart == null ? "no cart" : "cart " + p.cart,
+        picks,
+      ];
+      return `<button class="prow" data-id="${p.id}">` +
+        `<span class="pwho"><span class="pname">${esc(p.name || "(no name)")}</span>` +
+        `<span class="pmeta">${esc(bits.join(" · "))}</span></span>` +
+        `<span class="pch"><span class="pchn">${ch==null?"–":ch}</span>` +
+        `<span class="pchl">C.H.</span></span><span class="chev">›</span></button>`;
+    }).join("");
+    wrap.querySelectorAll(".prow").forEach(b =>
+      b.addEventListener("click", () => editPlayer(b.dataset.id)));
+  }
+  document.getElementById("addBtn").disabled = n >= MAX_PLAYERS;
+  fitBoardNames();
+}
+
+/* ---------- setup: one player's form ---------- */
+let editing = null;   // a working copy; nothing is saved until Save is pressed
+
+function editPlayer(id){
+  const found = state.players.find(p => p.id === id);
+  editing = found ? Object.assign({}, found) : blankPlayer();
+  editing.isNew = !found;
+  drawEdit();
+  show("edit");
+}
+
+function drawEdit(){
+  const p = editing;
+  const legal = E.birdiePickHoles(courseOf(p));
+  const teeOpts = E.TEE_IDS.map(t =>
+    `<option value="${t}"${t===p.tee?" selected":""}>Tee ${t}</option>`).join("");
+  const pickOpts = (holes, chosen) =>
+    `<option value="">— not chosen —</option>` +
+    holes.map(h => `<option value="${h}"${h===chosen?" selected":""}>Hole ${h}</option>`).join("");
+  const ch = chOf(p);
+
+  document.getElementById("editBody").innerHTML =
+    `<div class="field"><label for="fName">Name</label>
+      <input type="text" id="fName" autocomplete="off" autocapitalize="words" value="${esc(p.name)}"></div>
+
+     <div class="field"><label for="fIndex">Handicap index</label>
+      <input type="number" id="fIndex" inputmode="decimal" step="0.1" value="${p.index==null?"":p.index}"></div>
+
+     <div class="field"><label for="fTee">Tee</label>
+      <select id="fTee">${teeOpts}</select></div>
+
+     <div class="field"><span class="flab">Tees and stroke index</span>
+      <div class="seg" id="fGender">
+        <button type="button" data-g="M" aria-pressed="${p.gender!=="F"}">Men</button>
+        <button type="button" data-g="F" aria-pressed="${p.gender==="F"}">Women</button>
+      </div></div>
+
+     <div class="chread">Course handicap <b id="fCh">${ch==null?"–":ch}</b>
+       <span id="fChNote" style="font-size:18px"></span></div>
+
+     <div class="field"><label for="fCart">Cart number</label>
+      <input type="number" id="fCart" inputmode="numeric" step="1" value="${p.cart==null?"":p.cart}"></div>
+
+     <div class="field"><span class="flab">Watch the Birdie picks</span>
+      <div class="two">
+        <select id="fFront" aria-label="Front nine pick">${pickOpts(legal.front, p.front)}</select>
+        <select id="fBack" aria-label="Back nine pick">${pickOpts(legal.back, p.back)}</select>
+      </div></div>
+
+     <div id="fErr" class="err"></div>
+     <div class="pad">
+       <button class="big solid" id="fSave">Save player</button>
+       <button class="big" id="fCancel">Cancel</button>
+       ${p.isNew ? "" : `<button class="big danger" id="fRemove">Remove this player</button>`}
+     </div>`;
+
+  const $ = (id) => document.getElementById(id);
+  const refreshCh = () => {
+    const v = chOf(editing);
+    $("fCh").textContent = v==null ? "–" : v;
+    const c = courseOf(editing);
+    $("fChNote").textContent = " · " + c.courseRating.toFixed(1) + "/" + c.slope;
+  };
+  refreshCh();
+
+  $("fName").addEventListener("input", e => { editing.name = e.target.value; });
+  $("fIndex").addEventListener("input", e => {
+    const v = e.target.value.trim();
+    editing.index = v === "" ? null : Number(v);
+    refreshCh();
+  });
+  $("fTee").addEventListener("change", e => { editing.tee = e.target.value; refreshCh(); });
+  $("fCart").addEventListener("input", e => {
+    const v = e.target.value.trim();
+    editing.cart = v === "" ? null : Number(v);
+  });
+  $("fFront").addEventListener("change", e => { editing.front = e.target.value ? Number(e.target.value) : null; });
+  $("fBack").addEventListener("change", e => { editing.back = e.target.value ? Number(e.target.value) : null; });
+  $("fGender").querySelectorAll("button").forEach(b =>
+    b.addEventListener("click", () => {
+      editing.gender = b.dataset.g;
+      // The women's stroke index changes which holes get strokes, so redraw the
+      // picks and the course handicap together.
+      drawEdit();
+    }));
+
+  $("fSave").addEventListener("click", saveEditing);
+  $("fCancel").addEventListener("click", () => { editing = null; renderSetup(); show("setup"); });
+  const rm = $("fRemove");
+  if(rm) rm.addEventListener("click", removeEditing);
+}
+
+function saveEditing(){
+  const p = editing, err = document.getElementById("fErr");
+  if(!p.name || !p.name.trim()){ err.textContent = "A name is needed."; return; }
+  if(p.index == null || !isFinite(p.index)){ err.textContent = "A handicap index is needed."; return; }
+  if(p.index < -10 || p.index > 54){ err.textContent = "That handicap index looks wrong."; return; }
+  err.textContent = "";
+
+  p.name = p.name.trim();
+  const rec = { id: p.id, name: p.name, index: p.index, tee: p.tee, gender: p.gender,
+                cart: p.cart, front: p.front, back: p.back };
+  const at = state.players.findIndex(x => x.id === p.id);
+  if(at === -1) state.players.push(rec); else state.players[at] = rec;
+  editing = null;
+  save();
+  renderSetup(); show("setup");
+}
+
+function removeEditing(){
+  const p = editing;
+  if(!window.confirm("Remove " + (p.name || "this player") + " from the round?")) return;
+  state.players = state.players.filter(x => x.id !== p.id);
+  delete state.scores[p.id];
+  editing = null;
+  save();
+  renderSetup(); show("setup");
+}
+
+/* ---------- import ---------- */
+let importMode = "auto";     // auto | net | gross — what the pasted hole columns are
+let importPreview = null;    // the parsed rows, held until Use these scores
+
+function renderImport(){
+  const body = document.getElementById("importBody");
+  body.innerHTML =
+    `<div class="pad">
+       <div class="field" style="border:0;padding:0 0 12px">
+         <label for="paste">Paste the player rows</label>
+         <textarea id="paste" spellcheck="false" autocapitalize="off" autocomplete="off"
+           placeholder="Select the rows in the Golf Genius leaderboard, copy, and paste here."></textarea>
+       </div>
+       <div class="field" style="border:0;padding:0 0 12px">
+         <span class="flab">The hole columns are</span>
+         <div class="seg" id="mode">
+           <button type="button" data-m="auto" aria-pressed="${importMode==="auto"}">Work it out</button>
+           <button type="button" data-m="net" aria-pressed="${importMode==="net"}">Net</button>
+           <button type="button" data-m="gross" aria-pressed="${importMode==="gross"}">Gross</button>
+         </div>
+       </div>
+       <button class="big solid" id="parseBtn">Show what this contains</button>
+     </div>
+     <div id="previewBox"></div>`;
+
+  document.getElementById("mode").querySelectorAll("button").forEach(b =>
+    b.addEventListener("click", () => {
+      importMode = b.dataset.m;
+      b.parentElement.querySelectorAll("button").forEach(x =>
+        x.setAttribute("aria-pressed", String(x.dataset.m === importMode)));
+      if(importPreview) doPreview();
+    }));
+  document.getElementById("parseBtn").addEventListener("click", doPreview);
+}
+
+/** Decide what one parsed row means for one setup player, without committing. */
+function assess(card){
+  const key = IMP.normaliseName(card.name);
+  const player = state.players.find(p => IMP.normaliseName(p.name) === key) || null;
+  const mode = importMode === "auto" ? card.mode : importMode;
+
+  const out = { card, player, mode, gross: null, problems: [], warnings: [] };
+  if(!player){ out.problems.push("not on the setup list"); return out; }
+  if(!isReady(player)){ out.problems.push("player needs an index and a tee on Setup"); return out; }
+  if(card.holesPlayed === 0){ out.problems.push("no hole scores in this row"); return out; }
+  if(mode === "unknown"){
+    out.problems.push("can't tell net from gross — choose Net or Gross above");
+    return out;
+  }
+
+  const course = courseOf(player);
+  if(mode === "gross"){
+    out.gross = card.holes.slice();
+  } else {
+    // Golf Genius already took the strokes off. Put them back with the handicap
+    // it used — the one printed after the name — so the engine can take them off
+    // again against this player's own stroke index.
+    const ch = card.handicap != null ? card.handicap : chOf(player);
+    if(ch == null){ out.problems.push("no course handicap in the paste to undo the strokes"); return out; }
+    out.gross = E.grossFromNet(card.holes, course, ch);
+    out.usedHandicap = ch;
+  }
+
+  const setupCh = chOf(player);
+  if(card.handicap != null && setupCh != null && card.handicap !== setupCh){
+    out.warnings.push("paste says handicap " + card.handicap + ", setup computes " + setupCh);
+  }
+  const total = out.gross.reduce((a,h) => a + (h==null?0:h), 0);
+  if(card.grossTotal != null && card.holesPlayed === HOLES && total !== card.grossTotal){
+    out.warnings.push("gross works out to " + total + ", the Total column says " + card.grossTotal);
+  }
+  return out;
+}
+
+function doPreview(){
+  const text = document.getElementById("paste").value;
+  const parsed = IMP.parseScores(text);
+  const rows = parsed.cards.map(assess);
+  importPreview = { rows, errors: parsed.errors };
+
+  const usable = rows.filter(r => r.gross);
+  const box = document.getElementById("previewBox");
+
+  if(parsed.cards.length === 0){
+    box.innerHTML = `<div class="note warn">Nothing readable in that paste yet.</div>`;
+    return;
+  }
+
+  const unmatchedPlayers = state.players.filter(p =>
+    isReady(p) && !rows.some(r => r.player && r.player.id === p.id));
+
+  let html = `<div class="section-label">What this paste contains</div>`;
+  html += rows.map(r => {
+    const bad = r.problems.length > 0;
+    const bits = [];
+    bits.push(r.card.holesPlayed + " of 18 holes");
+    if(!bad) bits.push(r.mode === "net" ? "net holes" : "gross holes");
+    if(r.card.handicap != null) bits.push("hcp " + r.card.handicap);
+    const detail = bad ? r.problems.join(" · ")
+                       : bits.concat(r.warnings).join(" · ");
+    return `<div class="prev"><div class="pv">` +
+      `<div class="pvn">${esc(r.card.name)}</div>` +
+      `<div class="pvd">${esc(detail)}</div></div>` +
+      `<div class="pvt"><span class="tag${bad?" no":""}">${bad ? "skip" : "ready"}</span></div></div>`;
+  }).join("");
+
+  if(parsed.errors.length){
+    html += `<div class="note warn"><b>Rows the parser rejected</b><br>` +
+      parsed.errors.map(esc).join("<br>") + `</div>`;
+  }
+  if(unmatchedPlayers.length){
+    html += `<div class="note warn"><b>On setup but not in this paste</b><br>` +
+      unmatchedPlayers.map(p => esc(p.name)).join(", ") +
+      `<br>Their scores will be cleared — a paste replaces the round, it never merges.</div>`;
+  }
+
+  html += `<div class="pad">` +
+    `<button class="big solid" id="commitBtn"${usable.length?"":" disabled"}>` +
+      (usable.length ? "Use these " + usable.length + " card" + (usable.length===1?"":"s") : "Nothing to import") +
+    `</button>` +
+    `<button class="big" id="discardBtn">Discard this paste</button></div>`;
+
+  box.innerHTML = html;
+  const commit = document.getElementById("commitBtn");
+  if(commit) commit.addEventListener("click", commitImport);
+  document.getElementById("discardBtn").addEventListener("click", () => {
+    importPreview = null;
+    document.getElementById("paste").value = "";
+    document.getElementById("previewBox").innerHTML = "";
+  });
+}
+
+function commitImport(){
+  if(!importPreview) return;
+  // A paste replaces the round rather than merging into it (brief section 4).
+  state.scores = {};
+  importPreview.rows.forEach(r => {
+    if(r.gross && r.player) state.scores[r.player.id] = r.gross;
+  });
+  importPreview = null;
+  save();
+  renderBoard();
+  show("board");
+}
+
+/* ---------- wiring ---------- */
+document.getElementById("backBtn").addEventListener("click", () => { renderBoard(); show("board"); });
+document.getElementById("editBack").addEventListener("click", () => { editing = null; renderSetup(); show("setup"); });
+document.getElementById("addBtn").addEventListener("click", () => {
+  if(state.players.length >= MAX_PLAYERS) return;
+  editPlayer(null);
+});
 // Re-fit names when the viewport changes (rotation, split-view, browser resize).
 window.addEventListener("resize", fitBoardNames);
 
+load();
+buildTabs();
 renderBoard();
+renderSetup();
+renderImport();
+show(state.tab);
 </script>
 </body>
 </html>

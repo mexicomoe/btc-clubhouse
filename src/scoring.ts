@@ -12,7 +12,14 @@
  */
 
 import "../engine.js";
-import type { CourseConfig, ContestConfig } from "./courseConfig.ts";
+import type { CourseConfig, ContestConfig, Gender } from "./courseConfig.ts";
+
+/**
+ * How a field is scored. A config scores everyone against one course; omit it
+ * and each card falls back to its own tee and gender; a function covers any
+ * other arrangement.
+ */
+export type CourseSource = CourseConfig | ((card: PlayerCard) => CourseConfig) | undefined;
 
 const E = (globalThis as { ClubhouseEngine: any }).ClubhouseEngine;
 
@@ -23,6 +30,10 @@ export interface PlayerCard {
   handicapIndex?: number;
   /** Course handicap, if already known (Golf Genius prints it). Overrides index. */
   courseHandicap?: number;
+  /** Tee played. With `gender`, decides rating, slope and which stroke index applies. */
+  tee?: string;
+  /** Men and women play different tees AND a different stroke index. Defaults to "M". */
+  gender?: Gender;
   /** Gross score per hole (18 entries). `null` = hole not played; never 0. */
   gross: (number | null)[];
   /**
@@ -76,6 +87,11 @@ export const netOnHole: (gross: number | null, par: number, strokeIndex: number,
 export const cappedNetByHole: (card: PlayerCard, course: CourseConfig) => (number | null)[] = E.cappedNetByHole;
 /** The par 4s nominatable on each nine, derived from the course's par. */
 export const birdiePickHoles: (course: CourseConfig) => { front: number[]; back: number[] } = E.birdiePickHoles;
-export const scorePlayer: (card: PlayerCard, course: CourseConfig, contests: ContestConfig) => PlayerResult = E.scorePlayer;
-export const scoreField: (cards: PlayerCard[], course: CourseConfig, contests: ContestConfig) => PlayerResult[] = E.scoreField;
-export const computeLeaderboard: (players?: PlayerCard[], course?: CourseConfig, contests?: ContestConfig) => PlayerResult[] = E.computeLeaderboard;
+/** Rebuild gross holes from Golf Genius's net ones, so the engine can score them. */
+export const grossFromNet: (netHoles: (number | null)[], course: CourseConfig, courseHcp: number) => (number | null)[] = E.grossFromNet;
+/** Resolve which course a card is scored against. */
+export const courseFor: (card: PlayerCard, course?: CourseSource) => CourseConfig = E.courseFor;
+
+export const scorePlayer: (card: PlayerCard, course?: CourseSource, contests?: ContestConfig) => PlayerResult = E.scorePlayer;
+export const scoreField: (cards: PlayerCard[], course?: CourseSource, contests?: ContestConfig) => PlayerResult[] = E.scoreField;
+export const computeLeaderboard: (players?: PlayerCard[], course?: CourseSource, contests?: ContestConfig) => PlayerResult[] = E.computeLeaderboard;
