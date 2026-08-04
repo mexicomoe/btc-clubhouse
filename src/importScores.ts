@@ -51,3 +51,19 @@ export const grossCardToPlayer: (card: ImportedCard, picks?: BirdiePicks) => Pla
 
 /** Case- and spacing-insensitive key for matching a pasted row to a setup player. */
 export const normaliseName: (name: string) => string = I.normaliseName;
+
+/** "Ridgeway, Ken" → "Ken Ridgeway"; null when there is no comma to undo. */
+export const unreverseName: (name: string) => string | null = I.unreverseName;
+
+/** "Ken Ridgeway" and "Ken R." both reduce to "ken r"; null for a single word. */
+export const initialKey: (name: string) => string | null = I.initialKey;
+
+/** Which rule matched a pasted name to the roster, if any. */
+export type MatchHow = "exact" | "reversed" | "initial" | "ambiguous" | null;
+
+/**
+ * Match a pasted name against the setup roster: exact, then "Last, First"
+ * reversed, then first name plus last initial. `index` is -1 when nothing fits
+ * or when an initial key is shared — those come back for a person to decide.
+ */
+export const matchName: (exportName: string, names: string[]) => { index: number; how: MatchHow } = I.matchName;

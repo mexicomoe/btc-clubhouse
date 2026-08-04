@@ -672,14 +672,19 @@ function renderImport(){
   document.getElementById("parseBtn").addEventListener("click", doPreview);
 }
 
-/** Decide what one parsed row means for one setup player, without committing. */
-function assess(card){
-  const key = IMP.normaliseName(card.name);
-  const player = state.players.find(p => IMP.normaliseName(p.name) === key) || null;
+/** Decide what one parsed row means for the player chosen for it, uncommitted. */
+function assess(row){
+  const card = row.card;
+  const player = row.playerId ? state.players.find(p => p.id === row.playerId) || null : null;
   const mode = importMode === "auto" ? card.mode : importMode;
 
   const out = { card, player, mode, gross: null, problems: [], warnings: [] };
-  if(!player){ out.problems.push("not on the setup list"); return out; }
+  if(!player){
+    out.problems.push(row.how === "ambiguous"
+      ? "two players share that name — choose below"
+      : "no player chosen — pick one below");
+    return out;
+  }
   if(!isReady(player)){ out.problems.push("player needs an index and a tee on Setup"); return out; }
   if(card.holesPlayed === 0){ out.problems.push("no hole scores in this row"); return out; }
   if(mode === "unknown"){
@@ -711,55 +716,98 @@ function assess(card){
   return out;
 }
 
+const HOW_SAID = {
+  exact: "matched by name",
+  reversed: "matched after turning “Last, First” around",
+  initial: "matched on first name and last initial",
+  chosen: "you chose this player",
+};
+
 function doPreview(){
   const text = document.getElementById("paste").value;
   const parsed = IMP.parseScores(text);
-  const rows = parsed.cards.map(assess);
+  // Auto-match each row to the roster, and remember HOW so the screen can say so.
+  const names = state.players.map(p => p.name);
+  const rows = parsed.cards.map(card => {
+    const m = IMP.matchName(card.name, names);
+    return { card, playerId: m.index >= 0 ? state.players[m.index].id : null, how: m.how };
+  });
   importPreview = { rows, errors: parsed.errors };
+  drawPreview();
+}
 
-  const usable = rows.filter(r => r.gross);
+function drawPreview(){
   const box = document.getElementById("previewBox");
+  if(!importPreview) { box.innerHTML = ""; return; }
+  const { rows, errors } = importPreview;
 
-  if(parsed.cards.length === 0){
-    box.innerHTML = `<div class="note warn">Nothing readable in that paste yet.</div>`;
+  if(rows.length === 0){
+    box.innerHTML = `<div class="note warn">Nothing readable in that paste yet.` +
+      (errors.length ? `<br>` + errors.map(esc).join("<br>") : ``) + `</div>`;
     return;
   }
 
-  const unmatchedPlayers = state.players.filter(p =>
-    isReady(p) && !rows.some(r => r.player && r.player.id === p.id));
+  const seen = rows.map(assess);
+  const usable = seen.filter(a => a.gross);
+  const options = (chosen) =>
+    `<option value=""${chosen?"":" selected"}>— nobody —</option>` +
+    state.players.map(p =>
+      `<option value="${p.id}"${p.id===chosen?" selected":""}>${esc(p.name || "(no name)")}</option>`).join("");
 
   let html = `<div class="section-label">What this paste contains</div>`;
-  html += rows.map(r => {
-    const bad = r.problems.length > 0;
-    const bits = [];
-    bits.push(r.card.holesPlayed + " of 18 holes");
-    if(!bad) bits.push(r.mode === "net" ? "net holes" : "gross holes");
-    if(r.card.handicap != null) bits.push("hcp " + r.card.handicap);
-    const detail = bad ? r.problems.join(" · ")
-                       : bits.concat(r.warnings).join(" · ");
+  html += rows.map((row, i) => {
+    const a = seen[i];
+    const bad = a.problems.length > 0;
+    const bits = [row.card.holesPlayed + " of 18 holes"];
+    if(!bad) bits.push(a.mode === "net" ? "net holes" : "gross holes");
+    if(row.card.handicap != null) bits.push("hcp " + row.card.handicap);
+    const said = HOW_SAID[row.how];
+    const detail = bad ? a.problems.join(" · ") : bits.concat(a.warnings).join(" · ");
     return `<div class="prev"><div class="pv">` +
-      `<div class="pvn">${esc(r.card.name)}</div>` +
-      `<div class="pvd">${esc(detail)}</div></div>` +
-      `<div class="pvt"><span class="tag${bad?" no":""}">${bad ? "skip" : "ready"}</span></div></div>`;
+        `<div class="pvn">${esc(row.card.name)}</div>` +
+        `<div class="pvd">${esc(detail)}</div>` +
+        (said && !bad ? `<div class="pvd">${said}</div>` : ``) +
+      `</div>` +
+      `<div class="pvt"><span class="tag${bad?" no":""}">${bad ? "skip" : "ready"}</span></div></div>` +
+      `<div class="field" style="border-bottom-width:2px">` +
+        `<label for="pick${i}">Scores belong to</label>` +
+        `<select id="pick${i}" data-row="${i}">${options(row.playerId)}</select></div>`;
   }).join("");
 
-  if(parsed.errors.length){
+  if(errors.length){
     html += `<div class="note warn"><b>Rows the parser rejected</b><br>` +
-      parsed.errors.map(esc).join("<br>") + `</div>`;
-  }
-  if(unmatchedPlayers.length){
-    html += `<div class="note warn"><b>On setup but not in this paste</b><br>` +
-      unmatchedPlayers.map(p => esc(p.name)).join(", ") +
-      `<br>Their scores will be cleared — a paste replaces the round, it never merges.</div>`;
+      errors.map(esc).join("<br>") + `</div>`;
   }
 
-  html += `<div class="pad">` +
-    `<button class="big solid" id="commitBtn"${usable.length?"":" disabled"}>` +
-      (usable.length ? "Use these " + usable.length + " card" + (usable.length===1?"":"s") : "Nothing to import") +
-    `</button>` +
-    `<button class="big" id="discardBtn">Discard this paste</button></div>`;
+  if(usable.length === 0){
+    // Refuse outright. A paste that matched nobody must never be allowed to
+    // clear a round that is already on the phone.
+    html += `<div class="note warn"><b>Nothing to import, so nothing has changed.</b><br>` +
+      `None of these rows is assigned to a player in this round, so there is ` +
+      `nothing to replace the scores with. Pick the players above, or check you ` +
+      `pasted the right event. The round on this phone has been left exactly as it was.</div>`;
+    html += `<div class="pad"><button class="big" id="discardBtn">Discard this paste</button></div>`;
+  } else {
+    const cleared = state.players.filter(p =>
+      isReady(p) && state.scores[p.id] && !usable.some(a => a.player && a.player.id === p.id));
+    if(cleared.length){
+      html += `<div class="note warn"><b>These players are not in this paste</b><br>` +
+        cleared.map(p => esc(p.name)).join(", ") +
+        `<br>Their scores will be cleared — a paste replaces the round, it never merges.</div>`;
+    }
+    html += `<div class="pad">` +
+      `<button class="big solid" id="commitBtn">Use these ${usable.length} card${usable.length===1?"":"s"}</button>` +
+      `<button class="big" id="discardBtn">Discard this paste</button></div>`;
+  }
 
   box.innerHTML = html;
+  box.querySelectorAll("select[data-row]").forEach(sel =>
+    sel.addEventListener("change", () => {
+      const row = importPreview.rows[Number(sel.dataset.row)];
+      row.playerId = sel.value || null;
+      row.how = sel.value ? "chosen" : null;
+      drawPreview();
+    }));
   const commit = document.getElementById("commitBtn");
   if(commit) commit.addEventListener("click", commitImport);
   document.getElementById("discardBtn").addEventListener("click", () => {
@@ -771,11 +819,14 @@ function doPreview(){
 
 function commitImport(){
   if(!importPreview) return;
+  const usable = importPreview.rows.map(assess).filter(a => a.gross && a.player);
+  // Never let an empty import wipe the round — the screen refuses this too, but
+  // the guard belongs next to the write, not only next to the button.
+  if(usable.length === 0) return;
+
   // A paste replaces the round rather than merging into it (brief section 4).
   state.scores = {};
-  importPreview.rows.forEach(r => {
-    if(r.gross && r.player) state.scores[r.player.id] = r.gross;
-  });
+  usable.forEach(a => { state.scores[a.player.id] = a.gross; });
   importPreview = null;
   save();
   renderBoard();
