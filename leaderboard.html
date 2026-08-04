@@ -819,25 +819,40 @@ function drawPreview(){
     state.players.map(p =>
       `<option value="${p.id}"${p.id===chosen?" selected":""}>${esc(p.name || "(no name)")}</option>`).join("");
 
-  let html = `<div class="section-label">What this paste contains</div>`;
-  html += rows.map((row, i) => {
-    const a = seen[i];
-    const bad = a.problems.length > 0;
-    const bits = [row.card.holesPlayed + " of 18 holes"];
-    if(!bad) bits.push(a.mode === "net" ? "net holes" : "gross holes");
-    if(row.card.handicap != null) bits.push("hcp " + row.card.handicap);
-    const said = HOW_SAID[row.how];
-    const detail = bad ? a.problems.join(" · ") : bits.concat(a.warnings).join(" · ");
-    return `<div class="prev"><div class="pv">` +
-        `<div class="pvn">${esc(row.card.name)}</div>` +
-        `<div class="pvd">${esc(detail)}</div>` +
-        (said && !bad ? `<div class="pvd">${said}</div>` : ``) +
-      `</div>` +
-      `<div class="pvt"><span class="tag${bad?" no":""}">${bad ? "skip" : "ready"}</span></div></div>` +
-      `<div class="field" style="border-bottom-width:2px">` +
-        `<label for="pick${i}">Scores belong to</label>` +
-        `<select id="pick${i}" data-row="${i}">${options(row.playerId)}</select></div>`;
-  }).join("");
+  // Rows needing a hand come first. With a two-dozen man field the three that
+  // need picking must not be buried down the list. Sort is stable, so within
+  // each group the paste's own order is kept, and `i` stays the row's real
+  // index so the dropdowns still address the right card.
+  const needing = [], ready = [];
+  rows.forEach((row, i) => (seen[i].problems.length ? needing : ready).push({ row, i }));
+  const groups = [
+    { list: needing, label: needing.length === 1 ? "1 needs a player" : needing.length + " need a player" },
+    { list: ready,   label: ready.length + " ready to import" },
+  ];
+
+  let html = "";
+  for(const group of groups){
+    if(group.list.length === 0) continue;
+    html += `<div class="section-label">${esc(group.label)}</div>`;
+    html += group.list.map(({ row, i }) => {
+      const a = seen[i];
+      const bad = a.problems.length > 0;
+      const bits = [row.card.holesPlayed + " of 18 holes"];
+      if(!bad) bits.push(a.mode === "net" ? "net holes" : "gross holes");
+      if(row.card.handicap != null) bits.push("hcp " + row.card.handicap);
+      const said = HOW_SAID[row.how];
+      const detail = bad ? a.problems.join(" · ") : bits.concat(a.warnings).join(" · ");
+      return `<div class="prev"><div class="pv">` +
+          `<div class="pvn">${esc(row.card.name)}</div>` +
+          `<div class="pvd">${esc(detail)}</div>` +
+          (said && !bad ? `<div class="pvd">${said}</div>` : ``) +
+        `</div>` +
+        `<div class="pvt"><span class="tag${bad?" no":""}">${bad ? "skip" : "ready"}</span></div></div>` +
+        `<div class="field" style="border-bottom-width:2px">` +
+          `<label for="pick${i}">Scores belong to</label>` +
+          `<select id="pick${i}" data-row="${i}">${options(row.playerId)}</select></div>`;
+    }).join("");
+  }
 
   if(errors.length){
     html += `<div class="note warn"><b>Rows the parser rejected</b><br>` +
