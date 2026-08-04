@@ -313,6 +313,16 @@
     const bounceBack = { strokes: gradeAtLeast(bounces, contests.bounceBack), detail: bounces + " bounce-back" + (bounces === 1 ? "" : "s"), live: true };
 
     const allContests = { watchTheBirdie, agonyAlley, damageControl, goLong, getShorty, bounceBack };
+
+    // Nothing pays on an empty card. Every "count" contest reads zero holes as
+    // zero of whatever it counts — no net doubles, no bounce-backs — which would
+    // grade as the best possible round and pay a man who never teed off.
+    if (holesPlayed === 0) {
+      for (const key of Object.keys(allContests)) {
+        allContests[key] = { strokes: 0, detail: "no card", live: false };
+      }
+    }
+
     let earned = sum(Object.values(allContests).map((c) => c.strokes));
     if (-earned > contests.maxContestStrokes) earned = -contests.maxContestStrokes;
 
@@ -454,7 +464,18 @@
 
     applyCartSkins(cards, results, course, contests);
 
+    /**
+     * A finished card outranks an unfinished one however the numbers fall.
+     * Twelve holes of net will always total less than eighteen, so comparing
+     * them on the final rewards walking in — a short card is placed below every
+     * complete one and takes no position at all.
+     */
+    const tier = (r) => (r.holesPlayed === HOLES ? 0 : r.holesPlayed > 0 ? 1 : 2);
+
     results.sort((a, b) => {
+      const ta = tier(a), tb = tier(b);
+      if (ta !== tb) return ta - tb;
+      if (ta > 0) return b.holesPlayed - a.holesPlayed;   // furthest round first
       const fa = a.final == null ? Infinity : a.final;
       const fb = b.final == null ? Infinity : b.final;
       if (fa !== fb) return fa - fb;
@@ -464,6 +485,8 @@
     // Place them. A man shares the place above only if the cards are level too.
     let lastRank = 0;
     results.forEach((r, i) => {
+      r.eligible = r.holesPlayed === HOLES;
+      if (!r.eligible) { r.rank = null; return; }   // no card, no position
       const prev = i > 0 ? results[i - 1] : null;
       if (!prev || prev.final !== r.final) {
         lastRank = i + 1;
@@ -503,6 +526,11 @@
     const table = cartSkins(entered, course);
     cards.forEach((card, i) => {
       const r = results[i];
+      if (r.holesPlayed === 0) {
+        // His cart may well have won skins; he did not play for any of them.
+        r.contests.skins = { strokes: 0, detail: "no card", live: false };
+        return;
+      }
       if (card.cart == null || String(card.cart).trim() === "") {
         r.contests.skins = { strokes: 0, detail: "no cart", live: false };
         return;

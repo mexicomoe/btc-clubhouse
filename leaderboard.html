@@ -483,16 +483,27 @@ function renderBoard(){
 
   boardResults = results;
   rowsEl.innerHTML = "";
+  let markedIneligible = false;
   results.forEach(r=>{
+    // Everyone who finished, then a line, then everyone who didn't.
+    if(!r.eligible && !markedIneligible){
+      markedIneligible = true;
+      const head = document.createElement("div");
+      head.className = "section-label";
+      head.textContent = "Not eligible — no full round";
+      rowsEl.appendChild(head);
+    }
     const b = document.createElement("button");
-    b.className = "row" + (r.rank===1 && r.final!=null ? " leader" : "");
+    b.className = "row" + (r.rank===1 ? " leader" : "");
     // Net only. Gross is on the detail screen — a scoreboard is read at arm's
     // length, and the net is the number the final is built from.
     const partial = r.holesPlayed>0 && r.holesPlayed<HOLES ? " · "+r.holesPlayed+" holes" : "";
     const meta = r.net==null ? "no card yet" : "Net "+r.net+partial;
-    const tie = tieNote(r);
+    // The holes played are already on the line above, and the heading says why,
+    // so this only has to carry the one word that matters — and fit at 18px.
+    const tie = r.eligible ? tieNote(r) : "not eligible";
     b.innerHTML =
-      `<span class="rank">${r.final==null ? "–" : r.rank}</span>` +
+      `<span class="rank">${r.eligible ? r.rank : "–"}</span>` +
       `<span class="who"><span class="name">${esc(r.name)}</span>` +
       `<span class="meta">${esc(meta)}</span>` +
       (tie ? `<span class="tie">${esc(tie)}</span>` : ``) + `</span>` +

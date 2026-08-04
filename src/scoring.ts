@@ -84,8 +84,13 @@ export interface PlayerResult {
   final: number | null;
   /** Skins won by this player's cart; present when Skins is on. */
   skins?: number;
-  /** Competition rank; present only on results from `computeLeaderboard`. */
-  rank?: number;
+  /**
+   * Competition rank, from `computeLeaderboard`. Null for a card that isn't a
+   * full round: an unfinished card takes no position at all.
+   */
+  rank?: number | null;
+  /** True only for a complete eighteen — the cards that can take a position. */
+  eligible?: boolean;
   /**
    * How an equal final was settled, when it was. `shared` means the cards were
    * level too and the place is shared; otherwise `wonBy` names the stretch that
