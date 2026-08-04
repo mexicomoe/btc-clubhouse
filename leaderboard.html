@@ -236,6 +236,7 @@
   <nav class="tabs" data-tabs></nav>
   <div id="setupRows"></div>
   <div class="pad"><button class="big solid" id="addBtn">+ Add player</button></div>
+  <div id="skinsSwitch"></div>
 </section>
 
 <section id="edit" class="screen">
@@ -286,7 +287,7 @@ const STORE_KEY = "btc.clubhouse.v1";
 // `handicaps` holds the course handicap the export printed beside a player's
 // name — the one that was in force on the day. It outranks anything derived
 // from today's index, because an index moves and a played round does not.
-let state = { nextId: 1, players: [], scores: {}, handicaps: {}, tab: "board" };
+let state = { nextId: 1, players: [], scores: {}, handicaps: {}, skinsOn: true, tab: "board" };
 
 function load(){
   try {
@@ -299,6 +300,8 @@ function load(){
         players: s.players,
         scores: s.scores || {},
         handicaps: s.handicaps || {},
+        skinsOn: s.skinsOn !== false,          // on unless it was switched off
+
         tab: s.tab === "setup" || s.tab === "import" ? s.tab : "board",
       };
     }
@@ -360,6 +363,16 @@ function blankPlayer(){
   return { id: "p" + (state.nextId++), name: "", index: null, tee: "IV", gender: "M",
            cart: null, front: null, back: null };
 }
+/**
+ * The thresholds this round is scored on. The only thing the organiser can
+ * change from the app is whether Skins runs — switched off, it scores nothing
+ * and no cart number is read.
+ */
+function contestConfig(){
+  return state.skinsOn ? E.DEFAULT_CONTESTS
+                       : Object.assign({}, E.DEFAULT_CONTESTS, { skins: null });
+}
+
 function courseOf(p){ return E.courseForTee(p.tee || "IV", p.gender || "M"); }
 /** Course handicap as the brief computes it, or null when there's no index yet. */
 function chOf(p){
@@ -472,7 +485,7 @@ function renderBoard(){
   } else {
     boardCards = ready.map(cardOf);
     // No course argument: every card is scored against its own tee and gender.
-    results = E.computeLeaderboard(boardCards);
+    results = E.computeLeaderboard(boardCards, undefined, contestConfig());
     const withScores = boardCards.filter(c => c.gross.some(g => g != null)).length;
     subEl.textContent = "Aberdeen G&CC · " + ready.length + " player" + (ready.length===1?"":"s") +
       (withScores === 0 ? " · no scores yet" : "");
@@ -603,7 +616,38 @@ function renderSetup(){
       b.addEventListener("click", () => editPlayer(b.dataset.id)));
   }
   document.getElementById("addBtn").disabled = n >= MAX_PLAYERS;
+  drawSkinsSwitch();
   fitBoardNames();
+}
+
+/**
+ * The one threshold the organiser can change from the app. Some rounds the
+ * groups won't divide sensibly and he'll want to skip skins altogether — a
+ * round with only one cart skips itself, but this covers the rest.
+ */
+function drawSkinsSwitch(){
+  const carts = new Set(readyPlayers()
+    .filter(p => p.cart != null && String(p.cart).trim() !== "")
+    .map(p => String(p.cart)));
+  const note = !state.skinsOn ? "Nobody is scored for skins this round."
+    : carts.size < 2 ? "Only one cart out, so no skins today whatever this says."
+    : carts.size + " carts out, playing for 18 skins.";
+
+  document.getElementById("skinsSwitch").innerHTML =
+    `<div class="field"><span class="flab">Cart Skins</span>
+       <div class="seg" id="skinsSeg">
+         <button type="button" data-on="1" aria-pressed="${state.skinsOn}">On</button>
+         <button type="button" data-on="0" aria-pressed="${!state.skinsOn}">Off</button>
+       </div>
+       <div class="cd" style="margin-top:10px;font-size:18px;font-weight:700">${esc(note)}</div>
+     </div>`;
+
+  document.getElementById("skinsSeg").querySelectorAll("button").forEach(b =>
+    b.addEventListener("click", () => {
+      state.skinsOn = b.dataset.on === "1";
+      save();
+      renderSetup(); renderSkins(); renderBoard();
+    }));
 }
 
 /* ---------- setup: one player's form ---------- */
@@ -744,12 +788,13 @@ function removeEditing(){
 function renderSkins(){
   const body = document.getElementById("skinsBody");
   const sub = document.getElementById("skinsSub");
-  const config = E.DEFAULT_CONTESTS.skins;
+  const config = contestConfig().skins;
 
   const entered = readyPlayers().filter(p => p.cart != null && String(p.cart).trim() !== "");
   if(!config){
     sub.textContent = "Switched off for this round";
-    body.innerHTML = `<div class="note">Skins is switched off for this round.</div>`;
+    body.innerHTML = `<div class="note warn">Skins is switched off for this round.
+      Turn it back on at the bottom of the <b>Setup</b> tab.</div>`;
     return;
   }
   if(entered.length === 0){
@@ -760,9 +805,6 @@ function renderSkins(){
     return;
   }
 
-  const cards = entered.map(cardOf);
-  const table = E.cartSkins(cards.map(c => ({ card: c, cart: c.cart })), undefined);
-
   // Who is in which cart, for the totals.
   const byCart = new Map();
   entered.forEach(p => {
@@ -772,6 +814,24 @@ function renderSkins(){
   });
 
   const carts = [...byCart.keys()].sort((a,b) => (Number(a)||0) - (Number(b)||0));
+
+  // One cart has nobody to play against: uncontested it takes all eighteen for
+  // going round on its own. No skins on a round that never divided into two.
+  if(carts.length < 2){
+    sub.textContent = "Only one cart out";
+    body.innerHTML =
+      `<div class="note warn"><b>No skins today — only one cart out.</b><br>
+        Skins is cart against cart, and a cart on its own wins every hole by
+        default. Give the men a second cart number on the <b>Setup</b> tab and
+        the skins will run.</div>` +
+      `<div class="contest"><div class="cname"><div class="cn">Cart ${esc(carts[0])}</div>` +
+      `<div class="cd">${esc(byCart.get(carts[0]).join(" & "))}</div></div>` +
+      `<div class="pvt" style="text-align:right"><div class="cd">not playing for skins</div></div></div>`;
+    return;
+  }
+
+  const cards = entered.map(cardOf);
+  const table = E.cartSkins(cards.map(c => ({ card: c, cart: c.cart })), undefined);
   const won = (id) => table.skins.get(id) || 0;
   const played = cards.some(c => c.gross.some(g => g != null));
   sub.textContent = played

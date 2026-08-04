@@ -540,11 +540,24 @@
    */
   function applyCartSkins(cards, results, course, contests) {
     if (!contests.skins) return null;
+    const hasCart = (c) => c.cart != null && String(c.cart).trim() !== "";
     const entered = [];
-    cards.forEach((c) => {
-      if (c.cart != null && String(c.cart).trim() !== "") entered.push({ card: c, cart: c.cart });
-    });
+    cards.forEach((c) => { if (hasCart(c)) entered.push({ card: c, cart: c.cart }); });
     if (entered.length === 0) return null;
+
+    // One cart is nobody to play against. Uncontested it wins every hole by
+    // default and takes all eighteen skins for going round on its own, so there
+    // are no skins on a round that never divided into two carts.
+    const distinctCarts = new Set(entered.map((e) => String(e.cart)));
+    if (distinctCarts.size < 2) {
+      cards.forEach((card, i) => {
+        const r = results[i];
+        if (r.holesPlayed === 0) r.contests.skins = { strokes: 0, detail: "no card", live: false };
+        else if (!hasCart(card)) r.contests.skins = { strokes: 0, detail: "no cart", live: false };
+        else r.contests.skins = { strokes: 0, detail: "only one cart out", live: false };
+      });
+      return null;
+    }
 
     const table = cartSkins(entered, course);
     // The cap is set by how many carts are actually competing, not by the

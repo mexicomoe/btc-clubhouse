@@ -223,6 +223,45 @@ test("a player with no cart scores zero from skins rather than breaking", () => 
   assert.equal(by["Carted"].skins, 1);
 });
 
+// One cart is nobody to play against: uncontested it wins all eighteen holes by
+// default and would be paid the cap for going round on its own.
+test("one cart out means no skins at all", () => {
+  const a = card("A", 1, (g) => { g[0] = 3; });
+  const b = card("B", 1);
+  const board = computeLeaderboard([a, b], ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
+
+  for (const r of board) {
+    assert.equal(r.contests.skins!.strokes, 0, `${r.name} is paid nothing`);
+    assert.equal(r.contests.skins!.live, false, "and it is shown as not running");
+    assert.equal(r.contests.skins!.detail, "only one cart out");
+    assert.equal(r.skins, undefined, "no skin count to report");
+  }
+  // The rest of the round is untouched.
+  assert.ok(board.every((r) => r.final != null));
+});
+
+test("a second cart is all it takes for skins to run", () => {
+  const a = card("A", 1, (g) => { g[0] = 3; });
+  const alone = computeLeaderboard([a, card("B", 1)], ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
+  const paired = computeLeaderboard([a, card("B", 2)], ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
+
+  assert.equal(alone.find((r) => r.name === "A")!.contests.skins!.live, false);
+  assert.equal(paired.find((r) => r.name === "A")!.contests.skins!.live, true);
+  assert.equal(paired.find((r) => r.name === "A")!.skins, 1, "and the hole is won");
+});
+
+test("one cart among uncarted players still pays nobody", () => {
+  // The trap: carted men would take the cap while the rest took nothing.
+  const board = computeLeaderboard(
+    [card("Carted", 1, (g) => { g[0] = 3; }), card("Loose", null)],
+    ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
+  const by = Object.fromEntries(board.map((r) => [r.name, r]));
+  assert.equal(by["Carted"].contests.skins!.strokes, 0, "no free cap for the only cart");
+  assert.equal(by["Carted"].contests.skins!.detail, "only one cart out");
+  assert.equal(by["Loose"].contests.skins!.strokes, 0);
+  assert.equal(by["Loose"].contests.skins!.detail, "no cart");
+});
+
 test("nobody in a cart at all leaves the round scoring as before", () => {
   const a = card("A", null), b = card("B", null);
   const board = computeLeaderboard([a, b], ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
