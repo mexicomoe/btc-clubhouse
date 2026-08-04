@@ -353,10 +353,18 @@ function scoresFor(p){
   const s = state.scores[p.id];
   return Array.isArray(s) && s.length === HOLES ? s : new Array(HOLES).fill(null);
 }
+/**
+ * The name to put on the scoreboard. The setup sheet may carry whatever the
+ * organiser typed — "Ridgeway, Robert (18)", straight off the export — but a
+ * handicap is not part of a man's name and the board is read at arm's length,
+ * so it shows "Robert Ridgeway". Setup keeps what was typed.
+ */
+function displayName(p){ return IMP.canonicalName(p.name) || p.name.trim(); }
+
 /** Build the card the engine scores: the player's own tee and stroke index. */
 function cardOf(p){
   return {
-    name: p.name.trim(),
+    name: displayName(p),
     handicapIndex: p.index,
     tee: p.tee, gender: p.gender,
     gross: scoresFor(p),
@@ -378,6 +386,9 @@ function show(id){
         b.setAttribute("aria-current", String(b.dataset.go === id)));
     });
   }
+  // Fit only now the screen is visible — a display:none box measures zero wide,
+  // so a name fitted before the switch would be left at full size and overflow.
+  fitBoardNames();
   window.scrollTo(0,0);
 }
 function buildTabs(){
@@ -673,7 +684,7 @@ function renderImport(){
 }
 
 /** Decide what one parsed row means for the player chosen for it, uncommitted. */
-function assess(row){
+function assess(row, idx, all){
   const card = row.card;
   const player = row.playerId ? state.players.find(p => p.id === row.playerId) || null : null;
   const mode = importMode === "auto" ? card.mode : importMode;
@@ -683,6 +694,12 @@ function assess(row){
     out.problems.push(row.how === "ambiguous"
       ? "two players share that name — choose below"
       : "no player chosen — pick one below");
+    return out;
+  }
+  // Two rows on one man would quietly drop a card, and hand-picking makes that
+  // easy to do. Refuse both rather than choose between them.
+  if(all && all.some((r, j) => j !== idx && r.playerId === row.playerId)){
+    out.problems.push("another row is already assigned to " + player.name);
     return out;
   }
   if(!isReady(player)){ out.problems.push("player needs an index and a tee on Setup"); return out; }

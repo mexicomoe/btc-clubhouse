@@ -16,7 +16,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-import { parseScores, matchName, unreverseName, initialKey } from "../src/importScores.ts";
+import { parseScores, matchName, unreverseName, initialKey, stripHandicap, canonicalName } from "../src/importScores.ts";
 
 const read = (name: string) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), "utf8");
 const PASTE = read("golfgenius_lastfirst.tsv");
@@ -97,6 +97,53 @@ test("the real paste's names find a roster written as First L.", () => {
   // one comes back unmatched for the organiser to assign rather than guessed.
   assert.equal(got[2].index, -1, "Kingsley, Mitchell does not match Mitch K.");
   assert.equal(got[2].how, null);
+});
+
+/* ---- the setup sheet written the same way as the export ---- */
+
+test("a handicap typed into a setup name is not part of the name", () => {
+  assert.equal(stripHandicap("Kingsley, Mitchell (14)"), "Kingsley, Mitchell");
+  assert.equal(stripHandicap("Ken Ridgeway (18)"), "Ken Ridgeway");
+  assert.equal(stripHandicap("Ken Ridgeway"), "Ken Ridgeway", "nothing to strip");
+  assert.equal(stripHandicap("Ridgeway (Jr) "), "Ridgeway (Jr)", "only a number is a handicap");
+  assert.equal(canonicalName("Kingsley, Mitchell (14)"), "Mitchell Kingsley");
+});
+
+// The organiser typed the roster in the export's own format, handicap and all.
+// A full first name against a short one is not something any rule may guess at.
+test("full first names never auto-match their short forms", () => {
+  const roster = [
+    "Ridgeway, Robert (18)",
+    "Merrick, David (21)",
+    "Kingsley, Mitchell (14)",
+    "Danforth, Mike (23)",
+  ];
+
+  // Same man, shortened first name — must fall through to the dropdown.
+  assert.deepEqual(matchName("Ridgeway, Rob", roster), { index: -1, how: null },
+    "Robert is not Rob");
+  assert.deepEqual(matchName("Merrick, Dave", roster), { index: -1, how: null },
+    "David is not Dave");
+
+  // Identical first names — the handicap is all that differs, so these match.
+  assert.deepEqual(matchName("Kingsley, Mitchell", roster), { index: 2, how: "exact" });
+  assert.deepEqual(matchName("Danforth, Mike", roster), { index: 3, how: "exact" });
+});
+
+test("the initial rule is never applied to a “Last, First” string", () => {
+  // Reduced naively, "Ridgeway, Robert" and "Ridgeway, Rob" BOTH come out as
+  // "ridgeway, r" and would match. Every rule works in First-Last order so that
+  // the initial compared is the surname's, never the shortened first name's.
+  assert.equal(initialKey(canonicalName("Ridgeway, Robert (18)")), "robert r");
+  assert.equal(initialKey(canonicalName("Ridgeway, Rob")), "rob r");
+  assert.notEqual(
+    initialKey(canonicalName("Ridgeway, Robert (18)")),
+    initialKey(canonicalName("Ridgeway, Rob")));
+});
+
+test("a setup sheet carrying handicaps still matches the shorthand roster", () => {
+  // "Ken R. (18)" on setup, "Ridgeway, Ken" from the export.
+  assert.deepEqual(matchName("Ridgeway, Ken", ["Ken R. (18)"]), { index: 0, how: "initial" });
 });
 
 test("a shared initial is reported ambiguous, never guessed", () => {

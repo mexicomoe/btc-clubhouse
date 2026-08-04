@@ -55,6 +55,12 @@ export const normaliseName: (name: string) => string = I.normaliseName;
 /** "Ridgeway, Ken" → "Ken Ridgeway"; null when there is no comma to undo. */
 export const unreverseName: (name: string) => string | null = I.unreverseName;
 
+/** Drop a trailing "(18)" — a handicap, on either side, is not part of the name. */
+export const stripHandicap: (name: string) => string = I.stripHandicap;
+
+/** A name in "First Last" order with any handicap removed — the form rules compare in. */
+export const canonicalName: (name: string) => string = I.canonicalName;
+
 /** "Ken Ridgeway" and "Ken R." both reduce to "ken r"; null for a single word. */
 export const initialKey: (name: string) => string | null = I.initialKey;
 

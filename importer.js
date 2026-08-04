@@ -196,6 +196,26 @@
   }
 
   /**
+   * Drop a trailing "(18)". The export carries the handicap after the name, and
+   * the organiser may well have typed it into the setup sheet too — on either
+   * side it is a handicap, not part of what the man is called.
+   */
+  function stripHandicap(name) {
+    return String(name == null ? "" : name).replace(/\s*\(\s*\d+\s*\)\s*$/, "").trim();
+  }
+
+  /**
+   * A name in "First Last" order with any handicap removed — the one form both
+   * sides can be compared in. Comparing "Last, First" strings directly is what
+   * makes "Ridgeway, Robert" and "Ridgeway, Rob" look alike when reduced to a
+   * first name and an initial, so every rule below works on this form instead.
+   */
+  function canonicalName(name) {
+    const bare = stripHandicap(name);
+    return unreverseName(bare) || bare;
+  }
+
+  /**
    * "Ken Ridgeway" and "Ken R." both reduce to "ken r" — a first name plus a
    * last initial, which is how a clubhouse roster is usually written down.
    * Null for a single-word name, which has no initial to match on.
@@ -222,20 +242,24 @@
    * these rules comes back unmatched for a person to decide.
    */
   function matchName(exportName, names) {
-    const forms = [{ text: exportName, how: "exact" }];
-    const reversed = unreverseName(exportName);
-    if (reversed) forms.push({ text: reversed, how: "reversed" });
+    // 1 · the names as written, once any handicap is off either side.
+    const bareKey = normaliseName(stripHandicap(exportName));
+    let i = names.findIndex((n) => normaliseName(stripHandicap(n)) === bareKey);
+    if (i !== -1) return { index: i, how: "exact" };
 
-    for (const form of forms) {
-      const key = normaliseName(form.text);
-      const i = names.findIndex((n) => normaliseName(n) === key);
-      if (i !== -1) return { index: i, how: form.how };
-    }
-    for (const form of forms) {
-      const key = initialKey(form.text);
-      if (key == null) continue;
+    // 2 · both sides put into "First Last" order.
+    const canon = canonicalName(exportName);
+    const canonKey = normaliseName(canon);
+    i = names.findIndex((n) => normaliseName(canonicalName(n)) === canonKey);
+    if (i !== -1) return { index: i, how: "reversed" };
+
+    // 3 · first name plus last initial, on the ordered form only. This is the
+    // loosest rule and deliberately the last: it can tell "Rob T." from "Rob
+    // Ridgeway", but it must never be asked to tell Robert from Rob.
+    const key = initialKey(canon);
+    if (key != null) {
       const hits = [];
-      names.forEach((n, i) => { if (initialKey(n) === key) hits.push(i); });
+      names.forEach((n, idx) => { if (initialKey(canonicalName(n)) === key) hits.push(idx); });
       if (hits.length === 1) return { index: hits[0], how: "initial" };
       if (hits.length > 1) return { index: -1, how: "ambiguous" };
     }
@@ -244,6 +268,6 @@
 
   globalThis.ClubhouseImporter = {
     parseScores, splitName, grossCardToPlayer,
-    normaliseName, unreverseName, initialKey, matchName,
+    normaliseName, unreverseName, stripHandicap, canonicalName, initialKey, matchName,
   };
 })();
