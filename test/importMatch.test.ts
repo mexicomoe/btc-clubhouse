@@ -17,6 +17,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 import { parseScores, matchName, unreverseName, initialKey, stripHandicap, canonicalName } from "../src/importScores.ts";
+import { grossFromNet, scorePlayer, type PlayerCard } from "../src/scoring.ts";
+import { courseForTee } from "../src/courseConfig.ts";
 
 const read = (name: string) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), "utf8");
 const PASTE = read("golfgenius_lastfirst.tsv");
@@ -58,6 +60,57 @@ test("a header that is not one column out is left alone", () => {
   const odd = "\t1\t2\tTotal\tNet\nSomebody (10)\t4\t4\t8\t7\tx\ty";
   const { cards } = parseScores(odd);
   assert.ok(cards.length === 0 || cards[0].mode === "unknown");
+});
+
+/* ---- whose handicap is in force ---- */
+
+// The export prints the course handicap that applied the day the round was
+// played. An index moves; a played round does not. So when a paste supplies one
+// it outranks anything derived from today's index — and the proof is that the
+// round then scores back to the export's OWN Net column, to the stroke.
+test("the pasted handicap reproduces the export's net exactly", () => {
+  const { cards } = parseScores(PASTE);
+  const course = courseForTee("IV", "M");
+
+  for (const card of cards) {
+    assert.notEqual(card.handicap, null, `${card.name} carries a handicap`);
+    const ch = card.handicap!;
+    // Put the strokes back with the handicap the export used...
+    const gross = grossFromNet(card.holes, course, ch);
+    // ...and score on that same handicap, not one derived from an index.
+    const played: PlayerCard = {
+      name: card.name, courseHandicap: ch, tee: "IV", gender: "M", gross,
+    };
+    const result = scorePlayer(played);
+    assert.equal(result.net, card.netTotal, `${card.name} net matches the Net column`);
+    assert.equal(result.courseHandicap, ch, `${card.name} scored on the card's handicap`);
+  }
+});
+
+test("a stale index would have scored the round wrong", () => {
+  // Ken's card says 18. Suppose his index has since drifted to a course
+  // handicap of 13 — scoring on that would move his net by the difference.
+  const { cards } = parseScores(PASTE);
+  const card = cards.find((c) => c.name === "Ridgeway, Ken")!;
+  const course = courseForTee("IV", "M");
+  const gross = grossFromNet(card.holes, course, card.handicap!);
+
+  const asPlayed = scorePlayer({ name: "x", courseHandicap: 18, tee: "IV", gender: "M", gross });
+  const asStale = scorePlayer({ name: "x", courseHandicap: 13, tee: "IV", gender: "M", gross });
+
+  assert.equal(asPlayed.net, card.netTotal, "the day's handicap is right");
+  assert.notEqual(asStale.net, card.netTotal, "a newer handicap is not");
+  assert.equal(asStale.net! - asPlayed.net!, 5, "five strokes, the whole difference");
+});
+
+test("an export with no handicap in the name leaves the index in charge", () => {
+  // The same paste with the parentheticals taken off: the cards still read, but
+  // there is no day handicap to apply, so the setup index remains the only one.
+  const { cards, errors } = parseScores(PASTE.replace(/ \(\d+\)/g, ""));
+  assert.equal(errors.length, 0, errors.join("\n"));
+  assert.equal(cards.length, 4);
+  assert.ok(cards.every((c) => c.handicap === null), "nothing to take from the name");
+  assert.ok(cards.every((c) => c.holesPlayed === 18), "the scores still read fine");
 });
 
 /* ---- the name rules ---- */

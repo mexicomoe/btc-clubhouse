@@ -268,7 +268,10 @@ const HOLES = 18;
 
 /* ---------- persistence: a locked phone must not lose the round ---------- */
 const STORE_KEY = "btc.clubhouse.v1";
-let state = { nextId: 1, players: [], scores: {}, tab: "board" };
+// `handicaps` holds the course handicap the export printed beside a player's
+// name — the one that was in force on the day. It outranks anything derived
+// from today's index, because an index moves and a played round does not.
+let state = { nextId: 1, players: [], scores: {}, handicaps: {}, tab: "board" };
 
 function load(){
   try {
@@ -280,6 +283,7 @@ function load(){
         nextId: s.nextId || s.players.length + 1,
         players: s.players,
         scores: s.scores || {},
+        handicaps: s.handicaps || {},
         tab: s.tab === "setup" || s.tab === "import" ? s.tab : "board",
       };
     }
@@ -361,11 +365,27 @@ function scoresFor(p){
  */
 function displayName(p){ return IMP.canonicalName(p.name) || p.name.trim(); }
 
+/**
+ * The course handicap to score a player on, and where it came from. The export
+ * prints the handicap that was in force the day the round was played; an index
+ * can move between then and now, so the printed one wins whenever there is one.
+ */
+function handicapOf(p){
+  const fromPaste = state.handicaps[p.id];
+  if(fromPaste != null) return { value: fromPaste, source: "paste" };
+  const derived = chOf(p);
+  return { value: derived, source: derived == null ? "none" : "index" };
+}
+
 /** Build the card the engine scores: the player's own tee and stroke index. */
 function cardOf(p){
+  const hcp = handicapOf(p);
   return {
     name: displayName(p),
     handicapIndex: p.index,
+    // Set only when the export supplied one — the engine prefers it over the
+    // index. The tee and gender still decide WHICH holes the strokes fall on.
+    courseHandicap: hcp.source === "paste" ? hcp.value : undefined,
     tee: p.tee, gender: p.gender,
     gross: scoresFor(p),
     picks: (p.front && p.back) ? { front: p.front, back: p.back } : undefined,
@@ -458,8 +478,11 @@ function showPlayer(name){
   const r = E.scorePlayer(card, undefined, E.DEFAULT_CONTESTS);
   const course = E.courseFor(card);
   const off = -r.strokesEarned;                    // positive = strokes taken off the net
+  // "as played" marks a handicap that came off the card rather than from the
+  // index, so a figure that disagrees with the setup screen explains itself.
+  const asPlayed = card.courseHandicap != null ? " as played" : "";
   const teeLine = "Tee " + (course.tee || "IV") + (course.gender === "F" ? " · women's" : "") +
-                  " · Course handicap " + r.courseHandicap +
+                  " · Course handicap " + r.courseHandicap + asPlayed +
                   (r.gross==null ? "" : " · Gross " + r.gross);
   let html =
     `<div class="detail-head"><div class="name">${esc(r.name)}</div>` +
@@ -657,6 +680,7 @@ function removeEditing(){
   if(!window.confirm("Remove " + (p.name || "this player") + " from the round?")) return;
   state.players = state.players.filter(x => x.id !== p.id);
   delete state.scores[p.id];
+  delete state.handicaps[p.id];
   editing = null;
   save();
   renderSetup(); show("setup");
@@ -736,9 +760,19 @@ function assess(row, idx, all){
     out.usedHandicap = ch;
   }
 
+  // Say plainly which handicap this card will be scored on, and where it came
+  // from — the export's is used whenever it has one, even when setup disagrees.
   const setupCh = chOf(player);
-  if(card.handicap != null && setupCh != null && card.handicap !== setupCh){
-    out.warnings.push("paste says handicap " + card.handicap + ", setup computes " + setupCh);
+  if(card.handicap != null){
+    out.applied = card.handicap;
+    out.appliedFrom = "paste";
+    out.warnings.push(setupCh != null && card.handicap !== setupCh
+      ? "handicap " + card.handicap + " from the paste, not the " + setupCh + " today's index gives"
+      : "handicap " + card.handicap + " from the paste");
+  } else if(setupCh != null){
+    out.applied = setupCh;
+    out.appliedFrom = "index";
+    out.warnings.push("handicap " + setupCh + " from the index — the paste printed none");
   }
   const total = out.gross.reduce((a,h) => a + (h==null?0:h), 0);
   if(card.grossTotal != null && card.holesPlayed === HOLES && total !== card.grossTotal){
@@ -857,7 +891,13 @@ function commitImport(){
 
   // A paste replaces the round rather than merging into it (brief section 4).
   state.scores = {};
-  usable.forEach(a => { state.scores[a.player.id] = a.gross; });
+  state.handicaps = {};
+  usable.forEach(a => {
+    state.scores[a.player.id] = a.gross;
+    // Keep the day's handicap with the card it belongs to, not just for scoring
+    // now but so a later reload still scores the round as it was played.
+    if(a.card.handicap != null) state.handicaps[a.player.id] = a.card.handicap;
+  });
   importPreview = null;
   save();
   renderBoard();
