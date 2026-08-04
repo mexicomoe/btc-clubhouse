@@ -428,6 +428,9 @@ const SCREENS = ["board","player","setup","edit","skins","import"];
 const TAB_LABELS = [["board","Leaders"],["setup","Setup"],["skins","Skins"],["import","Import"]];
 
 function show(id){
+  // Skins off takes its tab away, so there is nowhere to land — including a
+  // stored tab from before it was switched off.
+  if(id === "skins" && !state.skinsOn) id = "board";
   SCREENS.forEach(s => document.getElementById(s).classList.toggle("on", s === id));
   if(id === "board" || id === "setup" || id === "skins" || id === "import"){
     state.tab = id; save();
@@ -441,9 +444,19 @@ function show(id){
   fitBoardNames();
   window.scrollTo(0,0);
 }
+/**
+ * The tabs actually on offer. Skins switched off for the round takes its tab
+ * with it — there is nothing behind it to read, and a tab that only explains
+ * its own absence is a tab in the way. A one-cart round keeps the tab, because
+ * there it has something to say.
+ */
+function activeTabs(){
+  return TAB_LABELS.filter(([id]) => id !== "skins" || state.skinsOn);
+}
+
 function buildTabs(){
   document.querySelectorAll("nav.tabs").forEach(nav => {
-    nav.innerHTML = TAB_LABELS.map(([id,label]) =>
+    nav.innerHTML = activeTabs().map(([id,label]) =>
       `<button data-go="${id}">${label}</button>`).join("");
     nav.querySelectorAll("button").forEach(b =>
       b.addEventListener("click", () => { if(b.dataset.go === "import") renderImport();
@@ -646,7 +659,10 @@ function drawSkinsSwitch(){
     b.addEventListener("click", () => {
       state.skinsOn = b.dataset.on === "1";
       save();
-      renderSetup(); renderSkins(); renderBoard();
+      buildTabs();                       // the Skins tab comes and goes with it
+      renderSetup(); renderBoard();
+      if(state.skinsOn) renderSkins();
+      show("setup");                     // stay where the switch is
     }));
 }
 
@@ -1133,7 +1149,7 @@ load();
 buildTabs();
 renderBoard();
 renderSetup();
-renderSkins();
+if(state.skinsOn) renderSkins();
 renderImport();
 show(state.tab);
 </script>
