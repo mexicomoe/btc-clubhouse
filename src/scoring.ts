@@ -36,6 +36,8 @@ export interface PlayerCard {
   gender?: Gender;
   /** Gross score per hole (18 entries). `null` = hole not played; never 0. */
   gross: (number | null)[];
+  /** Cart number. Without one a player scores zero from Skins. */
+  cart?: string | number | null;
   /**
    * Watch the Birdie: the two par 4s nominated before the round, one per nine
    * (hole numbers, 1-based). Omit and the contest simply doesn't score.
@@ -65,6 +67,8 @@ export interface PlayerResult {
   net: number | null;
   /** Net total before the cap — kept only to reconcile against Golf Genius. */
   netUncapped: number | null;
+  /** Capped net per hole — what a match of cards is settled on. */
+  netByHole: (number | null)[];
   holesPlayed: number;
   contests: {
     watchTheBirdie: ContestResult;
@@ -73,11 +77,28 @@ export interface PlayerResult {
     goLong: ContestResult;
     getShorty: ContestResult;
     bounceBack: ContestResult;
+    /** Added by `computeLeaderboard` — Skins can only be settled field-wide. */
+    skins?: ContestResult;
   };
   strokesEarned: number;
   final: number | null;
+  /** Skins won by this player's cart; present when Skins is on. */
+  skins?: number;
   /** Competition rank; present only on results from `computeLeaderboard`. */
   rank?: number;
+  /**
+   * How an equal final was settled, when it was. `shared` means the cards were
+   * level too and the place is shared; otherwise `wonBy` names the stretch that
+   * took it — "the back nine", "13–18", "16–18", "the 18th".
+   */
+  cardMatch?: { shared: boolean; wonBy: string | null };
+}
+
+/** One stretch of a match of cards, tried in order. */
+export interface CardMatchSegment {
+  from: number;
+  to: number;
+  label: string;
 }
 
 /** The outcome of reading a hand-typed handicap index. */
@@ -110,6 +131,16 @@ export const birdiePickHoles: (course: CourseConfig) => { front: number[]; back:
 export const grossFromNet: (netHoles: (number | null)[], course: CourseConfig, courseHcp: number) => (number | null)[] = E.grossFromNet;
 /** Resolve which course a card is scored against. */
 export const courseFor: (card: PlayerCard, course?: CourseSource) => CourseConfig = E.courseFor;
+
+/**
+ * Settle two equal finals by match of cards: back nine, then 13–18, 16–18, the
+ * 18th. `order` is -1 if `a` takes the place, 1 if `b` does, 0 if they share it.
+ * A man who did not finish cannot win a card match and is placed below one who did.
+ */
+export const matchOfCards: (a: PlayerResult, b: PlayerResult) => { order: number; label: string | null } = E.matchOfCards;
+
+/** The stretches a match of cards is settled on, in order. */
+export const CARD_MATCH: CardMatchSegment[] = E.CARD_MATCH;
 
 export const scorePlayer: (card: PlayerCard, course?: CourseSource, contests?: ContestConfig) => PlayerResult = E.scorePlayer;
 export const scoreField: (cards: PlayerCard[], course?: CourseSource, contests?: ContestConfig) => PlayerResult[] = E.scoreField;

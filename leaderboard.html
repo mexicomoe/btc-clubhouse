@@ -75,6 +75,11 @@
     display: block; font-size: 18px; font-weight: 700; margin-top: 7px;
     white-space: nowrap; overflow: hidden;
   }
+  /* Only appears when a tie had to be settled, so most rows never grow. */
+  .row .tie {
+    display: block; font-size: 18px; font-weight: 700; margin-top: 5px;
+    white-space: nowrap; overflow: hidden;
+  }
   .row .final { flex: 0 0 auto; font-size: 44px; font-weight: 800; font-variant-numeric: tabular-nums; }
   .row.leader { background: #fff7d6; }             /* faint gold, still black text */
   .row.leader:active { background: var(--ink); }
@@ -238,6 +243,15 @@
   <div id="editBody"></div>
 </section>
 
+<section id="skins" class="screen">
+  <header class="band">
+    <div class="title">Cart Skins</div>
+    <div class="sub" id="skinsSub">Cart against cart, hole by hole</div>
+  </header>
+  <nav class="tabs" data-tabs></nav>
+  <div id="skinsBody"></div>
+</section>
+
 <section id="import" class="screen">
   <header class="band">
     <div class="title">Import scores</div>
@@ -261,8 +275,9 @@ const CONTEST_NAMES = {
   watchTheBirdie: "Watch the Birdie", agonyAlley: "Agony Alley",
   damageControl: "Damage Control", goLong: "Go Long",
   getShorty: "Get Shorty", bounceBack: "Bounce Back",
+  skins: "Cart Skins",
 };
-const CONTEST_ORDER = ["watchTheBirdie","agonyAlley","damageControl","goLong","getShorty","bounceBack"];
+const CONTEST_ORDER = ["watchTheBirdie","agonyAlley","damageControl","goLong","getShorty","bounceBack","skins"];
 const MAX_PLAYERS = 24;
 const HOLES = 18;
 
@@ -387,6 +402,7 @@ function cardOf(p){
     // index. The tee and gender still decide WHICH holes the strokes fall on.
     courseHandicap: hcp.source === "paste" ? hcp.value : undefined,
     tee: p.tee, gender: p.gender,
+    cart: p.cart,
     gross: scoresFor(p),
     picks: (p.front && p.back) ? { front: p.front, back: p.back } : undefined,
   };
@@ -394,12 +410,13 @@ function cardOf(p){
 function readyPlayers(){ return state.players.filter(isReady); }
 
 /* ---------- screen routing ---------- */
-const SCREENS = ["board","player","setup","edit","import"];
-const TAB_LABELS = [["board","Leaderboard"],["setup","Setup"],["import","Import"]];
+const SCREENS = ["board","player","setup","edit","skins","import"];
+// Four tabs across a phone: short labels, so none has to shrink below 18px.
+const TAB_LABELS = [["board","Leaders"],["setup","Setup"],["skins","Skins"],["import","Import"]];
 
 function show(id){
   SCREENS.forEach(s => document.getElementById(s).classList.toggle("on", s === id));
-  if(id === "board" || id === "setup" || id === "import"){
+  if(id === "board" || id === "setup" || id === "skins" || id === "import"){
     state.tab = id; save();
     document.querySelectorAll("nav.tabs").forEach(nav => {
       nav.querySelectorAll("button").forEach(b =>
@@ -418,13 +435,24 @@ function buildTabs(){
     nav.querySelectorAll("button").forEach(b =>
       b.addEventListener("click", () => { if(b.dataset.go === "import") renderImport();
                                           if(b.dataset.go === "setup") renderSetup();
+                                          if(b.dataset.go === "skins") renderSkins();
                                           if(b.dataset.go === "board") renderBoard();
                                           show(b.dataset.go); }));
   });
 }
 
 /* ---------- the leaderboard ---------- */
-let boardCards = [];   // cards behind the rows on screen, for the detail view
+let boardCards = [];     // cards behind the rows on screen, for the detail view
+let boardResults = [];   // and their scored results — Skins only exists on these
+
+/** How an equal final was settled, said the way a golfer would say it. */
+function tieNote(r){
+  if(!r.cardMatch) return "";
+  if(r.cardMatch.shared) return "shared — cards level";
+  return r.cardMatch.wonBy === "a finished card"
+    ? "won on a full card"
+    : "won on " + r.cardMatch.wonBy;
+}
 
 function renderBoard(){
   const rowsEl = document.getElementById("rows");
@@ -453,6 +481,7 @@ function renderBoard(){
       : "";
   }
 
+  boardResults = results;
   rowsEl.innerHTML = "";
   results.forEach(r=>{
     const b = document.createElement("button");
@@ -461,10 +490,12 @@ function renderBoard(){
     // length, and the net is the number the final is built from.
     const partial = r.holesPlayed>0 && r.holesPlayed<HOLES ? " · "+r.holesPlayed+" holes" : "";
     const meta = r.net==null ? "no card yet" : "Net "+r.net+partial;
+    const tie = tieNote(r);
     b.innerHTML =
       `<span class="rank">${r.final==null ? "–" : r.rank}</span>` +
       `<span class="who"><span class="name">${esc(r.name)}</span>` +
-      `<span class="meta">${esc(meta)}</span></span>` +
+      `<span class="meta">${esc(meta)}</span>` +
+      (tie ? `<span class="tie">${esc(tie)}</span>` : ``) + `</span>` +
       `<span class="final">${fmtFinal(r.final)}</span><span class="chev">›</span>`;
     b.addEventListener("click", ()=>showPlayer(r.name));
     rowsEl.appendChild(b);
@@ -475,7 +506,9 @@ function renderBoard(){
 function showPlayer(name){
   const card = boardCards.find(c => c.name === name);
   if(!card) return;
-  const r = E.scorePlayer(card, undefined, E.DEFAULT_CONTESTS);
+  // Take the leaderboard's own result: Skins is settled across the field, so
+  // re-scoring this card on its own would silently drop it.
+  const r = boardResults.find(x => x.name === name) || E.scorePlayer(card, undefined, E.DEFAULT_CONTESTS);
   const course = E.courseFor(card);
   const off = -r.strokesEarned;                    // positive = strokes taken off the net
   // "as played" marks a handicap that came off the card rather than from the
@@ -504,6 +537,7 @@ function showPlayer(name){
 
   for(const key of CONTEST_ORDER){
     const c = r.contests[key];
+    if(!c) continue;                       // skins is absent when nobody has a cart
     const cls = !c.live ? "none" : c.strokes<0 ? "good" : c.strokes>0 ? "penalty" : "none";
     const shown = !c.live ? "—" : fmtStrokes(c.strokes);
     html +=
@@ -532,6 +566,11 @@ function renderSetup(){
   } else {
     wrap.innerHTML = state.players.map(p => {
       const ch = chOf(p);
+      const hcp = handicapOf(p);
+      // The index gives one figure and the card another. When they disagree the
+      // played one is what scores, so show both rather than quietly differing
+      // from the leaderboard.
+      const differs = hcp.source === "paste" && ch != null && hcp.value !== ch;
       const picks = (p.front && p.back) ? "picks " + p.front + "/" + p.back : "no picks";
       const bits = [
         p.index == null ? "no index" : "idx " + E.formatHandicapIndex(p.index),
@@ -539,11 +578,15 @@ function renderSetup(){
         p.cart == null ? "no cart" : "cart " + p.cart,
         picks,
       ];
+      if(differs) bits.push("plays off " + hcp.value + " on this card");
       return `<button class="prow" data-id="${p.id}">` +
         `<span class="pwho"><span class="pname">${esc(p.name || "(no name)")}</span>` +
         `<span class="pmeta">${esc(bits.join(" · "))}</span></span>` +
-        `<span class="pch"><span class="pchn">${ch==null?"–":ch}</span>` +
-        `<span class="pchl">C.H.</span></span><span class="chev">›</span></button>`;
+        `<span class="pch">` +
+          `<span class="pchn">${ch==null?"–":ch}</span>` +
+          `<span class="pchl">${differs ? "FROM INDEX" : "C.H."}</span>` +
+          (differs ? `<span class="pchn">${hcp.value}</span><span class="pchl">AS PLAYED</span>` : ``) +
+        `</span><span class="chev">›</span></button>`;
     }).join("");
     wrap.querySelectorAll(".prow").forEach(b =>
       b.addEventListener("click", () => editPlayer(b.dataset.id)));
@@ -684,6 +727,84 @@ function removeEditing(){
   editing = null;
   save();
   renderSetup(); show("setup");
+}
+
+/* ---------- cart skins ---------- */
+function renderSkins(){
+  const body = document.getElementById("skinsBody");
+  const sub = document.getElementById("skinsSub");
+  const config = E.DEFAULT_CONTESTS.skins;
+
+  const entered = readyPlayers().filter(p => p.cart != null && String(p.cart).trim() !== "");
+  if(!config){
+    sub.textContent = "Switched off for this round";
+    body.innerHTML = `<div class="note">Skins is switched off for this round.</div>`;
+    return;
+  }
+  if(entered.length === 0){
+    sub.textContent = "No carts yet";
+    body.innerHTML = `<div class="note">Nobody has a cart number yet. Give each man a cart on the
+      <b>Setup</b> tab and the skins will run themselves. A man with no cart simply doesn't
+      compete for them.</div>`;
+    return;
+  }
+
+  const cards = entered.map(cardOf);
+  const table = E.cartSkins(cards.map(c => ({ card: c, cart: c.cart })), undefined);
+
+  // Who is in which cart, for the totals.
+  const byCart = new Map();
+  entered.forEach(p => {
+    const id = String(p.cart);
+    if(!byCart.has(id)) byCart.set(id, []);
+    byCart.get(id).push(displayName(p));
+  });
+
+  const carts = [...byCart.keys()].sort((a,b) => (Number(a)||0) - (Number(b)||0));
+  const won = (id) => table.skins.get(id) || 0;
+  const played = cards.some(c => c.gross.some(g => g != null));
+  sub.textContent = played
+    ? carts.length + " cart" + (carts.length===1?"":"s") + " · 18 skins on the round"
+    : "No scores imported yet";
+
+  let html = `<div class="section-label">Totals by cart</div>`;
+  html += carts.slice().sort((a,b) => won(b) - won(a) || (Number(a)||0)-(Number(b)||0)).map(id => {
+    const n = won(id);
+    const strokes = E.skinStrokes(n, config);
+    return `<div class="contest"><div class="cname">` +
+      `<div class="cn">Cart ${esc(id)}</div>` +
+      `<div class="cd">${esc(byCart.get(id).join(" &amp; ").replace(/&amp;/g, "&"))}</div></div>` +
+      `<div class="pvt" style="text-align:right;white-space:nowrap">` +
+        `<div class="cn">${n} skin${n===1?"":"s"}</div>` +
+        `<div class="cd">${strokes === 0 ? "0.0" : fmtStrokes(strokes)}</div></div></div>`;
+  }).join("");
+
+  if(table.carried > 0){
+    html += `<div class="note warn">${table.carried} skin${table.carried===1?"":"s"} still
+      carrying after the 18th. Those vanish — nobody is paid for them.</div>`;
+  }
+
+  html += `<div class="section-label">Hole by hole</div>`;
+  html += table.holes.map(h => {
+    const par = E.ABERDEEN_TEE_IV.par[h.hole - 1];
+    const avg = h.wonBy != null ? h.averages.get(h.wonBy) : null;
+    const right = h.wonBy != null
+      ? `<span class="cn">Cart ${esc(h.wonBy)}</span>` +
+        (h.pot > 1 ? ` <span class="tag">${h.pot} skins</span>` : ``)
+      : (h.averages.size === 0
+          ? `<span class="cd">not played</span>`
+          : `<span class="cd">tied — carries on</span>`);
+    return `<div class="prev"><div class="pv">` +
+        `<div class="pvn">Hole ${h.hole}<span class="cd" style="font-weight:700"> · par ${par}</span></div>` +
+        `<div class="pvd">${avg == null ? "&nbsp;" : "won on " + (Math.round(avg*10)/10)}</div>` +
+      `</div><div class="pvt">${right}</div></div>`;
+  }).join("");
+
+  html += `<div class="note">A cart's score on a hole is the <b>average</b> of its players' net
+    scores, not the total — that is what lets a one-man cart compete fairly, with no blind
+    partner. A tied hole carries its skin into the next.</div>`;
+
+  body.innerHTML = html;
 }
 
 /* ---------- import ---------- */
@@ -933,6 +1054,7 @@ load();
 buildTabs();
 renderBoard();
 renderSetup();
+renderSkins();
 renderImport();
 show(state.tab);
 </script>

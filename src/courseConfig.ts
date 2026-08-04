@@ -54,6 +54,16 @@ export interface BirdiePayout {
   byHole?: Record<number, number>;
 }
 
+/**
+ * What a skin is worth. Skins sits outside `maxContestStrokes` — that governs
+ * the six contests — and carries its own cap. Set the whole thing to null to
+ * switch Skins off for a round.
+ */
+export interface SkinsConfig {
+  perSkin: number;
+  cap: number;
+}
+
 /** Contest thresholds. Agony/Damage/Long/Shorty grade `<=`; Bounce grades `>=`. */
 export interface ContestConfig {
   /** Not a ladder — paid per pick. */
@@ -64,6 +74,8 @@ export interface ContestConfig {
   getShorty: Step[];
   bounceBack: Step[];
   maxContestStrokes: number;
+  /** Null switches Skins off; it then scores nothing and no cart is read. */
+  skins: SkinsConfig | null;
 }
 
 export const ABERDEEN_TEE_IV: CourseConfig = E.ABERDEEN_TEE_IV;

@@ -111,6 +111,9 @@
       { threshold: 1, strokes: -0.5 }, { threshold: 0, strokes: 0 },
     ],
     maxContestStrokes: 11.0,
+    // Skins scores into FINAL. It sits outside maxContestStrokes, which governs
+    // the six contests, and carries its own cap. Set to null to switch it off.
+    skins: { perSkin: -0.2, cap: -1.5 },
   };
 
   /* ---- Reading a handicap index that someone typed in ----
@@ -321,8 +324,114 @@
 
     return {
       name: card.name, courseHandicap: ch, gross, net: netTotal, netUncapped,
+      // Capped net per hole — what a match of cards is settled on.
+      netByHole: net,
       holesPlayed, contests: allContests, strokesEarned: earned, final,
     };
+  }
+
+  /* ---- Breaking a tie: golf's own match of cards ----
+     Every contest except Skins pays in halves, so equal finals are the norm
+     rather than the exception. The club's own rule settles them: the better
+     back nine, then the last six, the last three, and finally the 18th. */
+  const CARD_MATCH = [
+    { from: 10, to: 18, label: "the back nine" },
+    { from: 13, to: 18, label: "13–18" },
+    { from: 16, to: 18, label: "16–18" },
+    { from: 18, to: 18, label: "the 18th" },
+  ];
+
+  /** Capped net over holes `from`..`to` (1-based), or null if any is unplayed. */
+  function segmentNet(result, from, to) {
+    let total = 0;
+    for (let h = from; h <= to; h++) {
+      const n = result.netByHole[h - 1];
+      if (n == null) return null;
+      total += n;
+    }
+    return total;
+  }
+
+  /**
+   * Compare two equal finals by match of cards. Returns { order, label } where
+   * order is -1 if `a` takes the place, 1 if `b` does, 0 if they still share it.
+   *
+   * A man who did not finish cannot win a card match — there is no card to
+   * match — so he is placed below anyone who did, and two unfinished cards
+   * simply share.
+   */
+  function matchOfCards(a, b) {
+    const aDone = a.holesPlayed === HOLES, bDone = b.holesPlayed === HOLES;
+    if (aDone !== bDone) return { order: aDone ? -1 : 1, label: "a finished card" };
+    if (!aDone) return { order: 0, label: null };
+
+    for (const seg of CARD_MATCH) {
+      const x = segmentNet(a, seg.from, seg.to);
+      const y = segmentNet(b, seg.from, seg.to);
+      if (x == null || y == null) continue;
+      if (x !== y) return { order: x < y ? -1 : 1, label: seg.label };
+    }
+    return { order: 0, label: null };
+  }
+
+  /* ---- Skins ----
+     A cart's score on a hole is the AVERAGE of its players' net scores, not the
+     total: averaging is self-correcting, so a one-man cart competes fairly and
+     needs no blind partner. Lowest average wins the hole; a tie carries the pot
+     into the next; anything still carrying after the 18th simply vanishes. */
+  function skinsByGroup(entries, course) {
+    const members = new Map();
+    const order = [];
+    for (const entry of entries) {
+      const id = String(entry.group);
+      if (!members.has(id)) { members.set(id, []); order.push(id); }
+      members.get(id).push(cappedNetByHole(entry.card, course));
+    }
+
+    const skins = new Map(order.map((id) => [id, 0]));
+    const holes = [];
+    let pot = 1;
+
+    for (let h = 0; h < HOLES; h++) {
+      const averages = new Map();
+      for (const id of order) {
+        const played = members.get(id).map((nets) => nets[h]).filter((n) => n != null);
+        if (played.length > 0) {
+          averages.set(id, played.reduce((a, b) => a + b, 0) / played.length);
+        }
+      }
+      let wonBy = null;
+      if (averages.size > 0) {
+        let best = Infinity;
+        averages.forEach((avg) => { if (avg < best) best = avg; });
+        const winners = [];
+        averages.forEach((avg, id) => { if (avg === best) winners.push(id); });
+        if (winners.length === 1) {
+          wonBy = winners[0];
+          skins.set(wonBy, skins.get(wonBy) + pot);
+        }
+        // A tie leaves the pot to carry into the next hole.
+      }
+      holes.push({ hole: h + 1, averages, pot, wonBy });
+      pot = wonBy == null ? pot + 1 : 1;
+    }
+    return { skins, holes, carried: pot - 1 };
+  }
+
+  /** Cart Skins: group by cart. Same engine as teams — only membership differs. */
+  function cartSkins(entries, course) {
+    return skinsByGroup(entries.map((e) => ({ card: e.card, group: e.cart })), course);
+  }
+  /** Team Skins: identical engine, grouped by team instead of cart. */
+  function teamSkins(entries, course) {
+    return skinsByGroup(entries.map((e) => ({ card: e.card, group: e.team })), course);
+  }
+
+  /** What a count of skins is worth, at the configured rate and cap. */
+  function skinStrokes(count, config) {
+    const raw = Math.round(count * config.perSkin * 10) / 10;
+    if (raw === 0) return 0;                  // never hand back a negative zero
+    return raw < config.cap ? config.cap : raw;
   }
 
   /** Score a field, sorted by final (lowest first). Ties are left as ties. */
@@ -330,16 +439,90 @@
     return cards.map((c) => scorePlayer(c, course, contests)).sort((a, b) => (a.final == null ? Infinity : a.final) - (b.final == null ? Infinity : b.final));
   }
 
-  /** Leaderboard: scored field with competition ranks (equal finals share a rank). */
+  /**
+   * Leaderboard: the scored field, with Skins folded in, ordered, and placed.
+   *
+   * Skins can only be settled across the whole field, so it is added here
+   * rather than in scorePlayer. Equal finals are then separated by match of
+   * cards, and only genuinely level cards share a place.
+   */
   function computeLeaderboard(players, course, contests) {
+    const cards = players || SAMPLE_ROUND;
+    contests = contests || DEFAULT_CONTESTS;
     // `course` passes through untouched so a mixed-tee field resolves per card.
-    const results = scoreField(players || SAMPLE_ROUND, course, contests || DEFAULT_CONTESTS);
-    let lastFinal = null, lastRank = 0;
+    const results = cards.map((c) => scorePlayer(c, course, contests));
+
+    applyCartSkins(cards, results, course, contests);
+
+    results.sort((a, b) => {
+      const fa = a.final == null ? Infinity : a.final;
+      const fb = b.final == null ? Infinity : b.final;
+      if (fa !== fb) return fa - fb;
+      return matchOfCards(a, b).order;
+    });
+
+    // Place them. A man shares the place above only if the cards are level too.
+    let lastRank = 0;
     results.forEach((r, i) => {
-      if (r.final !== lastFinal) { lastRank = i + 1; lastFinal = r.final; }
-      r.rank = lastRank;
+      const prev = i > 0 ? results[i - 1] : null;
+      if (!prev || prev.final !== r.final) {
+        lastRank = i + 1;
+        r.rank = lastRank;
+        return;
+      }
+      const m = matchOfCards(prev, r);
+      if (m.order === 0) {
+        r.rank = lastRank;                       // genuinely level: share it
+        prev.cardMatch = { shared: true, wonBy: null };
+        r.cardMatch = { shared: true, wonBy: null };
+      } else {
+        lastRank = i + 1;
+        r.rank = lastRank;
+        // The man above took the place, and this is what took it.
+        if (!prev.cardMatch || !prev.cardMatch.shared) {
+          prev.cardMatch = { shared: false, wonBy: m.label };
+        }
+      }
     });
     return results;
+  }
+
+  /**
+   * Score Skins by cart across the field and fold it into each final.
+   * A player with no cart number simply doesn't compete for skins — he scores
+   * zero from it rather than breaking the round for everyone else.
+   */
+  function applyCartSkins(cards, results, course, contests) {
+    if (!contests.skins) return null;
+    const entered = [];
+    cards.forEach((c) => {
+      if (c.cart != null && String(c.cart).trim() !== "") entered.push({ card: c, cart: c.cart });
+    });
+    if (entered.length === 0) return null;
+
+    const table = cartSkins(entered, course);
+    cards.forEach((card, i) => {
+      const r = results[i];
+      if (card.cart == null || String(card.cart).trim() === "") {
+        r.contests.skins = { strokes: 0, detail: "no cart", live: false };
+        return;
+      }
+      const count = table.skins.get(String(card.cart)) || 0;
+      const strokes = skinStrokes(count, contests.skins);
+      r.contests.skins = {
+        strokes, live: true,
+        detail: count + " skin" + (count === 1 ? "" : "s") + " for cart " + card.cart,
+      };
+      r.skins = count;
+      r.strokesEarned = Math.round((r.strokesEarned + strokes) * 100) / 100;
+      if (r.net != null) {
+        let f = Math.round((r.net + r.strokesEarned) * 100) / 100;
+        const c = courseFor(card, course);
+        if (c.floor != null) f = Math.max(c.floor, f);
+        r.final = f;
+      }
+    });
+    return table;
   }
 
   /* ---- Section 11 round: the leaderboard's initial data (31 July) ---- */
@@ -358,6 +541,7 @@
     ABERDEEN_TEE_IV, ABERDEEN_TEES, TEE_IDS, GENDERS, DEFAULT_CONTESTS, SAMPLE_ROUND,
     courseForTee, courseFor, grossFromNet,
     parseHandicapIndex, formatHandicapIndex,
+    skinsByGroup, cartSkins, teamSkins, skinStrokes, matchOfCards, CARD_MATCH,
     courseHandicap, resolveCourseHandicap, strokesOnHole, netOnHole, cappedNetByHole,
     birdiePickHoles,
     scorePlayer, scoreField, computeLeaderboard,
