@@ -46,6 +46,10 @@ export interface SkinsResult {
   holes: HoleSkinResult[];
   /** Skins left unresolved by a tie on the final hole — these vanish. */
   carried: number;
+  /** How many groups competed; set when scored through `computeLeaderboard`. */
+  cartCount?: number;
+  /** The cap this field's size produced, in strokes. */
+  cap?: number;
 }
 
 /** Two players per cart, cart against cart. */
@@ -69,5 +73,8 @@ export const cartSkins: (entries: CartEntry[], course?: CourseConfig) => SkinsRe
 /** Team Skins: identical engine, grouped by team instead of cart. */
 export const teamSkins: (entries: TeamEntry[], course?: CourseConfig) => SkinsResult = E.teamSkins;
 
-/** What a count of skins is worth in strokes, at the configured rate and cap. */
-export const skinStrokes: (count: number, config: SkinsConfig) => number = E.skinStrokes;
+/** What a count of skins is worth in strokes, at the configured rate and the field's cap. */
+export const skinStrokes: (count: number, config: SkinsConfig, cartCount: number) => number = E.skinStrokes;
+
+/** The most Skins can pay in a field of this many carts — one cart's even share. */
+export const skinCap: (config: SkinsConfig, cartCount: number) => number = E.skinCap;

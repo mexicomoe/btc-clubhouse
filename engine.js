@@ -21,6 +21,13 @@
   const sum = (a) => a.reduce((x, y) => x + y, 0);
   const range = (n) => Array.from({ length: n }, (_, i) => i);
   const signed = (n) => (n >= 0 ? "+" + n : "" + n);
+  /**
+   * Round to a tenth — every value in the game is a multiple of 0.1. Rounds on
+   * the magnitude so a half lands the same way either side of zero: Math.round
+   * alone takes -4.5 to -4 but 4.5 to 5, which would make a penalty and a credit
+   * of the same size round differently. Never returns a negative zero.
+   */
+  const toTenth = (v) => (v === 0 ? 0 : (v < 0 ? -1 : 1) * Math.round(Math.abs(v) * 10) / 10);
 
   /* ---- Course config: Aberdeen, nine tees, two stroke indexes ----
      Par is 72 from every tee and the holes don't move, so par and the Agony
@@ -113,7 +120,12 @@
     maxContestStrokes: 11.0,
     // Skins scores into FINAL. It sits outside maxContestStrokes, which governs
     // the six contests, and carries its own cap. Set to null to switch it off.
-    skins: { perSkin: -0.2, cap: -1.5 },
+    //
+    // The cap is one cart's even share of the eighteen skins, so it tightens as
+    // the field grows: two carts −1.8, four −0.9, six −0.6. A fixed cap cannot
+    // work — split eighteen skins two ways and both carts clear any fixed
+    // ceiling, so the contest pays everyone the same and decides nothing.
+    skins: { perSkin: -0.2, capSkins: 18 },
   };
 
   /* ---- Reading a handicap index that someone typed in ----
@@ -437,11 +449,22 @@
     return skinsByGroup(entries.map((e) => ({ card: e.card, group: e.team })), course);
   }
 
-  /** What a count of skins is worth, at the configured rate and cap. */
-  function skinStrokes(count, config) {
-    const raw = Math.round(count * config.perSkin * 10) / 10;
+  /**
+   * The most Skins can be worth in a field of `cartCount` carts: one cart's
+   * even share of the eighteen on offer. Rounded to a tenth like every other
+   * value in the game. With no carts to divide by, the whole board is the cap.
+   */
+  function skinCap(config, cartCount) {
+    const share = cartCount > 0 ? config.capSkins / cartCount : config.capSkins;
+    return toTenth(share * config.perSkin);
+  }
+
+  /** What a count of skins is worth, at the configured rate and the field's cap. */
+  function skinStrokes(count, config, cartCount) {
+    const raw = toTenth(count * config.perSkin);
     if (raw === 0) return 0;                  // never hand back a negative zero
-    return raw < config.cap ? config.cap : raw;
+    const cap = skinCap(config, cartCount);
+    return raw < cap ? cap : raw;
   }
 
   /** Score a field, sorted by final (lowest first). Ties are left as ties. */
@@ -524,6 +547,11 @@
     if (entered.length === 0) return null;
 
     const table = cartSkins(entered, course);
+    // The cap is set by how many carts are actually competing, not by the
+    // number of players — two men in a cart share one cart's share.
+    const cartCount = table.skins.size;
+    table.cartCount = cartCount;
+    table.cap = skinCap(contests.skins, cartCount);
     cards.forEach((card, i) => {
       const r = results[i];
       if (r.holesPlayed === 0) {
@@ -536,10 +564,13 @@
         return;
       }
       const count = table.skins.get(String(card.cart)) || 0;
-      const strokes = skinStrokes(count, contests.skins);
+      const strokes = skinStrokes(count, contests.skins, cartCount);
+      const capped = count > 0 && strokes === table.cap
+        && Math.round(count * contests.skins.perSkin * 10) / 10 < table.cap;
       r.contests.skins = {
         strokes, live: true,
-        detail: count + " skin" + (count === 1 ? "" : "s") + " for cart " + card.cart,
+        detail: count + " skin" + (count === 1 ? "" : "s") + " for cart " + card.cart
+          + (capped ? " · capped" : ""),
       };
       r.skins = count;
       r.strokesEarned = Math.round((r.strokesEarned + strokes) * 100) / 100;
@@ -569,7 +600,7 @@
     ABERDEEN_TEE_IV, ABERDEEN_TEES, TEE_IDS, GENDERS, DEFAULT_CONTESTS, SAMPLE_ROUND,
     courseForTee, courseFor, grossFromNet,
     parseHandicapIndex, formatHandicapIndex,
-    skinsByGroup, cartSkins, teamSkins, skinStrokes, matchOfCards, CARD_MATCH,
+    skinsByGroup, cartSkins, teamSkins, skinStrokes, skinCap, matchOfCards, CARD_MATCH,
     courseHandicap, resolveCourseHandicap, strokesOnHole, netOnHole, cappedNetByHole,
     birdiePickHoles,
     scorePlayer, scoreField, computeLeaderboard,

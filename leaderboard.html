@@ -778,10 +778,14 @@ function renderSkins(){
     ? carts.length + " cart" + (carts.length===1?"":"s") + " · 18 skins on the round"
     : "No scores imported yet";
 
+  // The cap is one cart's even share of the eighteen, so it depends on how many
+  // carts are out — pass the count or every total comes back uncapped.
+  const cap = E.skinCap(config, carts.length);
+
   let html = `<div class="section-label">Totals by cart</div>`;
   html += carts.slice().sort((a,b) => won(b) - won(a) || (Number(a)||0)-(Number(b)||0)).map(id => {
     const n = won(id);
-    const strokes = E.skinStrokes(n, config);
+    const strokes = E.skinStrokes(n, config, carts.length);
     return `<div class="contest"><div class="cname">` +
       `<div class="cn">Cart ${esc(id)}</div>` +
       `<div class="cd">${esc(byCart.get(id).join(" &amp; ").replace(/&amp;/g, "&"))}</div></div>` +
@@ -789,6 +793,10 @@ function renderSkins(){
         `<div class="cn">${n} skin${n===1?"":"s"}</div>` +
         `<div class="cd">${strokes === 0 ? "0.0" : fmtStrokes(strokes)}</div></div></div>`;
   }).join("");
+
+  html += `<div class="note">Most a cart can earn today: <b>${fmtStrokes(cap)}</b> —
+    an even share of the eighteen skins between ${carts.length} cart${carts.length===1?"":"s"}.
+    The fewer carts are out, the more the skins are worth.</div>`;
 
   if(table.carried > 0){
     html += `<div class="note warn">${table.carried} skin${table.carried===1?"":"s"} still

@@ -60,8 +60,16 @@ export interface BirdiePayout {
  * switch Skins off for a round.
  */
 export interface SkinsConfig {
+  /** What one skin is worth. */
   perSkin: number;
-  cap: number;
+  /**
+   * The skins on offer over a round — 18. The cap is one cart's even share of
+   * them, `(capSkins / carts) × perSkin`, so it tightens as the field grows:
+   * two carts −1.8, four −0.9, six −0.6. A fixed cap cannot work, because
+   * eighteen skins split two ways clear any fixed ceiling both ways and the
+   * contest then pays everyone the same.
+   */
+  capSkins: number;
 }
 
 /** Contest thresholds. Agony/Damage/Long/Shorty grade `<=`; Bounce grades `>=`. */
