@@ -19,8 +19,9 @@ import {
   birdiePickHoles, type PlayerCard,
 } from "../src/scoring.ts";
 
-const MENS_SI = [13, 11, 17, 1, 3, 7, 5, 15, 9, 12, 6, 14, 16, 8, 10, 4, 18, 2];
-const WOMENS_SI = [7, 13, 15, 1, 3, 5, 9, 17, 11, 2, 12, 16, 18, 8, 4, 10, 14, 6];
+// Golf Genius's allocation — the one that actually computes the posted net.
+const MENS_SI = [9, 5, 17, 1, 3, 7, 13, 15, 11, 6, 10, 8, 16, 14, 4, 12, 18, 2];
+const WOMENS_SI = [9, 11, 17, 1, 3, 7, 5, 15, 13, 4, 12, 16, 18, 8, 6, 10, 14, 2];
 
 test("nine tees, each rated for both fields", () => {
   assert.deepEqual(TEE_IDS, ["I", "I/II", "II", "II/III", "III", "III/IV", "IV", "IV/V", "V"]);
@@ -99,13 +100,15 @@ test("a card carries its own tee and gender", () => {
 });
 
 test("the women's stroke index changes which holes get the strokes", () => {
-  // Hole 10 is stroke index 12 for the men and 2 for the women, so a 26 handicap
-  // gets one shot there off the men's card and two off the women's.
-  const card: PlayerCard = { name: "x", courseHandicap: 26, gross: LEVEL, tee: "IV" };
+  // Hole 12 is stroke index 8 for the men and 16 for the women, so off a course
+  // handicap of 12 the men take a shot there and the women take none.
+  assert.equal(MENS_SI[11], 8);
+  assert.equal(WOMENS_SI[11], 16);
+  const card: PlayerCard = { name: "x", courseHandicap: 12, gross: LEVEL, tee: "IV" };
   const asMen = cappedNetByHole({ ...card, gender: "M" }, undefined as never);
   const asWomen = cappedNetByHole({ ...card, gender: "F" }, undefined as never);
-  assert.equal(asMen[9], 4 - 1, "men: one stroke on hole 10");
-  assert.equal(asWomen[9], 4 - 2, "women: two strokes on hole 10");
+  assert.equal(asMen[11], 4 - 1, "men: a shot on hole 12");
+  assert.equal(asWomen[11], 4, "women: none");
 });
 
 test("a mixed field is scored tee by tee in one leaderboard", () => {

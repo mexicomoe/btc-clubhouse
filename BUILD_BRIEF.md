@@ -132,6 +132,7 @@ Lowest cart average wins the hole. **Tied holes carry over** — the next hole i
 | A hole scored worse than net double | Capped to net double before anything else runs. |
 | Odd number of players | Organiser assigns cart numbers; a cart of one is legal. |
 | A hole not yet played | Blank, never zero. Zero is a score. |
+| A player picks up | Golf Genius prints `X`. Scored par + 4 gross, so the cap takes it to net double. The hole still counts as played, so an X'd card is a full round and can win. Shown as X, never as the filled figure. |
 | Score typed wrong | Every entry must be editable at any time, and everything recomputes. |
 | Two players tie | Show the tie. Do not invent a tiebreak in v1. |
 
@@ -195,11 +196,18 @@ The eight lowest-index players from 19 December, scored by the spreadsheet. Any 
 
 ```
 par by hole    4 4 3 5 4 4 5 3 4 4 4 4 3 4 4 5 3 5     (total 72)
-stroke index   13 11 17 1 3 7 5 15 9 12 6 14 16 8 10 4 18 2
+stroke index    9  5 17 1 3 7 13 15 11  6 10  8 16 14  4 12 18  2   (Golf Genius, men)
 slope 117 · course rating 65.3 · Agony Alley = holes 4, 5, 6
 ```
 
 **The stroke index is essential and appears in no export.** Net *totals* come out right whatever index you assume — a 19-handicap gets 19 strokes wherever they fall — but every contest depends on *which* holes receive them. **Matching net totals with mismatched contests means the stroke index is wrong.** That is the single most likely failure in this build.
+
+**Use Golf Genius's allocation, not the printed card.** The two disagree on ten holes, and Golf Genius's is the one that computes the net actually posted against these rounds. The switch was measured across the club's cards: the contests are unmoved — same clear rates, correlations within 0.02 — and of the sixteen reference finals only one moves at all (Finn, section 11). The women play a different allocation again:
+
+```
+men      9  5 17  1  3  7 13 15 11   6 10  8 16 14  4 12 18  2
+women    9 11 17  1  3  7  5 15 13   4 12 16 18  8  6 10 14  2
+```
 
 **Source data:** `Hole by Hole Excel Export -- Spreadsheet Composer.xlsx`. Hole columns are **gross**. Do not use the TGIF file for these eight — it is a different round, different players, and its hole columns are net.
 
@@ -265,7 +273,10 @@ Verified: Sid Ferndale's 18 holes sum to 72, which matches the Net column. His T
 
 - Split the handicap out of the name with a trailing-parenthesis match; keep the name for display and the number for reference only.
 - Ignore the Out, In and Net columns; recompute everything from the 18 hole values so a bad export is caught rather than trusted.
-- Blank or non-numeric cell means the hole was not played.
+- **A blank cell means the hole was not played. An `X` does not.** Golf Genius prints X where a man picked up; that hole **was** played and scores **par + 4 gross**, which the net double bogey cap takes to net double — what picking up means. Any mark that isn't a number reads the same way.
+- **A picked-up hole counts towards the eighteen.** A man who X'd three holes went round and can win; walking in after twelve is a different thing and is not eligible. Getting this wrong quietly disqualifies him.
+- Show an X as an X, never as the par + 4 that was filled in, or somebody will read it as a score he made.
+- A card with an X on it cannot be summed against Out/In/Total, so gross and net cannot be told apart by arithmetic — the organiser is asked which the columns are rather than the paste being called broken.
 - Sheet 1 of the same file holds Golf Genius's own skins result — a free cross-check on the Cart Skins maths.
 
 
@@ -294,7 +305,7 @@ Hoyt      7  5  4  8  8  4  8  4  6  5  6  7  4  7  5  5  4  6
 |---|---|---|---|---|---|---|
 | Dex | 23 | 93 | 6 / 14 | 70 | 5.00 | **65.00** |
 | Alex | 18 | 90 | 1 / 10 | 72 | 5.00 | **67.00** |
-| Finn | 26 | 99 | 1 / 10 | 73 | 5.00 | **68.00** |
+| Finn | 26 | 99 | 1 / 10 | 73 | 4.50 | **68.50** |
 | Boyd | 21 | 96 | 2 / 11 | 75 | 5.00 | **70.00** |
 | Emmet | 14 | 91 | 9 / 15 | 77 | 0.50 | **76.50** |
 | Chip | 15 | 94 | 5 / 12 | 79 | 1.50 | **77.50** |
@@ -307,7 +318,7 @@ Hoyt      7  5  4  8  8  4  8  4  6  5  6  7  4  7  5  5  4  6
 >
 > Change a single pick and the finals move, and so can the order. **Get the real picks before treating any number here as a reference.** The same warning applies to the section 9 table.
 
-**Cart skins** with carts 1,1,2,2,3,3,4,4 in the order Alex, Boyd, Chip, Dex, Emmet, Finn, Grady, Hoyt: **5, 9, 1, 3** — eighteen, all accounted for.
+**Cart skins** with carts 1,1,2,2,3,3,4,4 in the order Alex, Boyd, Chip, Dex, Emmet, Finn, Grady, Hoyt: **6, 9, 1, 2** — eighteen, all accounted for.
 
 ### Why this round is a better test than section 9
 

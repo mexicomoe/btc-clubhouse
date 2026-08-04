@@ -35,8 +35,12 @@
      the women play a different stroke index — which changes which holes receive
      strokes, and so changes every contest, not just the net total. */
   const ABERDEEN_PAR = [4, 4, 3, 5, 4, 4, 5, 3, 4, 4, 4, 4, 3, 4, 4, 5, 3, 5];
-  const ABERDEEN_SI_MEN = [13, 11, 17, 1, 3, 7, 5, 15, 9, 12, 6, 14, 16, 8, 10, 4, 18, 2];
-  const ABERDEEN_SI_WOMEN = [7, 13, 15, 1, 3, 5, 9, 17, 11, 2, 12, 16, 18, 8, 4, 10, 14, 6];
+  // Golf Genius's allocation, which is what actually computes the net posted
+  // against these rounds. The printed card disagrees on ten holes; measured over
+  // the club's cards the contests are unmoved — same clear rates, correlations
+  // within 0.02 — but every net is settled on these, so these are the ones.
+  const ABERDEEN_SI_MEN = [9, 5, 17, 1, 3, 7, 13, 15, 11, 6, 10, 8, 16, 14, 4, 12, 18, 2];
+  const ABERDEEN_SI_WOMEN = [9, 11, 17, 1, 3, 7, 5, 15, 13, 4, 12, 16, 18, 8, 6, 10, 14, 2];
 
   /** Tee id → course rating and slope, per gender. */
   const ABERDEEN_TEES = {
@@ -190,6 +194,19 @@
     if (strokeIndex <= courseHcp - 36) n++;
     return n;
   }
+  /**
+   * Picking up. Golf Genius prints an X where a man lifted his ball, and any
+   * mark that isn't a number means the same thing. It is scored as par + 4
+   * gross, which the net double bogey cap then takes to net double — which is
+   * what picking up means. The hole still counts as played: a man who X'd three
+   * holes went round eighteen and can win. That is a different thing entirely
+   * from walking in after twelve, which is a card that cannot be placed.
+   */
+  const PICKED_UP_OVER_PAR = 4;
+  const isPickedUp = (v) => v != null && typeof v !== "number";
+  const grossOnHole = (v, par) =>
+    v == null ? null : (isPickedUp(v) ? par + PICKED_UP_OVER_PAR : v);
+
   function netOnHole(gross, par, strokeIndex, courseHcp) {
     if (gross == null) return null;
     return Math.min(gross - strokesOnHole(strokeIndex, courseHcp), par + 2);
@@ -197,7 +214,8 @@
   function cappedNetByHole(card, course) {
     course = courseFor(card, course);
     const ch = resolveCourseHandicap(card, course);
-    return course.par.map((par, i) => netOnHole(card.gross[i], par, course.strokeIndex[i], ch));
+    return course.par.map((par, i) =>
+      netOnHole(grossOnHole(card.gross[i], par), par, course.strokeIndex[i], ch));
   }
 
   /**
@@ -252,19 +270,24 @@
     contests = contests || DEFAULT_CONTESTS;
     const ch = resolveCourseHandicap(card, course);
 
-    const net = course.par.map((par, i) => netOnHole(card.gross[i], par, course.strokeIndex[i], ch));
+    // A picked-up hole becomes par + 4 here and is a played hole from now on.
+    const grossByHole = course.par.map((par, i) => grossOnHole(card.gross[i], par));
+    const pickedUpHoles = [];
+    card.gross.forEach((v, i) => { if (isPickedUp(v)) pickedUpHoles.push(i + 1); });
+
+    const net = course.par.map((par, i) => netOnHole(grossByHole[i], par, course.strokeIndex[i], ch));
     const played = (i) => net[i] != null;
     const over = (i) => net[i] - course.par[i];
 
     const holesPlayed = net.filter((n) => n != null).length;
-    const gross = card.gross.some((g) => g != null) ? sum(card.gross.filter((g) => g != null)) : null;
+    const gross = grossByHole.some((g) => g != null) ? sum(grossByHole.filter((g) => g != null)) : null;
     const netTotal = holesPlayed > 0 ? sum(net.filter((n) => n != null)) : null;
 
     let netUncapped = null;
     if (holesPlayed > 0) {
       netUncapped = 0;
       for (let i = 0; i < HOLES; i++) {
-        if (card.gross[i] != null) netUncapped += card.gross[i] - strokesOnHole(course.strokeIndex[i], ch);
+        if (grossByHole[i] != null) netUncapped += grossByHole[i] - strokesOnHole(course.strokeIndex[i], ch);
       }
     }
 
@@ -348,6 +371,10 @@
       name: card.name, courseHandicap: ch, gross, net: netTotal, netUncapped,
       // Capped net per hole — what a match of cards is settled on.
       netByHole: net,
+      /** Gross per hole with picked-up holes filled in at par + 4. */
+      grossByHole,
+      /** Hole numbers he picked up on — shown as X, never as the filled figure. */
+      pickedUpHoles,
       holesPlayed, contests: allContests, strokesEarned: earned, final,
     };
   }
@@ -613,6 +640,7 @@
     ABERDEEN_TEE_IV, ABERDEEN_TEES, TEE_IDS, GENDERS, DEFAULT_CONTESTS, SAMPLE_ROUND,
     courseForTee, courseFor, grossFromNet,
     parseHandicapIndex, formatHandicapIndex,
+    PICKED_UP_OVER_PAR, isPickedUp, grossOnHole,
     skinsByGroup, cartSkins, teamSkins, skinStrokes, skinCap, matchOfCards, CARD_MATCH,
     courseHandicap, resolveCourseHandicap, strokesOnHole, netOnHole, cappedNetByHole,
     birdiePickHoles,

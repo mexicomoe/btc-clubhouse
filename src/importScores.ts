@@ -23,9 +23,15 @@ export interface ImportedCard {
   /** Course handicap from the "(n)" suffix — for reference and, for gross holes,
    *  to recompute net. `null` if the name carried no parenthetical. */
   handicap: number | null;
-  /** The eighteen hole values exactly as pasted; `null` = hole not played. */
-  holes: (number | null)[];
+  /**
+   * The eighteen hole values as pasted. `null` = the hole was not played;
+   * `"X"` = he picked up, which IS a played hole and scores par + 4 gross.
+   */
+  holes: (number | string | null)[];
+  /** Holes played, counting picked-up ones — an X card is still a full round. */
   holesPlayed: number;
+  /** How many of them he picked up on. */
+  pickedUp: number;
   /** What the hole numbers are, decided by which total the 18 holes sum to. */
   mode: HoleMode;
   /** The Total column — the gross total, kept to reconcile against Golf Genius. */
@@ -48,6 +54,9 @@ export const splitName: (cell: string) => { name: string; handicap: number | nul
 
 /** Turn a GROSS-hole imported card into a PlayerCard the scoring engine can run. */
 export const grossCardToPlayer: (card: ImportedCard, picks?: BirdiePicks) => PlayerCard = I.grossCardToPlayer;
+
+/** The marker a picked-up hole carries in `holes` — Golf Genius prints it as X. */
+export const PICKED_UP: string = I.PICKED_UP;
 
 /** Case- and spacing-insensitive key for matching a pasted row to a setup player. */
 export const normaliseName: (name: string) => string = I.normaliseName;

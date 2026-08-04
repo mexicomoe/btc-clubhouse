@@ -25,6 +25,8 @@
  */
 (function () {
   const HOLES = 18;
+  /** A hole the player picked up on. Golf Genius prints it as X. */
+  const PICKED_UP = "X";
 
   /** Section-10 fixed layout: name, 1–9, Out, 10–18, In, Total, Net. */
   const FIXED_LAYOUT = {
@@ -64,24 +66,33 @@
         continue;
       }
 
-      const holes = layout.holeCols.map((i) => numOrNull(cells[i]));
+      const holes = layout.holeCols.map((i) => holeValue(cells[i]));
       const grossTotal = layout.totalCol != null ? numOrNull(cells[layout.totalCol]) : null;
       const netTotal = layout.netCol != null ? numOrNull(cells[layout.netCol]) : null;
+      // A picked-up hole was played, so it counts towards the eighteen.
       const holesPlayed = holes.filter((h) => h != null).length;
+      const pickedUp = holes.filter((h) => h === PICKED_UP).length;
 
-      const verdict = classify(name, holes, holesPlayed, grossTotal, netTotal);
+      const verdict = classify(name, holes, holesPlayed, pickedUp, grossTotal, netTotal);
       if (verdict.error) errors.push(verdict.error);
 
-      cards.push({ name, handicap, holes, holesPlayed, mode: verdict.mode, grossTotal, netTotal });
+      cards.push({ name, handicap, holes, holesPlayed, pickedUp,
+                   mode: verdict.mode, grossTotal, netTotal });
     }
 
     return { cards, errors };
   }
 
   /** Decide gross vs net for one card by which total the 18 holes sum to. */
-  function classify(name, holes, holesPlayed, grossTotal, netTotal) {
+  function classify(name, holes, holesPlayed, pickedUp, grossTotal, netTotal) {
     if (grossTotal == null) {
       return { mode: "unknown", error: name + ": no Total column — cannot read the card." };
+    }
+    if (pickedUp > 0) {
+      // A picked-up hole has no number to add, so the eighteen cannot be summed
+      // against either total and gross cannot be told from net this way. Not an
+      // error — the card is fine, it just needs telling which the columns are.
+      return { mode: "unknown" };
     }
     if (holesPlayed < HOLES) {
       // A partial round has nothing to sum against, so gross vs net can't be told
@@ -166,6 +177,26 @@
     if (t === "") return null;
     const n = Number(t);
     return Number.isFinite(n) ? n : null;
+  }
+
+  /**
+   * One hole cell. Three outcomes, and the difference between the last two
+   * matters more than it looks:
+   *
+   *   ""   → null        the hole was not played
+   *   "5"  → 5           a score
+   *   "X"  → PICKED_UP   the hole WAS played; he picked up
+   *
+   * A picked-up hole still counts towards the eighteen, so a man who X'd three
+   * holes played a full round and can win. Reading X as "not played" would make
+   * him a fourteen-hole card and take him out of the competition.
+   */
+  function holeValue(v) {
+    if (v == null) return null;
+    const t = String(v).trim();
+    if (t === "") return null;
+    const n = Number(t);
+    return Number.isFinite(n) ? n : PICKED_UP;
   }
 
   /**
@@ -269,5 +300,6 @@
   globalThis.ClubhouseImporter = {
     parseScores, splitName, grossCardToPlayer,
     normaliseName, unreverseName, stripHandicap, canonicalName, initialKey, matchName,
+    PICKED_UP,
   };
 })();

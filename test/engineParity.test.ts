@@ -20,7 +20,7 @@ const html = readFileSync(new URL("../leaderboard.html", import.meta.url), "utf8
 
 // The section-11 finals, with Watch the Birdie in place of Call Your Number.
 const EXPECTED: Record<string, string> = {
-  Dex: "65.00", Alex: "67.00", Finn: "68.00", Boyd: "70.00",
+  Dex: "65.00", Alex: "67.00", Finn: "68.50", Boyd: "70.00",
   Emmet: "76.50", Chip: "77.50", Grady: "78.50", Hoyt: "79.50",
 };
 

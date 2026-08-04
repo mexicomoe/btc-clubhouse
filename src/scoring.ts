@@ -34,8 +34,12 @@ export interface PlayerCard {
   tee?: string;
   /** Men and women play different tees AND a different stroke index. Defaults to "M". */
   gender?: Gender;
-  /** Gross score per hole (18 entries). `null` = hole not played; never 0. */
-  gross: (number | null)[];
+  /**
+   * Gross score per hole (18 entries). `null` = hole not played; never 0.
+   * A non-numeric entry — Golf Genius prints "X" — means he picked up: the hole
+   * WAS played and scores par + 4 gross, which the cap takes to net double.
+   */
+  gross: (number | string | null)[];
   /** Cart number. Without one a player scores zero from Skins. */
   cart?: string | number | null;
   /**
@@ -69,6 +73,10 @@ export interface PlayerResult {
   netUncapped: number | null;
   /** Capped net per hole — what a match of cards is settled on. */
   netByHole: (number | null)[];
+  /** Gross per hole, with picked-up holes filled in at par + 4. */
+  grossByHole: (number | null)[];
+  /** Hole numbers he picked up on. Show these as X, never as the filled figure. */
+  pickedUpHoles: number[];
   holesPlayed: number;
   contests: {
     watchTheBirdie: ContestResult;

@@ -35,7 +35,7 @@ interface Reference {
 const REFERENCE: Reference[] = [
   ref("Dex",   23, { front: 6, back: 14 }, [5,5,4,6,6,6,7,3,5,4,4,6,3,6,6,6,6,5], 93, 70, 5.00, 65.00),
   ref("Alex",  18, { front: 1, back: 10 }, [5,5,3,6,5,5,6,3,5,7,5,5,4,4,6,6,3,7], 90, 72, 5.00, 67.00),
-  ref("Finn",  26, { front: 1, back: 10 }, [5,6,6,7,5,4,7,4,7,6,7,5,3,5,5,6,4,7], 99, 73, 5.00, 68.00),
+  ref("Finn",  26, { front: 1, back: 10 }, [5,6,6,7,5,4,7,4,7,6,7,5,3,5,5,6,4,7], 99, 73, 4.50, 68.50),
   ref("Boyd",  21, { front: 2, back: 11 }, [6,5,4,7,6,5,7,4,5,6,6,5,4,5,7,4,4,6], 96, 75, 5.00, 70.00),
   ref("Emmet", 14, { front: 9, back: 15 }, [6,5,3,7,7,6,5,3,5,4,5,5,3,5,6,7,3,6], 91, 77, 0.50, 76.50),
   ref("Chip",  15, { front: 5, back: 12 }, [6,5,4,8,6,5,5,4,5,5,6,3,5,6,6,5,4,6], 94, 79, 1.50, 77.50),
@@ -90,12 +90,12 @@ const CARTS: CartEntry[] = [
   { cart: 4, card: REFERENCE.find((r) => r.card.name === "Hoyt")!.card },
 ];
 
-test("section 11 · Cart Skins reproduces 5, 9, 1, 3", () => {
+test("section 11 · Cart Skins reproduces 6, 9, 1, 2", () => {
   const { skins, carried } = cartSkins(CARTS, ABERDEEN_TEE_IV);
-  assert.equal(skins.get("1"), 5, "Cart 1");
+  assert.equal(skins.get("1"), 6, "Cart 1");
   assert.equal(skins.get("2"), 9, "Cart 2");
   assert.equal(skins.get("3"), 1, "Cart 3");
-  assert.equal(skins.get("4"), 3, "Cart 4");
+  assert.equal(skins.get("4"), 2, "Cart 4");
   const total = [...skins.values()].reduce((a, b) => a + b, 0);
   assert.equal(total + carried, 18, "eighteen skins accounted for");
   assert.equal(carried, 0);

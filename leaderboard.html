@@ -209,6 +209,17 @@
   .tag { display: inline-block; padding: 4px 9px; border: 2px solid var(--ink); border-radius: 6px; font-size: 18px; font-weight: 800; }
   .tag.no { color: var(--penalty); border-color: var(--penalty); }
   .empty { padding: 28px 18px; font-size: 20px; font-weight: 700; }
+
+  /* The card, nine holes to a row. Numbers stay at 18px+ like everything else. */
+  .cardwrap { padding: 8px 12px 4px; }
+  table.card { width: 100%; border-collapse: collapse; margin-bottom: 10px; table-layout: fixed; }
+  table.card th, table.card td {
+    border: 2px solid var(--ink); text-align: center; padding: 8px 0;
+    font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums;
+  }
+  table.card tr.hn th { background: var(--wash); font-size: 18px; }
+  table.card td.blank { color: var(--ink); }
+  table.card td.xup { background: var(--ink); color: var(--paper); }
 </style>
 </head>
 <body>
@@ -570,6 +581,27 @@ function showPlayer(name){
         `<span><span class="lab">Final</span><br><span class="fin">${fmtFinal(r.final)}</span></span>` +
       `</div>`;
   }
+  // The card itself, nine holes to a row. A hole he picked up shows X, never the
+  // par + 4 the engine filled in — nobody should read that as a score he made.
+  if(r.holesPlayed > 0){
+    const cell = (i) => {
+      if(card.gross[i] == null) return `<td class="blank">–</td>`;
+      if(E.isPickedUp(card.gross[i])) return `<td class="xup">X</td>`;
+      return `<td>${r.grossByHole[i]}</td>`;
+    };
+    const nine = (from) =>
+      `<table class="card"><tr class="hn">` +
+      Array.from({length:9}, (_,k) => `<th>${from+k}</th>`).join("") + `</tr><tr>` +
+      Array.from({length:9}, (_,k) => cell(from-1+k)).join("") + `</tr></table>`;
+    html += `<div class="section-label">His card</div>` +
+      `<div class="cardwrap">${nine(1)}${nine(10)}</div>`;
+    if(r.pickedUpHoles.length){
+      html += `<div class="note">Picked up on ${r.pickedUpHoles.length===1?"hole":"holes"} ` +
+        `${esc(r.pickedUpHoles.join(", "))} — scored net double, which is what picking up means. ` +
+        `Those holes still count: this is a full round.</div>`;
+    }
+  }
+
   html += `<div class="section-label">The contests</div>`;
 
   for(const key of CONTEST_ORDER){
@@ -972,7 +1004,11 @@ function assess(row, idx, all){
     // again against this player's own stroke index.
     const ch = card.handicap != null ? card.handicap : chOf(player);
     if(ch == null){ out.problems.push("no course handicap in the paste to undo the strokes"); return out; }
-    out.gross = E.grossFromNet(card.holes, course, ch);
+    // A picked-up hole has no net to add strokes back to — it carries its X
+    // through untouched and the engine fills it in at par + 4.
+    const numeric = card.holes.map(h => E.isPickedUp(h) ? null : h);
+    const rebuilt = E.grossFromNet(numeric, course, ch);
+    out.gross = card.holes.map((h, i) => E.isPickedUp(h) ? h : rebuilt[i]);
     out.usedHandicap = ch;
   }
 
@@ -990,9 +1026,16 @@ function assess(row, idx, all){
     out.appliedFrom = "index";
     out.warnings.push("handicap " + setupCh + " from the index — the paste printed none");
   }
-  const total = out.gross.reduce((a,h) => a + (h==null?0:h), 0);
-  if(card.grossTotal != null && card.holesPlayed === HOLES && total !== card.grossTotal){
-    out.warnings.push("gross works out to " + total + ", the Total column says " + card.grossTotal);
+  if(card.pickedUp > 0){
+    // Picked up: the hole has no number, so the eighteen can't be checked
+    // against the Total. Say what will be scored instead of a silent guess.
+    out.warnings.push("picked up on " + card.pickedUp + " hole" + (card.pickedUp===1?"":"s") +
+      " — each scored net double");
+  } else {
+    const total = out.gross.reduce((a,h) => a + (h==null?0:h), 0);
+    if(card.grossTotal != null && card.holesPlayed === HOLES && total !== card.grossTotal){
+      out.warnings.push("gross works out to " + total + ", the Total column says " + card.grossTotal);
+    }
   }
   return out;
 }
