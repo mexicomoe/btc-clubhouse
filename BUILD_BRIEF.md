@@ -132,7 +132,7 @@ Lowest cart average wins the hole. **Tied holes carry over** — the next hole i
 | A hole scored worse than net double | Capped to net double before anything else runs. |
 | Odd number of players | Organiser assigns cart numbers; a cart of one is legal. |
 | A hole not yet played | Blank, never zero. Zero is a score. |
-| A player picks up | Golf Genius prints `X`. Scored par + 4 gross, so the cap takes it to net double. The hole still counts as played, so an X'd card is a full round and can win. Shown as X, never as the filled figure. |
+| A player picks up | Golf Genius prints `X`. Scores **net double**, set directly so it holds at every handicap. The hole still counts as played, so an X'd card is a full round and can win. Shown as X, never as the par + 4 filled in behind it. |
 | Score typed wrong | Every entry must be editable at any time, and everything recomputes. |
 | Two players tie | Show the tie. Do not invent a tiebreak in v1. |
 
@@ -273,7 +273,7 @@ Verified: Sid Ferndale's 18 holes sum to 72, which matches the Net column. His T
 
 - Split the handicap out of the name with a trailing-parenthesis match; keep the name for display and the number for reference only.
 - Ignore the Out, In and Net columns; recompute everything from the 18 hole values so a bad export is caught rather than trusted.
-- **A blank cell means the hole was not played. An `X` does not.** Golf Genius prints X where a man picked up; that hole **was** played and scores **par + 4 gross**, which the net double bogey cap takes to net double — what picking up means. Any mark that isn't a number reads the same way.
+- **A blank cell means the hole was not played. An `X` does not.** Golf Genius prints X where a man picked up; that hole **was** played and scores **net double** — what picking up means. Any mark that isn't a number reads the same way. Set the net directly, do not reach it through an imputed gross: a 38 index off Tee I is a course handicap of 47, which is three shots on half the card, and par + 4 less three shots comes in *under* net double and credits a bogey for picking up. A gross of par + 4 is still filled in, but only so the round has a gross total to show.
 - **A picked-up hole counts towards the eighteen.** A man who X'd three holes went round and can win; walking in after twelve is a different thing and is not eligible. Getting this wrong quietly disqualifies him.
 - Show an X as an X, never as the par + 4 that was filled in, or somebody will read it as a score he made.
 - A card with an X on it cannot be summed against Out/In/Total, so gross and net cannot be told apart by arithmetic — the organiser is asked which the columns are rather than the paste being called broken.

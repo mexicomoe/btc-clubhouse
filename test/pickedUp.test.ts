@@ -1,8 +1,11 @@
 /**
  * Picking up — the X Golf Genius prints where a man lifted his ball.
  *
- * Scored as par + 4 gross, which the net double bogey cap then takes to net
- * double: exactly what picking up means.
+ * A picked-up hole scores net double — exactly what picking up means — and the
+ * net is set to that directly rather than reached through an imputed gross.
+ * Going via gross fails at the top of the handicap range, where three shots fall
+ * on a hole and par + 4 less three comes in under net double. A gross of par + 4
+ * is still filled in, but only so the round has a gross total to show.
  *
  * The part that matters most is not the arithmetic but the counting. A picked-up
  * hole WAS played. A man who X'd three holes went round eighteen and can win the
@@ -14,8 +17,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { ABERDEEN_TEE_IV, DEFAULT_CONTESTS } from "../src/courseConfig.ts";
-import { computeLeaderboard, scorePlayer, cappedNetByHole, type PlayerCard } from "../src/scoring.ts";
+import { ABERDEEN_TEE_IV, DEFAULT_CONTESTS, courseForTee } from "../src/courseConfig.ts";
+import { computeLeaderboard, scorePlayer, cappedNetByHole, courseHandicap, strokesOnHole, type PlayerCard } from "../src/scoring.ts";
 import { parseScores, PICKED_UP } from "../src/importScores.ts";
 
 const PAR = ABERDEEN_TEE_IV.par;
@@ -29,11 +32,11 @@ function card(name: string, xHoles: number[] = [], ch = 0): PlayerCard {
 
 /* ---- what an X scores ---- */
 
-test("a picked-up hole is par + 4 gross and net double", () => {
+test("a picked-up hole scores net double, and shows a gross of par + 4", () => {
   const r = scorePlayer(card("Picked up", [3]), ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
   const par3 = PAR[2];                       // hole 3 is a par 3
-  assert.equal(r.grossByHole[2], par3 + 4, "filled in at par + 4");
-  assert.equal(r.netByHole[2], par3 + 2, "and the cap takes it to net double");
+  assert.equal(r.netByHole[2], par3 + 2, "net double — what the hole scores");
+  assert.equal(r.grossByHole[2], par3 + 4, "gross filled in only for the total");
 });
 
 test("it is net double whatever the hole's par", () => {
@@ -43,23 +46,32 @@ test("it is net double whatever the hole's par", () => {
   }
 });
 
-test("it is net double at any ordinary handicap, shots received or not", () => {
-  // Hole 4 is stroke index 1, so it is the first hole anyone gets a shot on.
-  // par + 4 less one shot is par + 3, which the cap still takes to net double,
-  // and less two shots it lands exactly on it.
-  for (const ch of [0, 18, 26, 36]) {
+// The net is set directly, not reached through an imputed gross, so it says the
+// same thing at every handicap — including the top of the range, where three
+// shots fall on a hole and par + 4 less three would have come in UNDER net
+// double and credited a bogey for picking up.
+test("it is net double at every handicap, shots received or not", () => {
+  for (const ch of [0, 18, 26, 36, 37, 47, 54]) {
     const net = cappedNetByHole(card("x", [4], ch), ABERDEEN_TEE_IV);
     assert.equal(net[3], PAR[3] + 2, `course handicap ${ch}: net double`);
   }
 });
 
-// Three shots on one hole needs a course handicap of 37 or more — the very top
-// of the range. There par + 4 comes in UNDER net double, so a man who picked up
-// is credited with a net bogey. Pinned so the limit of the rule is on the record
-// rather than discovered on a card one day.
-test("above a 36 handicap, par + 4 stops being net double", () => {
-  const net = cappedNetByHole(card("x", [4], 37), ABERDEEN_TEE_IV);
-  assert.equal(net[3], PAR[3] + 1, "three shots take it below the cap");
+// A 38 index is a real handicap at this club, and off the back tee it is a
+// course handicap of 47 — three shots on half the card, hole 4 among them.
+test("a 38 index off the back tee still scores net double for a pick-up", () => {
+  const backTee = courseForTee("I", "M");
+  const ch = courseHandicap(38, backTee);
+  assert.equal(ch, 47, "38 index off Tee I");
+  assert.equal(strokesOnHole(backTee.strokeIndex[3], ch), 3, "three shots on hole 4");
+
+  const marty: PlayerCard = { name: "Marty", handicapIndex: 38, tee: "I", gender: "M",
+    gross: PAR.map((p, i) => (i === 3 ? "X" : p)), picks: { front: 5, back: 14 } };
+  const net = cappedNetByHole(marty, undefined as never);
+  assert.equal(net[3], PAR[3] + 2, "net double, not the net bogey gross would have given");
+
+  // What the old route would have produced, so the difference is on the record.
+  assert.equal(PAR[3] + 4 - 3, PAR[3] + 1, "par + 4 less three shots is a bogey");
 });
 
 /* ---- the counting, which is the point ---- */

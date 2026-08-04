@@ -196,16 +196,33 @@
   }
   /**
    * Picking up. Golf Genius prints an X where a man lifted his ball, and any
-   * mark that isn't a number means the same thing. It is scored as par + 4
-   * gross, which the net double bogey cap then takes to net double — which is
-   * what picking up means. The hole still counts as played: a man who X'd three
-   * holes went round eighteen and can win. That is a different thing entirely
-   * from walking in after twelve, which is a card that cannot be placed.
+   * mark that isn't a number means the same thing. The hole still counts as
+   * played: a man who X'd three holes went round eighteen and can win. That is
+   * a different thing entirely from walking in after twelve, which is a card
+   * that cannot be placed.
+   *
+   * The NET is set to net double directly rather than reached through an
+   * imputed gross. Going via gross fails at the top of the handicap range: a 38
+   * index off the back tee is a course handicap of 47, which is three shots on
+   * half the card, and par + 4 less three shots comes in UNDER net double and
+   * credits a bogey for picking up. Setting the net says what is meant, and
+   * says it the same way at every handicap.
+   *
+   * A gross figure is still imputed at par + 4, but only so the round has a
+   * gross total to show. It is never what the hole scores.
    */
+  const NET_DOUBLE_OVER_PAR = 2;
   const PICKED_UP_OVER_PAR = 4;
   const isPickedUp = (v) => v != null && typeof v !== "number";
   const grossOnHole = (v, par) =>
     v == null ? null : (isPickedUp(v) ? par + PICKED_UP_OVER_PAR : v);
+
+  /** Net for one hole from the raw card value, picked-up holes included. */
+  function netForHole(value, par, strokeIndex, courseHcp) {
+    if (value == null) return null;
+    if (isPickedUp(value)) return par + NET_DOUBLE_OVER_PAR;
+    return netOnHole(value, par, strokeIndex, courseHcp);
+  }
 
   function netOnHole(gross, par, strokeIndex, courseHcp) {
     if (gross == null) return null;
@@ -215,7 +232,7 @@
     course = courseFor(card, course);
     const ch = resolveCourseHandicap(card, course);
     return course.par.map((par, i) =>
-      netOnHole(grossOnHole(card.gross[i], par), par, course.strokeIndex[i], ch));
+      netForHole(card.gross[i], par, course.strokeIndex[i], ch));
   }
 
   /**
@@ -275,7 +292,8 @@
     const pickedUpHoles = [];
     card.gross.forEach((v, i) => { if (isPickedUp(v)) pickedUpHoles.push(i + 1); });
 
-    const net = course.par.map((par, i) => netOnHole(grossByHole[i], par, course.strokeIndex[i], ch));
+    const net = course.par.map((par, i) =>
+      netForHole(card.gross[i], par, course.strokeIndex[i], ch));
     const played = (i) => net[i] != null;
     const over = (i) => net[i] - course.par[i];
 
@@ -640,7 +658,7 @@
     ABERDEEN_TEE_IV, ABERDEEN_TEES, TEE_IDS, GENDERS, DEFAULT_CONTESTS, SAMPLE_ROUND,
     courseForTee, courseFor, grossFromNet,
     parseHandicapIndex, formatHandicapIndex,
-    PICKED_UP_OVER_PAR, isPickedUp, grossOnHole,
+    PICKED_UP_OVER_PAR, NET_DOUBLE_OVER_PAR, isPickedUp, grossOnHole, netForHole,
     skinsByGroup, cartSkins, teamSkins, skinStrokes, skinCap, matchOfCards, CARD_MATCH,
     courseHandicap, resolveCourseHandicap, strokesOnHole, netOnHole, cappedNetByHole,
     birdiePickHoles,
