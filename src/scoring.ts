@@ -80,6 +80,25 @@ export interface PlayerResult {
   rank?: number;
 }
 
+/** The outcome of reading a hand-typed handicap index. */
+export interface ParsedIndex {
+  ok: boolean;
+  /** The index, or null for a blank field — which is "not filled in", not "wrong". */
+  value: number | null;
+  /** Why it was refused, ready to show; null when `ok`. */
+  error: string | null;
+}
+
+/**
+ * Read a typed handicap index. Never use `parseFloat` for this: parseFloat("24,4")
+ * is 24, silently dropping the tenth. A comma is accepted and normalised; anything
+ * else is refused rather than guessed at.
+ */
+export const parseHandicapIndex: (text: string) => ParsedIndex = E.parseHandicapIndex;
+
+/** A handicap index as text, always period-decimal whatever the locale. */
+export const formatHandicapIndex: (value: number | null) => string = E.formatHandicapIndex;
+
 export const courseHandicap: (handicapIndex: number, course: CourseConfig) => number = E.courseHandicap;
 export const resolveCourseHandicap: (card: PlayerCard, course: CourseConfig) => number = E.resolveCourseHandicap;
 export const strokesOnHole: (strokeIndex: number, courseHcp: number) => number = E.strokesOnHole;

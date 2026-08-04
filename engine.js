@@ -113,6 +113,51 @@
     maxContestStrokes: 11.0,
   };
 
+  /* ---- Reading a handicap index that someone typed in ----
+     Never hand a typed index to parseFloat: parseFloat("24,4") is 24, which
+     quietly drops the tenth and can cost a man a stroke. Nor to a number input,
+     which throws a comma away and reports an empty field. Parsed here instead,
+     to one rule, and always written back with a period whatever the locale. */
+  const INDEX_MIN = -10, INDEX_MAX = 54;
+
+  /**
+   * Returns { ok, value, error }. A blank field is `ok` with a null value —
+   * that is "not filled in yet", not "wrong". A comma is accepted as the
+   * decimal separator and normalised, because a phone keypad in some locales
+   * offers no period; anything else is refused rather than guessed at.
+   */
+  function parseHandicapIndex(text) {
+    const t = String(text == null ? "" : text).trim();
+    if (t === "") return { ok: true, value: null, error: null };
+
+    // A leading + is a golf plus-handicap, which means the OPPOSITE sign to the
+    // one the arithmetic would give it. Refuse rather than get it backwards.
+    if (t.charAt(0) === "+") {
+      return { ok: false, value: null,
+        error: "For a plus handicap write it as a minus, like −2.4." };
+    }
+    if (!/^-?\d{1,2}([.,]\d{1,2})?$/.test(t)) {
+      return { ok: false, value: null, error: "Write the index as a number, like 24.4." };
+    }
+    const n = Number(t.replace(",", "."));
+    if (!Number.isFinite(n)) {
+      return { ok: false, value: null, error: "Write the index as a number, like 24.4." };
+    }
+    if (n < INDEX_MIN || n > INDEX_MAX) {
+      // A real minus sign, as everywhere else a negative number is shown.
+      return { ok: false, value: null,
+        error: "A handicap index runs from " + String(INDEX_MIN).replace("-", "−") +
+               " to " + INDEX_MAX + "." };
+    }
+    return { ok: true, value: n, error: null };
+  }
+
+  /** A handicap index as text, always period-decimal. Blank for no index. */
+  function formatHandicapIndex(value) {
+    // Number#toString is locale-independent — a period here and everywhere.
+    return value == null || !Number.isFinite(value) ? "" : String(value);
+  }
+
   /* ---- Handicap and net-score maths ---- */
   function courseHandicap(handicapIndex, course) {
     const par = sum(course.par);
@@ -312,6 +357,7 @@
   const api = {
     ABERDEEN_TEE_IV, ABERDEEN_TEES, TEE_IDS, GENDERS, DEFAULT_CONTESTS, SAMPLE_ROUND,
     courseForTee, courseFor, grossFromNet,
+    parseHandicapIndex, formatHandicapIndex,
     courseHandicap, resolveCourseHandicap, strokesOnHole, netOnHole, cappedNetByHole,
     birdiePickHoles,
     scorePlayer, scoreField, computeLeaderboard,

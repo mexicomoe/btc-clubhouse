@@ -511,7 +511,7 @@ function renderSetup(){
       const ch = chOf(p);
       const picks = (p.front && p.back) ? "picks " + p.front + "/" + p.back : "no picks";
       const bits = [
-        p.index == null ? "no index" : "idx " + p.index,
+        p.index == null ? "no index" : "idx " + E.formatHandicapIndex(p.index),
         "Tee " + p.tee + (p.gender === "F" ? " ♀" : ""),
         p.cart == null ? "no cart" : "cart " + p.cart,
         picks,
@@ -555,7 +555,9 @@ function drawEdit(){
       <input type="text" id="fName" autocomplete="off" autocapitalize="words" value="${esc(p.name)}"></div>
 
      <div class="field"><label for="fIndex">Handicap index</label>
-      <input type="number" id="fIndex" inputmode="decimal" step="0.1" value="${p.index==null?"":p.index}"></div>
+      <input type="text" id="fIndex" inputmode="decimal" autocomplete="off"
+        value="${esc(p.indexText != null ? p.indexText : E.formatHandicapIndex(p.index))}">
+      <div id="fIndexErr" class="err" style="padding:8px 0 0"></div></div>
 
      <div class="field"><label for="fTee">Tee</label>
       <select id="fTee">${teeOpts}</select></div>
@@ -596,14 +598,21 @@ function drawEdit(){
 
   $("fName").addEventListener("input", e => { editing.name = e.target.value; });
   $("fIndex").addEventListener("input", e => {
-    const v = e.target.value.trim();
-    editing.index = v === "" ? null : Number(v);
+    // Keep exactly what was typed, so a rejected entry is never wiped from under
+    // the man's thumb — he can see what he wrote and correct it.
+    editing.indexText = e.target.value;
+    const read = E.parseHandicapIndex(e.target.value);
+    editing.index = read.value;
+    editing.indexBad = !read.ok;
+    $("fIndexErr").textContent = read.error || "";
     refreshCh();
   });
   $("fTee").addEventListener("change", e => { editing.tee = e.target.value; refreshCh(); });
   $("fCart").addEventListener("input", e => {
+    // Same rule as the index: only a plain whole number counts, so nothing
+    // unreadable can reach storage and come back as "cart NaN".
     const v = e.target.value.trim();
-    editing.cart = v === "" ? null : Number(v);
+    editing.cart = /^\d{1,2}$/.test(v) ? Number(v) : null;
   });
   $("fFront").addEventListener("change", e => { editing.front = e.target.value ? Number(e.target.value) : null; });
   $("fBack").addEventListener("change", e => { editing.back = e.target.value ? Number(e.target.value) : null; });
@@ -624,8 +633,13 @@ function drawEdit(){
 function saveEditing(){
   const p = editing, err = document.getElementById("fErr");
   if(!p.name || !p.name.trim()){ err.textContent = "A name is needed."; return; }
-  if(p.index == null || !isFinite(p.index)){ err.textContent = "A handicap index is needed."; return; }
-  if(p.index < -10 || p.index > 54){ err.textContent = "That handicap index looks wrong."; return; }
+  // Re-read the raw text rather than trusting whatever was last kept, so nothing
+  // can be saved that the parser would refuse.
+  const read = E.parseHandicapIndex(
+    p.indexText != null ? p.indexText : E.formatHandicapIndex(p.index));
+  if(!read.ok){ err.textContent = read.error; return; }
+  if(read.value == null){ err.textContent = "A handicap index is needed."; return; }
+  p.index = read.value;
   err.textContent = "";
 
   p.name = p.name.trim();
