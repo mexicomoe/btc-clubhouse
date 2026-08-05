@@ -52,6 +52,13 @@ export interface PlayerCard {
   /** Cart number. Without one a player scores zero from Skins. */
   cart?: string | number | null;
   /**
+   * The flight he is placed in. Blank, or absent, means one undivided field.
+   * Independent of `cart` — a man's team and his flight are different
+   * groupings. Affects placings and Skins only; the six individual contests are
+   * graded against fixed thresholds and never depend on who he is drawn with.
+   */
+  flight?: string | null;
+  /**
    * Watch the Birdie: the two par 4s nominated before the round, one per nine
    * (hole numbers, 1-based). Omit and the contest simply doesn't score.
    */
@@ -116,12 +123,21 @@ export interface PlayerResult {
   rank?: number | null;
   /** True only for a complete eighteen — the cards that can take a position. */
   eligible?: boolean;
+  /** The flight this place was won in. "" is the one undivided field. */
+  flight?: string;
   /**
    * How an equal final was settled, when it was. `shared` means the cards were
    * level too and the place is shared; otherwise `wonBy` names the stretch that
    * took it — "the back nine", "13–18", "16–18", "the 18th".
    */
   cardMatch?: { shared: boolean; wonBy: string | null };
+}
+
+/** One flight's leaderboard, placed and tie-broken within itself. */
+export interface FlightBoard {
+  /** "" is the one undivided field. */
+  flight: string;
+  results: PlayerResult[];
 }
 
 /** One stretch of a match of cards, tried in order. */
@@ -186,3 +202,15 @@ export const CARD_MATCH: CardMatchSegment[] = E.CARD_MATCH;
 export const scorePlayer: (card: PlayerCard, course?: CourseSource, contests?: ContestConfig) => PlayerResult = E.scorePlayer;
 export const scoreField: (cards: PlayerCard[], course?: CourseSource, contests?: ContestConfig) => PlayerResult[] = E.scoreField;
 export const computeLeaderboard: (players?: PlayerCard[], course?: CourseSource, contests?: ContestConfig) => PlayerResult[] = E.computeLeaderboard;
+
+/** One leaderboard per flight, in reading order. */
+export const computeFlights: (players?: PlayerCard[], course?: CourseSource, contests?: ContestConfig) => FlightBoard[] = E.computeFlights;
+
+/** A player's flight, normalised. "" is the one undivided field. */
+export const flightOf: (card: PlayerCard) => string = E.flightOf;
+
+/** Every flight in use across a field, in reading order. */
+export const flightsInUse: (cards: PlayerCard[]) => string[] = E.flightsInUse;
+
+/** Flight names sorted for reading: the undivided field first, then naturally. */
+export const sortFlights: (names: string[]) => string[] = E.sortFlights;

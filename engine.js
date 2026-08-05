@@ -559,9 +559,34 @@
     contests = contests || DEFAULT_CONTESTS;
     // `course` passes through untouched so a mixed-tee field resolves per card.
     const results = cards.map((c) => scorePlayer(c, course, contests));
+    results.forEach((r, i) => { r.flight = flightOf(cards[i]); });
 
-    applyCartSkins(cards, results, course, contests);
+    // Everything that measures a man against other men happens inside his
+    // flight: Skins, the placings, and the card match that separates a tie.
+    // The six individual contests are untouched by it — they are graded against
+    // fixed thresholds, so a man's score never depends on who he is drawn with.
+    const byFlight = new Map();
+    cards.forEach((card, i) => {
+      const f = flightOf(card);
+      if (!byFlight.has(f)) byFlight.set(f, { cards: [], results: [] });
+      byFlight.get(f).cards.push(card);
+      byFlight.get(f).results.push(results[i]);
+    });
 
+    const placed = [];
+    for (const flight of sortFlights([...byFlight.keys()])) {
+      const group = byFlight.get(flight);
+      // Carts only face carts in the same flight, and the cap is set by how
+      // many carts are out in THIS flight, not across the whole field.
+      applyCartSkins(group.cards, group.results, course, contests);
+      placeField(group.results);
+      placed.push.apply(placed, group.results);
+    }
+    return placed;
+  }
+
+  /** Sort one flight into finishing order and give out its places. */
+  function placeField(results) {
     /**
      * A finished card outranks an unfinished one however the numbers fall.
      * Twelve holes of net will always total less than eighteen, so comparing
@@ -606,6 +631,43 @@
       }
     });
     return results;
+  }
+
+  /** A player's flight. Blank, or absent, means the one undivided field. */
+  function flightOf(card) {
+    return card && card.flight != null ? String(card.flight).trim() : "";
+  }
+
+  /**
+   * Flight names in the order they should be read: the undivided field first,
+   * then naturally, so "Flight 2" sorts before "Flight 10" rather than after it.
+   */
+  function sortFlights(names) {
+    return names.slice().sort((a, b) => {
+      if (a === b) return 0;
+      if (a === "") return -1;
+      if (b === "") return 1;
+      return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" });
+    });
+  }
+
+  /** The leaderboard split into flights, in reading order. */
+  function computeFlights(players, course, contests) {
+    const all = computeLeaderboard(players, course, contests);
+    const byFlight = new Map();
+    for (const r of all) {
+      if (!byFlight.has(r.flight)) byFlight.set(r.flight, []);
+      byFlight.get(r.flight).push(r);
+    }
+    return sortFlights([...byFlight.keys()])
+      .map((flight) => ({ flight, results: byFlight.get(flight) }));
+  }
+
+  /** Every flight in use across a field, in reading order. */
+  function flightsInUse(cards) {
+    const seen = new Set();
+    (cards || []).forEach((c) => seen.add(flightOf(c)));
+    return sortFlights([...seen]);
   }
 
   /**
@@ -694,6 +756,7 @@
     resolveCourseHandicap, strokesOnHole, netOnHole, cappedNetByHole,
     birdiePickHoles,
     scorePlayer, scoreField, computeLeaderboard,
+    computeFlights, flightOf, flightsInUse, sortFlights,
   };
   globalThis.ClubhouseEngine = api;
 })();

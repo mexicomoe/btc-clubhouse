@@ -47,6 +47,17 @@
   nav.tabs button:last-child { border-right: 0; }
   nav.tabs button[aria-current="true"] { background: var(--ink); color: var(--paper); }
 
+  /* Flight picker — only drawn when the field is actually divided */
+  nav.flights { display: flex; flex-wrap: wrap; border-bottom: 3px solid var(--ink); }
+  nav.flights button {
+    flex: 1 1 auto; min-width: 33%; min-height: 52px; padding: 10px 8px;
+    font: inherit; font-size: 18px; font-weight: 800;
+    background: var(--paper); color: var(--ink);
+    border: 0; border-right: 3px solid var(--ink); border-top: 0; cursor: pointer;
+  }
+  nav.flights button:last-child { border-right: 0; }
+  nav.flights button[aria-current="true"] { background: var(--ink); color: var(--paper); }
+
   /* Leaderboard rows */
   .row {
     display: flex; align-items: center; gap: 8px; width: 100%;
@@ -230,6 +241,7 @@
     <div class="sub" id="boardSub">Aberdeen G&amp;CC</div>
   </header>
   <nav class="tabs" data-tabs></nav>
+  <div id="boardFlights"></div>
   <div id="rows"></div>
   <div id="boardEmpty"></div>
 </section>
@@ -262,6 +274,7 @@
     <div class="sub" id="skinsSub">Cart against cart, hole by hole</div>
   </header>
   <nav class="tabs" data-tabs></nav>
+  <div id="skinsFlights"></div>
   <div id="skinsBody"></div>
 </section>
 
@@ -299,7 +312,7 @@ const STORE_KEY = "btc.clubhouse.v1";
 // `handicaps` holds the course handicap the export printed beside a player's
 // name — the one that was in force on the day. It outranks anything derived
 // from today's index, because an index moves and a played round does not.
-let state = { nextId: 1, players: [], scores: {}, handicaps: {}, skinsOn: true, allowancePercent: 100, tab: "board" };
+let state = { nextId: 1, players: [], scores: {}, handicaps: {}, skinsOn: true, allowancePercent: 100, flight: "", tab: "board" };
 
 function load(){
   try {
@@ -314,6 +327,7 @@ function load(){
         handicaps: s.handicaps || {},
         skinsOn: s.skinsOn !== false,          // on unless it was switched off
         allowancePercent: typeof s.allowancePercent === "number" ? s.allowancePercent : 100,
+        flight: typeof s.flight === "string" ? s.flight : "",
 
         tab: s.tab === "setup" || s.tab === "import" ? s.tab : "board",
       };
@@ -374,7 +388,7 @@ function fitBoardNames(){
 /* ---------- player records ---------- */
 function blankPlayer(){
   return { id: "p" + (state.nextId++), name: "", index: null, tee: "IV", gender: "M",
-           cart: null, front: null, back: null };
+           cart: null, flight: "", front: null, back: null };
 }
 /**
  * The thresholds this round is scored on. The only thing the organiser can
@@ -388,6 +402,46 @@ function contestConfig(){
 
 function courseOf(p){ return E.courseForTee(p.tee || "IV", p.gender || "M"); }
 /** Course handicap as the brief computes it, or null when there's no index yet. */
+/* ---------- flights ----------
+   Free text, because the club names them however it likes — "A", "Front 9",
+   "Seniors". The names already in use are offered for the picking so the
+   organiser types each one once and the rest are a tap. Blank means the man is
+   in the one undivided field. A flight is not a cart: the two are different
+   groupings and nothing here assumes they line up. */
+
+/** The flights already in use, for the autocomplete. */
+function flightsInUse(){
+  return E.flightsInUse(state.players).filter(f => f !== "");
+}
+function flightOptions(){
+  return flightsInUse().map(f => `<option value="${esc(f)}"></option>`).join("");
+}
+/** What this player's flight currently means, in words. */
+function flightHint(p){
+  const f = (p.flight || "").trim();
+  if(f === "") return "No flight — placed in one undivided field.";
+  const mates = state.players.filter(x => x.id !== p.id && (x.flight || "").trim() === f).length;
+  return mates === 0 ? "Alone in " + f + " so far."
+    : "Placed against " + mates + " other" + (mates===1?"":"s") + " in " + f + ".";
+}
+/** The flight name to show on screen. */
+function flightLabel(f){ return f === "" ? "One field" : f; }
+
+/**
+ * A row of flight buttons, shown only when the field is actually divided. An
+ * undivided round never sees it and reads exactly as it did before flights.
+ */
+function drawFlightPicker(id, flights, current, onPick){
+  const box = document.getElementById(id);
+  if(!box) return;
+  if(flights.length < 2){ box.innerHTML = ""; return; }
+  box.innerHTML = `<nav class="flights">` + flights.map(f =>
+    `<button data-f="${esc(f)}" aria-current="${f === current}">${esc(flightLabel(f))}</button>`
+  ).join("") + `</nav>`;
+  box.querySelectorAll("button").forEach(b =>
+    b.addEventListener("click", () => onPick(b.dataset.f)));
+}
+
 /** The handicap he plays off — the event's allowance already taken off it. */
 function chOf(p){
   if(p.index == null || !isFinite(p.index)) return null;
@@ -449,6 +503,8 @@ function cardOf(p){
     allowancePercent: state.allowancePercent,
     tee: p.tee, gender: p.gender,
     cart: p.cart,
+    // Placings and Skins are settled inside a flight; the six contests ignore it.
+    flight: (p.flight || "").trim(),
     gross: scoresFor(p),
     picks: (p.front && p.back) ? { front: p.front, back: p.back } : undefined,
   };
@@ -538,6 +594,19 @@ function renderBoard(){
     emptyEl.innerHTML = withScores === 0
       ? `<div class="note">No scores imported yet. Paste them on the <b>Import</b> tab.</div>`
       : "";
+  }
+
+  // One leaderboard per flight. The picker only appears when the field is
+  // actually divided — an undivided round looks exactly as it always did.
+  const flights = E.sortFlights([...new Set(results.map(r => r.flight || ""))]);
+  if(!flights.includes(state.flight)) state.flight = flights[0];
+  drawFlightPicker("boardFlights", flights, state.flight, (f) => {
+    state.flight = f; save(); renderBoard();
+  });
+  if(flights.length > 1){
+    results = results.filter(r => (r.flight || "") === state.flight);
+    subEl.textContent = subEl.textContent.replace(/·[^·]*player[^·]*/,
+      "· " + flightLabel(state.flight) + " · " + results.length + " player" + (results.length===1?"":"s"));
   }
 
   boardResults = results;
@@ -673,6 +742,7 @@ function renderSetup(){
         p.index == null ? "no index" : "idx " + E.formatHandicapIndex(p.index),
         "Tee " + p.tee + (p.gender === "F" ? " ♀" : ""),
         p.cart == null ? "no cart" : "cart " + p.cart,
+        (p.flight || "").trim() === "" ? "no flight" : "flight " + (p.flight || "").trim(),
         picks,
       ];
       const allow = allowanceNote(p);
@@ -821,6 +891,12 @@ function drawEdit(){
      <div class="field"><label for="fCart">Cart number</label>
       <input type="number" id="fCart" inputmode="numeric" step="1" value="${p.cart==null?"":p.cart}"></div>
 
+     <div class="field"><label for="fFlight">Flight</label>
+      <input type="text" id="fFlight" list="flightList" autocomplete="off"
+        placeholder="leave blank for one field" value="${esc(p.flight || "")}">
+      <datalist id="flightList">${flightOptions()}</datalist>
+      <div class="cd" style="margin-top:10px;font-size:18px;font-weight:700">${esc(flightHint(p))}</div></div>
+
      <div class="field"><span class="flab">Watch the Birdie picks</span>
       <div class="two">
         <select id="fFront" aria-label="Front nine pick">${pickOpts(legal.front, p.front)}</select>
@@ -865,6 +941,10 @@ function drawEdit(){
     const v = e.target.value.trim();
     editing.cart = /^\d{1,2}$/.test(v) ? Number(v) : null;
   });
+  $("fFlight").addEventListener("input", e => {
+    editing.flight = e.target.value;
+    document.querySelector("#fFlight").parentElement.querySelector(".cd").textContent = flightHint(editing);
+  });
   $("fFront").addEventListener("change", e => { editing.front = e.target.value ? Number(e.target.value) : null; });
   $("fBack").addEventListener("change", e => { editing.back = e.target.value ? Number(e.target.value) : null; });
   $("fGender").querySelectorAll("button").forEach(b =>
@@ -895,7 +975,7 @@ function saveEditing(){
 
   p.name = p.name.trim();
   const rec = { id: p.id, name: p.name, index: p.index, tee: p.tee, gender: p.gender,
-                cart: p.cart, front: p.front, back: p.back };
+                cart: p.cart, flight: (p.flight || "").trim(), front: p.front, back: p.back };
   const at = state.players.findIndex(x => x.id === p.id);
   if(at === -1) state.players.push(rec); else state.players[at] = rec;
   editing = null;
@@ -920,13 +1000,25 @@ function renderSkins(){
   const sub = document.getElementById("skinsSub");
   const config = contestConfig().skins;
 
-  const entered = readyPlayers().filter(p => p.cart != null && String(p.cart).trim() !== "");
   if(!config){
+    document.getElementById("skinsFlights").innerHTML = "";
     sub.textContent = "Switched off for this round";
     body.innerHTML = `<div class="note warn">Skins is switched off for this round.
       Turn it back on at the bottom of the <b>Setup</b> tab.</div>`;
     return;
   }
+
+  // Skins is played inside a flight: carts only ever face carts they are
+  // flighted with, so this screen shows one flight at a time.
+  const allFlights = E.sortFlights([...new Set(readyPlayers().map(p => (p.flight || "").trim()))]);
+  if(!allFlights.includes(state.flight)) state.flight = allFlights[0] || "";
+  drawFlightPicker("skinsFlights", allFlights, state.flight, (f) => {
+    state.flight = f; save(); renderSkins(); renderBoard();
+  });
+
+  const inFlight = readyPlayers().filter(p =>
+    allFlights.length < 2 || (p.flight || "").trim() === state.flight);
+  const entered = inFlight.filter(p => p.cart != null && String(p.cart).trim() !== "");
   if(entered.length === 0){
     sub.textContent = "No carts yet";
     body.innerHTML = `<div class="note">Nobody has a cart number yet. Give each man a cart on the
