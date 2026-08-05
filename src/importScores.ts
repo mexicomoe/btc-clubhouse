@@ -38,6 +38,13 @@ export interface ImportedCard {
   grossTotal: number | null;
   /** The Net column, if the paste had one. Used only to classify, never trusted. */
   netTotal: number | null;
+  /**
+   * Why this row is not a round, or null when it is one. A blind — the phantom
+   * player a draw invents to even up the teams — and a Total of "NC" are both
+   * carried through marked rather than dropped, so the import screen can show
+   * what it left out.
+   */
+  skip: string | null;
 }
 
 export interface ImportResult {

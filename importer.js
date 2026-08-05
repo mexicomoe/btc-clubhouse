@@ -28,6 +28,20 @@
   /** A hole the player picked up on. Golf Genius prints it as X. */
   const PICKED_UP = "X";
 
+  /**
+   * Rows that are in the export but are not a man's round.
+   *
+   *   "(blind)" in the name — a blind is a phantom player the draw invents to
+   *                           even up the teams. There is nobody to score.
+   *   a Total of "NC"       — no card returned.
+   *
+   * Neither is dropped on the floor: they come through marked, so the import
+   * screen can show what it left out and why. A paste that quietly loses rows
+   * is worse than one that refuses them.
+   */
+  const BLIND_NAME = /\(\s*blind\s*\)/i;
+  const NO_CARD_TOTAL = /^\s*n\.?c\.?\s*$/i;
+
   /** Section-10 fixed layout: name, 1–9, Out, 10–18, In, Total, Net. */
   const FIXED_LAYOUT = {
     holeCols: [1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19],
@@ -73,11 +87,24 @@
       const holesPlayed = holes.filter((h) => h != null).length;
       const pickedUp = holes.filter((h) => h === PICKED_UP).length;
 
+      // A row that is not a round comes through marked rather than dropped, and
+      // is never graded — there is nothing to tell gross from net on, and a
+      // blind has no card to call broken.
+      const rawTotal = layout.totalCol != null ? String(cells[layout.totalCol] || "") : "";
+      const skip = BLIND_NAME.test(rawName) ? "a blind, not a player"
+                 : NO_CARD_TOTAL.test(rawTotal) ? "no card returned (NC)"
+                 : null;
+      if (skip) {
+        cards.push({ name, handicap, holes, holesPlayed, pickedUp,
+                     mode: "unknown", grossTotal, netTotal, skip });
+        continue;
+      }
+
       const verdict = classify(name, holes, holesPlayed, pickedUp, grossTotal, netTotal);
       if (verdict.error) errors.push(verdict.error);
 
       cards.push({ name, handicap, holes, holesPlayed, pickedUp,
-                   mode: verdict.mode, grossTotal, netTotal });
+                   mode: verdict.mode, grossTotal, netTotal, skip: null });
     }
 
     return { cards, errors };

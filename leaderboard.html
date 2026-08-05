@@ -1149,7 +1149,14 @@ function assess(row, idx, all){
   const player = row.playerId ? state.players.find(p => p.id === row.playerId) || null : null;
   const mode = importMode === "auto" ? card.mode : importMode;
 
-  const out = { card, player, mode, gross: null, problems: [], warnings: [] };
+  const out = { card, player, mode, gross: null, problems: [], warnings: [], skipped: false };
+  // Not a round at all — a blind, or a card never returned. Nothing to assign
+  // and nothing to fix, so it is set aside and said so rather than dropped.
+  if(card.skip){
+    out.skipped = true;
+    out.problems.push(card.skip);
+    return out;
+  }
   if(!player){
     out.problems.push(row.how === "ambiguous"
       ? "two players share that name — choose below"
@@ -1256,11 +1263,17 @@ function drawPreview(){
   // need picking must not be buried down the list. Sort is stable, so within
   // each group the paste's own order is kept, and `i` stays the row's real
   // index so the dropdowns still address the right card.
-  const needing = [], ready = [];
-  rows.forEach((row, i) => (seen[i].problems.length ? needing : ready).push({ row, i }));
+  const needing = [], ready = [], setAside = [];
+  rows.forEach((row, i) => {
+    // Skipped rows are their own group: nothing about them is actionable, so
+    // they must not swell the count of rows that genuinely want a decision.
+    const bucket = seen[i].skipped ? setAside : seen[i].problems.length ? needing : ready;
+    bucket.push({ row, i });
+  });
   const groups = [
     { list: needing, label: needing.length === 1 ? "1 needs a player" : needing.length + " need a player" },
     { list: ready,   label: ready.length + " ready to import" },
+    { list: setAside, label: setAside.length + " not a round · left out" },
   ];
 
   let html = "";
@@ -1281,9 +1294,11 @@ function drawPreview(){
           (said && !bad ? `<div class="pvd">${said}</div>` : ``) +
         `</div>` +
         `<div class="pvt"><span class="tag${bad?" no":""}">${bad ? "skip" : "ready"}</span></div></div>` +
-        `<div class="field" style="border-bottom-width:2px">` +
-          `<label for="pick${i}">Scores belong to</label>` +
-          `<select id="pick${i}" data-row="${i}">${options(row.playerId)}</select></div>`;
+        // A set-aside row gets no picker: there is no player it could belong to.
+        (a.skipped ? `` :
+          `<div class="field" style="border-bottom-width:2px">` +
+            `<label for="pick${i}">Scores belong to</label>` +
+            `<select id="pick${i}" data-row="${i}">${options(row.playerId)}</select></div>`);
     }).join("");
   }
 
