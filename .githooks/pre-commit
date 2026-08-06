@@ -1,0 +1,34 @@
+#!/bin/sh
+#
+# Stamp version.js so the app can say which build it is.
+#
+# A commit cannot contain its own hash — the hash is taken over the content, so
+# writing it in would change it. What IS knowable before the commit exists is
+# the content itself, so the build is fingerprinted from the staged blob ids of
+# the files that make up the app. It changes exactly when the app changes, and
+# never when only a test or a note does.
+#
+# Enable it once per clone (hooks are not carried by git):
+#
+#     git config core.hooksPath .githooks
+#
+set -e
+
+# The blob ids git has staged for this commit — what is actually about to be
+# committed, not what happens to be sitting in the working tree. version.js is
+# left out of the reckoning: it holds the answer, so it cannot help compute it.
+BUILD=$(git ls-files -s engine.js importer.js leaderboard.html src/*.ts \
+        | awk '{print $2}' \
+        | git hash-object --stdin \
+        | cut -c1-7)
+DATE=$(date +%Y-%m-%d)
+
+cat > version.js <<EOF
+"use strict";
+/* Written by .githooks/pre-commit. Do not edit by hand — any change here is
+   overwritten on the next commit. The build is a fingerprint of engine.js,
+   importer.js, leaderboard.html and src/, so it moves only when the app does. */
+globalThis.ClubhouseVersion = { build: "$BUILD", date: "$DATE" };
+EOF
+
+git add version.js

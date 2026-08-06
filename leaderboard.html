@@ -47,6 +47,13 @@
   nav.tabs button:last-child { border-right: 0; }
   nav.tabs button[aria-current="true"] { background: var(--ink); color: var(--paper); }
 
+  /* Which build this is. Quiet, but still at the 18px floor — it is read by the
+     same eyes as everything else, just far less often. */
+  .version {
+    padding: 20px 14px 28px; font-size: 18px; font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
   /* Flight picker — only drawn when the field is actually divided */
   nav.flights { display: flex; flex-wrap: wrap; border-bottom: 3px solid var(--ink); }
   nav.flights button {
@@ -261,6 +268,7 @@
   <div class="pad"><button class="big solid" id="addBtn">+ Add player</button></div>
   <div id="allowanceBox"></div>
   <div id="skinsSwitch"></div>
+  <div id="versionLine"></div>
 </section>
 
 <section id="edit" class="screen">
@@ -289,6 +297,7 @@
 
 <script src="engine.js"></script>
 <script src="importer.js"></script>
+<script src="version.js"></script>
 <script>
 "use strict";
 /* Rendering and setup only — every number comes from engine.js
@@ -766,7 +775,34 @@ function renderSetup(){
   document.getElementById("addBtn").disabled = n >= MAX_PLAYERS;
   drawAllowance();
   drawSkinsSwitch();
+  drawVersion();
   fitBoardNames();
+}
+
+/**
+ * Which build this is. Stamped into version.js by the pre-commit hook, so a man
+ * reading a phone on the first tee can say what he is looking at without
+ * guessing. Absent — someone opened the page without version.js beside it — it
+ * says so rather than showing a number that means nothing.
+ */
+const MONTHS = ["January","February","March","April","May","June",
+                "July","August","September","October","November","December"];
+
+function niceDate(iso){
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ""));
+  if(!m) return String(iso || "");
+  // Built by hand rather than by toLocaleDateString, which would read
+  // differently on a phone set to another language.
+  return Number(m[3]) + " " + MONTHS[Number(m[2]) - 1] + " " + m[1];
+}
+
+function drawVersion(){
+  const v = window.ClubhouseVersion;
+  const text = v && v.build
+    ? "Build " + v.build + " · " + niceDate(v.date)
+    : "Build unknown — version.js is missing";
+  document.getElementById("versionLine").innerHTML =
+    `<div class="version">${esc(text)}</div>`;
 }
 
 /**
