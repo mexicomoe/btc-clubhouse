@@ -298,6 +298,7 @@
 
 <script src="engine.js"></script>
 <script src="importer.js"></script>
+<script src="exporter.js"></script>
 <script src="version.js"></script>
 <script>
 "use strict";
@@ -306,6 +307,7 @@
    implementations the tests also run. Nothing is scored or parsed in here. */
 const E = window.ClubhouseEngine;
 const IMP = window.ClubhouseImporter;
+const XP = window.ClubhouseExporter;
 
 const CONTEST_NAMES = {
   watchTheBirdie: "Watch the Birdie", agonyAlley: "Agony Alley",
@@ -345,6 +347,7 @@ function blankEvent(name, date){
     date: date || todayISO(),
     nextId: 1, players: [], scores: {}, handicaps: {},
     skinsOn: true, allowancePercent: 100, flight: "", tab: "setup",
+    exportedAt: null,
   };
 }
 
@@ -362,6 +365,8 @@ function normaliseEvent(e, fallbackName){
     allowancePercent: typeof e.allowancePercent === "number" ? e.allowancePercent : 100,
     flight: typeof e.flight === "string" ? e.flight : "",
     tab: e.tab === "setup" || e.tab === "import" || e.tab === "skins" ? e.tab : "board",
+    // Carried through, or the delete warning would forget an export had happened.
+    exportedAt: typeof e.exportedAt === "string" ? e.exportedAt : null,
   };
 }
 
@@ -444,7 +449,10 @@ function removeEvent(id){
   const players = e.players.length;
   const warn = "Delete " + (e.name || "this event") +
     (players ? " and its " + players + " player" + (players===1?"":"s") : "") +
-    "? This cannot be undone.";
+    "? This cannot be undone." +
+    // The round is about to be gone for good. If no copy of it has ever left
+    // the phone, that is the last moment anyone can be told.
+    (e.exportedAt ? "" : "\n\nThis event has NOT been exported.");
   if(!window.confirm(warn)) return;
 
   store.events = store.events.filter(x => x.id !== id);
@@ -452,6 +460,46 @@ function removeEvent(id){
   // rather than a screen with nothing behind it.
   if(store.events.length === 0) store.events.push(blankEvent("Round 1"));
   openEvent(store.events[0].id);
+}
+
+/**
+ * Write the open event out as a CSV and hand it to the phone. One row a player,
+ * scored exactly as the leaderboard scores them — the whole field, every flight,
+ * not just the one being looked at.
+ */
+function exportEvent(){
+  const ready = readyPlayers();
+  const cards = ready.map(cardOf);
+  const results = cards.length
+    ? E.computeLeaderboard(cards, undefined, contestConfig())
+    : [];
+
+  const csv = XP.eventToCsv(state.players, results, {
+    displayNameOf: displayName,
+    holesOf: (p) => scoresFor(p),
+  });
+  const name = XP.csvFilename(state.name, state.date);
+  downloadFile(name, csv, "text/csv;charset=utf-8");
+
+  state.exportedAt = new Date().toISOString();
+  save();
+  renderSetup();
+  return name;
+}
+
+/** Hand a file to the phone. A blob and a link — nothing to install, works offline. */
+function downloadFile(filename, text, mime){
+  // A byte order mark, so a spreadsheet opens the accents in a name correctly
+  // instead of showing mojibake.
+  const blob = new Blob(["﻿", text], { type: mime || "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
 }
 
 /** Events in date order, newest first — the one being played is near the top. */
@@ -463,6 +511,13 @@ function eventsInOrder(){
 /** "Friday · 5 August 2026", for a picker or a heading. */
 function eventLabel(e){
   return (e.name || "Untitled") + " · " + niceDate(e.date);
+}
+
+/** Whether a copy of this event has ever left the phone, in words. */
+function exportNote(e){
+  if(!e.exportedAt) return "Not yet exported.";
+  const d = String(e.exportedAt).slice(0, 10);
+  return "Last exported " + niceDate(d) + ".";
 }
 
 /* ---------- small helpers ---------- */
@@ -947,7 +1002,9 @@ function drawEventPicker(){
        <input type="date" id="fEventDate" value="${esc(e.date || "")}"></div>
      <div class="pad">
        <button class="big" id="fNewEvent">+ New event</button>
+       <button class="big" id="fExportEvent">Export this event</button>
        <button class="big danger" id="fDeleteEvent">Delete this event</button>
+       <div class="cd" style="margin-top:10px;font-size:18px;font-weight:700">${esc(exportNote(e))}</div>
      </div>`;
 
   const $ = (id) => document.getElementById(id);
@@ -966,6 +1023,7 @@ function drawEventPicker(){
     state.date = ev.target.value; save(); refresh();
   });
   $("fNewEvent").addEventListener("click", addEvent);
+  $("fExportEvent").addEventListener("click", exportEvent);
   $("fDeleteEvent").addEventListener("click", () => removeEvent(state.id));
 }
 
