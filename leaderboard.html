@@ -264,6 +264,7 @@
     <div class="sub" id="setupSub">Players for this round</div>
   </header>
   <nav class="tabs" data-tabs></nav>
+  <div id="eventBox"></div>
   <div id="setupRows"></div>
   <div class="pad"><button class="big solid" id="addBtn">+ Add player</button></div>
   <div id="allowanceBox"></div>
@@ -316,36 +317,152 @@ const CONTEST_ORDER = ["watchTheBirdie","agonyAlley","damageControl","goLong","g
 const MAX_PLAYERS = 24;
 const HOLES = 18;
 
-/* ---------- persistence: a locked phone must not lose the round ---------- */
-const STORE_KEY = "btc.clubhouse.v1";
+/* ---------- persistence: a locked phone must not lose the round ----------
+   The club plays Friday and Saturday, so the phone holds several events at
+   once. Each one keeps its own players, scores, flights and settings, and
+   `state` always points AT THE CURRENT EVENT — everything downstream reads and
+   writes it exactly as it did when there was only ever one. */
+const STORE_KEY = "btc.clubhouse.v2";
+const LEGACY_KEY = "btc.clubhouse.v1";     // the single round, before events
+
+let store = { version: 2, nextEventId: 1, currentId: null, events: [] };
 // `handicaps` holds the course handicap the export printed beside a player's
 // name — the one that was in force on the day. It outranks anything derived
 // from today's index, because an index moves and a played round does not.
-let state = { nextId: 1, players: [], scores: {}, handicaps: {}, skinsOn: true, allowancePercent: 100, flight: "", tab: "board" };
+let state = null;
+
+function todayISO(){
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, "0");
+  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+}
+
+/** An empty event, ready to be set up. */
+function blankEvent(name, date){
+  return {
+    id: "e" + (store.nextEventId++),
+    name: name || "New event",
+    date: date || todayISO(),
+    nextId: 1, players: [], scores: {}, handicaps: {},
+    skinsOn: true, allowancePercent: 100, flight: "", tab: "setup",
+  };
+}
+
+/** Fill in anything a stored event is missing, so an old blob still opens. */
+function normaliseEvent(e, fallbackName){
+  return {
+    id: e.id || ("e" + (store.nextEventId++)),
+    name: typeof e.name === "string" && e.name.trim() ? e.name : (fallbackName || "Round"),
+    date: /^\d{4}-\d{2}-\d{2}$/.test(e.date) ? e.date : todayISO(),
+    nextId: e.nextId || (Array.isArray(e.players) ? e.players.length + 1 : 1),
+    players: Array.isArray(e.players) ? e.players : [],
+    scores: e.scores || {},
+    handicaps: e.handicaps || {},
+    skinsOn: e.skinsOn !== false,            // on unless it was switched off
+    allowancePercent: typeof e.allowancePercent === "number" ? e.allowancePercent : 100,
+    flight: typeof e.flight === "string" ? e.flight : "",
+    tab: e.tab === "setup" || e.tab === "import" || e.tab === "skins" ? e.tab : "board",
+  };
+}
+
+function currentEvent(){
+  return store.events.find(e => e.id === store.currentId) || store.events[0];
+}
 
 function load(){
+  // 1 · the events store
   try {
     const raw = localStorage.getItem(STORE_KEY);
-    if(!raw) return;
-    const s = JSON.parse(raw);
-    if(s && Array.isArray(s.players)){
-      state = {
-        nextId: s.nextId || s.players.length + 1,
-        players: s.players,
-        scores: s.scores || {},
-        handicaps: s.handicaps || {},
-        skinsOn: s.skinsOn !== false,          // on unless it was switched off
-        allowancePercent: typeof s.allowancePercent === "number" ? s.allowancePercent : 100,
-        flight: typeof s.flight === "string" ? s.flight : "",
-
-        tab: s.tab === "setup" || s.tab === "import" ? s.tab : "board",
-      };
+    if(raw){
+      const s = JSON.parse(raw);
+      if(s && Array.isArray(s.events) && s.events.length){
+        store.nextEventId = s.nextEventId || s.events.length + 1;
+        store.events = s.events.map((e, i) => normaliseEvent(e, "Round " + (i + 1)));
+        store.currentId = s.currentId;        // the last one opened comes back
+        state = currentEvent();
+        store.currentId = state.id;
+        return;
+      }
     }
-  } catch(e) { /* corrupt or unavailable storage — start clean rather than die */ }
+  } catch(e) { /* corrupt or unavailable storage — fall through and start clean */ }
+
+  // 2 · a round saved before events existed becomes the first event. The old
+  // key is deliberately left where it is: if anything here is wrong, the
+  // original round is still on the phone untouched.
+  try {
+    const old = localStorage.getItem(LEGACY_KEY);
+    if(old){
+      const s = JSON.parse(old);
+      if(s && Array.isArray(s.players)){
+        const first = normaliseEvent(Object.assign({}, s, { name: "First round" }));
+        store.events = [first];
+        store.currentId = first.id;
+        state = first;
+        save();
+        return;
+      }
+    }
+  } catch(e) { /* the old round is unreadable — start clean rather than die */ }
+
+  // 3 · nothing stored at all
+  const fresh = blankEvent("Round 1");
+  store.events = [fresh];
+  store.currentId = fresh.id;
+  state = fresh;
 }
 function save(){
-  try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+  // `state` is one of store.events, so saving the store saves the open event
+  // and every other one along with it.
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); }
   catch(e) { /* private browsing or full disk — the round still works in memory */ }
+}
+
+/* ---------- events ---------- */
+
+/** Open another event. Everything on screen is redrawn against it. */
+function openEvent(id){
+  const found = store.events.find(e => e.id === id);
+  if(!found) return;
+  store.currentId = id;
+  state = found;
+  save();
+  buildTabs();                      // the Skins tab follows this event's switch
+  renderBoard(); renderSetup(); renderImport();
+  if(state.skinsOn) renderSkins();
+  show("setup");
+}
+
+function addEvent(){
+  const e = blankEvent("Round " + (store.events.length + 1));
+  store.events.push(e);
+  openEvent(e.id);
+}
+
+function removeEvent(id){
+  const e = store.events.find(x => x.id === id);
+  if(!e) return;
+  const players = e.players.length;
+  const warn = "Delete " + (e.name || "this event") +
+    (players ? " and its " + players + " player" + (players===1?"":"s") : "") +
+    "? This cannot be undone.";
+  if(!window.confirm(warn)) return;
+
+  store.events = store.events.filter(x => x.id !== id);
+  // There is always an event to be in: deleting the last one leaves a fresh one
+  // rather than a screen with nothing behind it.
+  if(store.events.length === 0) store.events.push(blankEvent("Round 1"));
+  openEvent(store.events[0].id);
+}
+
+/** Events in date order, newest first — the one being played is near the top. */
+function eventsInOrder(){
+  return store.events.slice().sort((a, b) =>
+    (b.date || "").localeCompare(a.date || "") || (a.name || "").localeCompare(b.name || ""));
+}
+
+/** "Friday · 5 August 2026", for a picker or a heading. */
+function eventLabel(e){
+  return (e.name || "Untitled") + " · " + niceDate(e.date);
 }
 
 /* ---------- small helpers ---------- */
@@ -589,7 +706,7 @@ function renderBoard(){
     // Nothing set up yet — show the seeded demo round so the screen isn't blank.
     boardCards = E.SAMPLE_ROUND.slice();
     results = E.computeLeaderboard();
-    subEl.textContent = "Aberdeen G&CC · demo round";
+    subEl.textContent = (state.name || "Round") + " · demo round";
     emptyEl.innerHTML =
       `<div class="note warn">This is a demo round. Add your players on the ` +
       `<b>Setup</b> tab, then paste the scores on <b>Import</b>.</div>`;
@@ -598,7 +715,7 @@ function renderBoard(){
     // No course argument: every card is scored against its own tee and gender.
     results = E.computeLeaderboard(boardCards, undefined, contestConfig());
     const withScores = boardCards.filter(c => c.gross.some(g => g != null)).length;
-    subEl.textContent = "Aberdeen G&CC · " + ready.length + " player" + (ready.length===1?"":"s") +
+    subEl.textContent = (state.name || "Round") + " · " + ready.length + " player" + (ready.length===1?"":"s") +
       (withScores === 0 ? " · no scores yet" : "");
     emptyEl.innerHTML = withScores === 0
       ? `<div class="note">No scores imported yet. Paste them on the <b>Import</b> tab.</div>`
@@ -773,6 +890,7 @@ function renderSetup(){
       b.addEventListener("click", () => editPlayer(b.dataset.id)));
   }
   document.getElementById("addBtn").disabled = n >= MAX_PLAYERS;
+  drawEventPicker();
   drawAllowance();
   drawSkinsSwitch();
   drawVersion();
@@ -803,6 +921,52 @@ function drawVersion(){
     : "Build unknown — version.js is missing";
   document.getElementById("versionLine").innerHTML =
     `<div class="version">${esc(text)}</div>`;
+}
+
+/**
+ * Which event this is, and the way to another. The club plays Friday and
+ * Saturday, so setting up one must never disturb the other: each event holds
+ * its own players, scores, flights and settings, and this is the only place
+ * they cross.
+ *
+ * The name and date are edited in place — typing in them IS renaming, so there
+ * is no separate rename step to find. Neither redraws the screen under the
+ * thumb; only the picker's own wording keeps up.
+ */
+function drawEventPicker(){
+  const e = state;
+  const options = eventsInOrder().map(x =>
+    `<option value="${esc(x.id)}"${x.id===e.id?" selected":""}>${esc(eventLabel(x))}</option>`).join("");
+
+  document.getElementById("eventBox").innerHTML =
+    `<div class="field"><label for="fEvent">Event</label>
+       <select id="fEvent">${options}</select></div>
+     <div class="field"><label for="fEventName">Name</label>
+       <input type="text" id="fEventName" autocomplete="off" value="${esc(e.name || "")}"></div>
+     <div class="field"><label for="fEventDate">Date</label>
+       <input type="date" id="fEventDate" value="${esc(e.date || "")}"></div>
+     <div class="pad">
+       <button class="big" id="fNewEvent">+ New event</button>
+       <button class="big danger" id="fDeleteEvent">Delete this event</button>
+     </div>`;
+
+  const $ = (id) => document.getElementById(id);
+  const refresh = () => {
+    document.getElementById("setupSub").textContent = eventLabel(state);
+    const opt = $("fEvent").querySelector(`option[value="${CSS.escape(state.id)}"]`);
+    if(opt) opt.textContent = eventLabel(state);
+  };
+  refresh();
+
+  $("fEvent").addEventListener("change", (ev) => openEvent(ev.target.value));
+  $("fEventName").addEventListener("input", (ev) => {
+    state.name = ev.target.value; save(); refresh();
+  });
+  $("fEventDate").addEventListener("change", (ev) => {
+    state.date = ev.target.value; save(); refresh();
+  });
+  $("fNewEvent").addEventListener("click", addEvent);
+  $("fDeleteEvent").addEventListener("click", () => removeEvent(state.id));
 }
 
 /**
