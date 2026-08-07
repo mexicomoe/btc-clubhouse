@@ -85,13 +85,14 @@ test("the columns are the ones the brief asks for, in order", () => {
     "Front pick", "Back pick", "Course handicap",
   ]);
   assert.deepEqual(head.slice(14, 32), Array.from({ length: 18 }, (_, i) => "H" + (i + 1)));
-  assert.deepEqual(head.slice(32, 34), ["Net", "Gross"]);
-  assert.deepEqual(head.slice(34, 41), [
+  assert.deepEqual(head.slice(32, 50), Array.from({ length: 18 }, (_, i) => "N" + (i + 1)));
+  assert.deepEqual(head.slice(50, 52), ["Net", "Gross"]);
+  assert.deepEqual(head.slice(52, 59), [
     "Watch the Birdie", "Agony Alley", "Damage Control",
     "Go Long", "Get Shorty", "Bounce Back", "Cart Skins",
   ]);
-  assert.equal(head[41], "Final");
-  assert.equal(head.length, 42);
+  assert.equal(head[59], "Final");
+  assert.equal(head.length, 60);
 });
 
 test("the event is stamped on every row", () => {
@@ -120,7 +121,7 @@ test("a row for every player, and a header", () => {
   assert.equal(r[0][0], "Event");
   assert.deepEqual(r.slice(1).map((x) => cell(x, "Name as entered")),
     ["Ridgeway, Ken", "Merrick, Sal"]);
-  for (const row of r) assert.equal(row.length, 42, "every row is the full width");
+  for (const row of r) assert.equal(row.length, 60, "every row is the full width");
 });
 
 /* ---- what is in it ---- */
@@ -177,7 +178,7 @@ test("a player with no index is still in the export", () => {
   assert.equal(cell(stray, "Handicap index"), "", "no index");
   assert.equal(cell(stray, "Course handicap"), "", "and so no course handicap");
   assert.equal(cell(stray, "Final"), "", "and no final");
-  assert.equal(stray.length, 42, "still the full width");
+  assert.equal(stray.length, 60, "still the full width");
 });
 
 /* ---- escaping ---- */
@@ -197,8 +198,8 @@ test("a name with a comma survives the round trip", () => {
   // rather than an edge case.
   const line = csv().trim().split("\r\n")[1];
   assert.ok(line.includes('"Ridgeway, Ken"'), "quoted, so the comma is not a column break");
-  assert.equal(line.split(",").length, 43, "split naively it comes apart...");
-  assert.equal(parseCsvLine(line).length, 42, "...but read properly it is one field");
+  assert.equal(line.split(",").length, 61, "split naively it comes apart...");
+  assert.equal(parseCsvLine(line).length, 60, "...but read properly it is one field");
   assert.equal(cell(parseCsvLine(line), "Name as entered"), "Ridgeway, Ken",
     "and the comma is still in the name");
 });
@@ -269,4 +270,55 @@ test("which tab was open is not a change to the round", () => {
 test("an export recorded before signatures existed counts as changed", () => {
   // Safer to warn once too often than to lose a round to a stale record.
   assert.equal(changedSinceExport({ ...EVENT, exportedAt: "2026-08-07T12:00:00.000Z" }), true);
+});
+
+/* ---- the net columns ---- */
+
+// The gross columns alone force anything reading the file to redo the handicap
+// allocation before it can see what the contests were actually graded on. The
+// N columns are that figure, straight off the result.
+test("the net columns are the capped net the engine scored", () => {
+  const scored = board();
+  const ken = rows()[1];
+  const r = scored.find((x) => x.name === "Ken Ridgeway")!;
+  for (let h = 1; h <= 18; h++) {
+    assert.equal(cell(ken, "N" + h), String(r.netByHole[h - 1]), "hole " + h);
+  }
+});
+
+test("net is not gross — the strokes really have come off", () => {
+  const ken = rows()[1];
+  const grossTotal = Array.from({ length: 18 }, (_, i) => Number(cell(ken, "H" + (i + 1))))
+    .reduce((a, b) => a + b, 0);
+  const netTotal = Array.from({ length: 18 }, (_, i) => Number(cell(ken, "N" + (i + 1))))
+    .reduce((a, b) => a + b, 0);
+  assert.ok(netTotal < grossTotal, "he receives shots, so his net is lower");
+  assert.equal(String(netTotal), cell(ken, "Net"), "and the holes add up to the Net column");
+  assert.equal(String(grossTotal), cell(ken, "Gross"));
+});
+
+test("the net columns follow the man's own tee and card", () => {
+  // Sal plays the women's stroke index off Tee I, so her allocation differs.
+  const scored = board();
+  const sal = rows()[2];
+  const r = scored.find((x) => x.name === "Sal Merrick")!;
+  assert.equal(cell(sal, "N1"), String(r.netByHole[0]));
+  assert.equal(cell(sal, "N17"), String(r.netByHole[16]));
+});
+
+test("a pick-up and an unplayed hole read the same on both sides", () => {
+  const sal = rows()[2];
+  assert.equal(cell(sal, "H4"), "X", "gross");
+  assert.equal(cell(sal, "N4"), "X", "and net, so a pick-up is never mistaken for a real net double");
+  assert.equal(cell(sal, "H18"), "", "not played");
+  assert.equal(cell(sal, "N18"), "", "blank on both sides");
+});
+
+test("a player who cannot be scored has no net columns either", () => {
+  const withStray = PLAYERS.concat([{ id: "p3", name: "No Index", index: null as any,
+    tee: "IV", gender: "M", cart: null as any, flight: "", front: null as any, back: null as any }]);
+  const out = eventToCsv({ ...EVENT, players: withStray }, board(),
+    { displayNameOf: shown, holesOf: () => [] }).trim().split("\r\n").map(parseCsvLine);
+  const stray = out[3];
+  for (let h = 1; h <= 18; h++) assert.equal(cell(stray, "N" + h), "", "hole " + h);
 });

@@ -36,7 +36,11 @@
                   "Name", "Name as entered", "GHIN",
                   "Handicap index", "Tee", "Gender", "Cart", "Flight",
                   "Front pick", "Back pick", "Course handicap"];
+    // Gross per hole, then the capped net per hole beside it. The net columns
+    // are what the contests are actually graded on, so anything reading this
+    // file no longer has to redo the handicap allocation to get at them.
     for (let h = 1; h <= HOLES; h++) cols.push("H" + h);
+    for (let h = 1; h <= HOLES; h++) cols.push("N" + h);
     cols.push("Net", "Gross");
     for (const [, label] of CONTEST_COLUMNS) cols.push(label);
     cols.push("Final");
@@ -56,6 +60,11 @@
 
   function csvRow(values) {
     return values.map(csvField).join(",");
+  }
+
+  /** A hole he picked up on — anything on the card that is not a number. */
+  function isPickedUp(v) {
+    return v != null && typeof v !== "number";
   }
 
   /**
@@ -105,6 +114,15 @@
       for (let i = 0; i < HOLES; i++) {
         const v = holes[i];
         cells.push(v == null ? "" : v);      // "X" stays X; a blank stays blank
+      }
+      // The capped net per hole, straight off the result — the figure every
+      // contest was graded on, so nothing downstream has to allocate the
+      // strokes again. A pick-up shows X here as it does on the gross side; the
+      // net it scored is net double, which is par + 2 on that hole.
+      const net = r && r.netByHole ? r.netByHole : null;
+      for (let i = 0; i < HOLES; i++) {
+        if (isPickedUp(holes[i])) { cells.push(holes[i]); continue; }
+        cells.push(net && net[i] != null ? net[i] : "");
       }
       cells.push(r && r.net != null ? r.net : "");
       cells.push(r && r.gross != null ? r.gross : "");
