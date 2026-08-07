@@ -327,6 +327,13 @@ const HOLES = 18;
 const STORE_KEY = "btc.clubhouse.v2";
 const LEGACY_KEY = "btc.clubhouse.v1";     // the single round, before events
 
+/* How the round was played. The app scores individual net, but the club runs
+   other formats and the export has to say which one a card came from. Free
+   text, with the usual ones offered. */
+const DEFAULT_FORMAT = "Individual net";
+const COMMON_FORMATS = ["Individual net", "Individual gross", "Stableford",
+                        "Better ball", "Best two of four", "Scramble"];
+
 let store = { version: 2, nextEventId: 1, currentId: null, events: [] };
 // `handicaps` holds the course handicap the export printed beside a player's
 // name — the one that was in force on the day. It outranks anything derived
@@ -345,9 +352,10 @@ function blankEvent(name, date){
     id: "e" + (store.nextEventId++),
     name: name || "New event",
     date: date || todayISO(),
+    format: DEFAULT_FORMAT,
     nextId: 1, players: [], scores: {}, handicaps: {},
     skinsOn: true, allowancePercent: 100, flight: "", tab: "setup",
-    exportedAt: null,
+    exportedAt: null, exportedSignature: null,
   };
 }
 
@@ -357,6 +365,7 @@ function normaliseEvent(e, fallbackName){
     id: e.id || ("e" + (store.nextEventId++)),
     name: typeof e.name === "string" && e.name.trim() ? e.name : (fallbackName || "Round"),
     date: /^\d{4}-\d{2}-\d{2}$/.test(e.date) ? e.date : todayISO(),
+    format: typeof e.format === "string" && e.format.trim() ? e.format : DEFAULT_FORMAT,
     nextId: e.nextId || (Array.isArray(e.players) ? e.players.length + 1 : 1),
     players: Array.isArray(e.players) ? e.players : [],
     scores: e.scores || {},
@@ -367,6 +376,7 @@ function normaliseEvent(e, fallbackName){
     tab: e.tab === "setup" || e.tab === "import" || e.tab === "skins" ? e.tab : "board",
     // Carried through, or the delete warning would forget an export had happened.
     exportedAt: typeof e.exportedAt === "string" ? e.exportedAt : null,
+    exportedSignature: typeof e.exportedSignature === "string" ? e.exportedSignature : null,
   };
 }
 
@@ -450,9 +460,13 @@ function removeEvent(id){
   const warn = "Delete " + (e.name || "this event") +
     (players ? " and its " + players + " player" + (players===1?"":"s") : "") +
     "? This cannot be undone." +
-    // The round is about to be gone for good. If no copy of it has ever left
-    // the phone, that is the last moment anyone can be told.
-    (e.exportedAt ? "" : "\n\nThis event has NOT been exported.");
+    // The round is about to be gone for good, so this is the last moment
+    // anyone can be told that no current copy of it exists off the phone.
+    (XP.changedSinceExport(e)
+      ? (e.exportedAt
+          ? "\n\nIt has CHANGED since it was exported on " + niceDate(String(e.exportedAt).slice(0,10)) + "."
+          : "\n\nThis event has NOT been exported.")
+      : "");
   if(!window.confirm(warn)) return;
 
   store.events = store.events.filter(x => x.id !== id);
@@ -474,14 +488,17 @@ function exportEvent(){
     ? E.computeLeaderboard(cards, undefined, contestConfig())
     : [];
 
-  const csv = XP.eventToCsv(state.players, results, {
+  const csv = XP.eventToCsv(state, results, {
     displayNameOf: displayName,
     holesOf: (p) => scoresFor(p),
   });
   const name = XP.csvFilename(state.name, state.date);
   downloadFile(name, csv, "text/csv;charset=utf-8");
 
+  // Record WHAT was exported, not just that it happened, so a round that moves
+  // afterwards is known to have moved.
   state.exportedAt = new Date().toISOString();
+  state.exportedSignature = XP.eventSignature(state);
   save();
   renderSetup();
   return name;
@@ -516,8 +533,10 @@ function eventLabel(e){
 /** Whether a copy of this event has ever left the phone, in words. */
 function exportNote(e){
   if(!e.exportedAt) return "Not yet exported.";
-  const d = String(e.exportedAt).slice(0, 10);
-  return "Last exported " + niceDate(d) + ".";
+  const when = niceDate(String(e.exportedAt).slice(0, 10));
+  return XP.changedSinceExport(e)
+    ? "Changed since it was exported on " + when + "."
+    : "Exported " + when + ", and unchanged since.";
 }
 
 /* ---------- small helpers ---------- */
@@ -568,7 +587,7 @@ function fitBoardNames(){
 
 /* ---------- player records ---------- */
 function blankPlayer(){
-  return { id: "p" + (state.nextId++), name: "", index: null, tee: "IV", gender: "M",
+  return { id: "p" + (state.nextId++), name: "", ghin: "", index: null, tee: "IV", gender: "M",
            cart: null, flight: "", front: null, back: null };
 }
 /**
@@ -1000,6 +1019,11 @@ function drawEventPicker(){
        <input type="text" id="fEventName" autocomplete="off" value="${esc(e.name || "")}"></div>
      <div class="field"><label for="fEventDate">Date</label>
        <input type="date" id="fEventDate" value="${esc(e.date || "")}"></div>
+     <div class="field"><label for="fEventFormat">Format</label>
+       <input type="text" id="fEventFormat" list="formatList" autocomplete="off"
+         value="${esc(e.format || "")}">
+       <datalist id="formatList">${COMMON_FORMATS.map(f =>
+         `<option value="${esc(f)}"></option>`).join("")}</datalist></div>
      <div class="pad">
        <button class="big" id="fNewEvent">+ New event</button>
        <button class="big" id="fExportEvent">Export this event</button>
@@ -1021,6 +1045,9 @@ function drawEventPicker(){
   });
   $("fEventDate").addEventListener("change", (ev) => {
     state.date = ev.target.value; save(); refresh();
+  });
+  $("fEventFormat").addEventListener("input", (ev) => {
+    state.format = ev.target.value; save(); refresh();
   });
   $("fNewEvent").addEventListener("click", addEvent);
   $("fExportEvent").addEventListener("click", exportEvent);
@@ -1129,6 +1156,10 @@ function drawEdit(){
     `<div class="field"><label for="fName">Name</label>
       <input type="text" id="fName" autocomplete="off" autocapitalize="words" value="${esc(p.name)}"></div>
 
+     <div class="field"><label for="fGhin">GHIN</label>
+      <input type="text" id="fGhin" inputmode="numeric" autocomplete="off"
+        placeholder="leave blank if you don't have it" value="${esc(p.ghin || "")}"></div>
+
      <div class="field"><label for="fIndex">Handicap index</label>
       <input type="text" id="fIndex" inputmode="decimal" autocomplete="off"
         value="${esc(p.indexText != null ? p.indexText : E.formatHandicapIndex(p.index))}">
@@ -1182,6 +1213,7 @@ function drawEdit(){
   refreshCh();
 
   $("fName").addEventListener("input", e => { editing.name = e.target.value; });
+  $("fGhin").addEventListener("input", e => { editing.ghin = e.target.value; });
   $("fIndex").addEventListener("input", e => {
     // Keep exactly what was typed, so a rejected entry is never wiped from under
     // the man's thumb — he can see what he wrote and correct it.
@@ -1232,7 +1264,8 @@ function saveEditing(){
   err.textContent = "";
 
   p.name = p.name.trim();
-  const rec = { id: p.id, name: p.name, index: p.index, tee: p.tee, gender: p.gender,
+  const rec = { id: p.id, name: p.name, ghin: (p.ghin || "").trim(),
+                index: p.index, tee: p.tee, gender: p.gender,
                 cart: p.cart, flight: (p.flight || "").trim(), front: p.front, back: p.back };
   const at = state.players.findIndex(x => x.id === p.id);
   if(at === -1) state.players.push(rec); else state.players[at] = rec;

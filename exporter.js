@@ -27,7 +27,14 @@
   ];
 
   function headerRow() {
-    const cols = ["Name", "Handicap index", "Tee", "Gender", "Cart", "Flight",
+    // The event's own columns lead every row. They repeat, which is the point:
+    // several rounds can be piled into one sheet and still be told apart.
+    const cols = ["Event", "Date", "Format",
+                  // Two names. The canonical one is what the scoreboard shows;
+                  // the one as entered is what Golf Genius will match on, and
+                  // only the organiser's own typing will do for that.
+                  "Name", "Name as entered", "GHIN",
+                  "Handicap index", "Tee", "Gender", "Cart", "Flight",
                   "Front pick", "Back pick", "Course handicap"];
     for (let h = 1; h <= HOLES; h++) cols.push("H" + h);
     cols.push("Net", "Gross");
@@ -54,7 +61,7 @@
   /**
    * Build the CSV for one event.
    *
-   *   players   the event's player records, exported in the order they are set up
+   *   event     the event itself — its name, date, format and players
    *   results   what computeLeaderboard returned for the whole field
    *   options   { displayNameOf, holesOf } — how to read a player's shown name
    *             and the raw hole values on his card
@@ -63,8 +70,10 @@
    * still gets his row, with the scoring columns left empty. He is in the event
    * and an export that dropped him would be lying about who was there.
    */
-  function eventToCsv(players, results, options) {
+  function eventToCsv(event, results, options) {
     const opts = options || {};
+    const e = event || {};
+    const players = e.players || [];
     const displayNameOf = opts.displayNameOf || ((p) => p.name);
     const holesOf = opts.holesOf || ((p) => p.gross || []);
 
@@ -72,13 +81,18 @@
     (results || []).forEach((r) => { if (!byName.has(r.name)) byName.set(r.name, r); });
 
     const lines = [csvRow(headerRow())];
-    (players || []).forEach((p) => {
+    players.forEach((p) => {
       const shown = displayNameOf(p);
       const r = byName.get(shown) || null;
       const holes = holesOf(p) || [];
 
       const cells = [
+        e.name == null ? "" : e.name,
+        e.date == null ? "" : e.date,
+        e.format == null ? "" : e.format,
         shown,
+        p.name == null ? "" : p.name,        // exactly as it was typed on Setup
+        p.ghin == null ? "" : p.ghin,
         p.index == null ? "" : p.index,
         p.tee || "",
         p.gender || "",
@@ -108,6 +122,40 @@
   }
 
   /**
+   * A fingerprint of everything the CSV would carry. Compared with the one
+   * taken when the event was last exported, it answers the question that
+   * actually matters before a delete: not "was this ever exported" but "has it
+   * moved since". Exported at lunch, the real scores imported after, deleted
+   * next week is exactly how a round gets lost.
+   *
+   * Only what the file carries is fingerprinted. Which tab was open or which
+   * flight was being looked at is not part of the round.
+   */
+  function eventSignature(event) {
+    const e = event || {};
+    return JSON.stringify({
+      name: e.name || "",
+      date: e.date || "",
+      format: e.format || "",
+      allowancePercent: e.allowancePercent,
+      skinsOn: e.skinsOn !== false,
+      players: (e.players || []).map((p) => [
+        p.id, p.name, p.ghin, p.index, p.tee, p.gender, p.cart, p.flight, p.front, p.back,
+      ]),
+      scores: e.scores || {},
+      handicaps: e.handicaps || {},
+    });
+  }
+
+  /** Has the round moved since it was last exported? */
+  function changedSinceExport(event) {
+    const e = event || {};
+    if (!e.exportedAt) return true;                  // never exported at all
+    if (!e.exportedSignature) return true;           // exported before this was recorded
+    return e.exportedSignature !== eventSignature(e);
+  }
+
+  /**
    * "Friday" on 2026-08-07 becomes "Friday 2026-08-07.csv". Anything a file
    * system objects to is replaced rather than left to fail silently on save.
    */
@@ -122,5 +170,6 @@
 
   globalThis.ClubhouseExporter = {
     eventToCsv, csvFilename, csvField, headerRow, CONTEST_COLUMNS,
+    eventSignature, changedSinceExport,
   };
 })();
