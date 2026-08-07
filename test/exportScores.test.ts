@@ -392,22 +392,59 @@ test("an accented name survives the round trip", () => {
   assert.equal(back.event!.players![0].name, "Renée Ødegård");
 });
 
-test("anything that is not an event code is refused, and says why", () => {
-  const cases: [string, RegExp][] = [
-    ["", /Nothing pasted/],
-    ["   ", /Nothing pasted/],
-    ["hello", /not an event code/],
-    ["https://example.com/thing", /not an event code/],
-    [CODE_PREFIX + "!!!not base64!!!", /damaged/],
-    [CODE_PREFIX + btoa("not json at all"), /damaged/],
-    [CODE_PREFIX + btoa(JSON.stringify({ name: "x" })), /no players/],
-    [CODE_PREFIX + btoa(JSON.stringify("a string")), /holds nothing|no players/],
+// A refusal has to say what it FOUND, not only what it wanted. "It was cut
+// short" tells a man to copy it again; "it should begin BTCCLUB1:" tells him
+// nothing he can act on when the marker is right there in front of him.
+test("a refusal says which thing went wrong", () => {
+  const cases: [string, string, RegExp][] = [
+    ["nothing at all", "", /Nothing pasted/],
+    ["only spaces", "   \n  ", /Nothing pasted/],
+    ["ordinary words", "hello lads", /No BTCCLUB1: marker/],
+    ["a link", "https://example.com/thing", /No BTCCLUB1: marker/],
+    ["pasted scores", "Ridgeway, Rob (18)\t4\t5\t2", /looks like pasted scores/],
+    ["marker and nothing else", CODE_PREFIX, /cut off before it started/],
+    // Half the code copied: it still unpacks, into the front of the payload.
+    ["half a code", encodeEvent(FULL_EVENT).slice(0, 60), /cut short/],
+    ["edited by a phone", CODE_PREFIX + "!!!not a code!!!", /not part of one/],
+    ["never a code", CODE_PREFIX + "QQQQ", /never an event code|altered/],
+    ["altered", CODE_PREFIX + btoa("not json at all"), /never an event code|altered/],
+    ["an event with nobody in it", CODE_PREFIX + btoa(JSON.stringify({ name: "x" })), /no players/],
   ];
-  for (const [text, why] of cases) {
+  for (const [what, text, why] of cases) {
     const back = decodeEvent(text);
-    assert.equal(back.ok, false, JSON.stringify(text.slice(0, 30)));
-    assert.equal(back.event, null);
-    assert.match(back.error!, why, JSON.stringify(text.slice(0, 30)));
+    assert.equal(back.ok, false, what);
+    assert.equal(back.event, null, what);
+    assert.match(back.error!, why, what);
+  }
+});
+
+/* ---- what a phone and a messaging app do to a code ---- */
+
+test("the marker is read in any case", () => {
+  // iOS autocorrect lowercased it on the way into the box.
+  const code = encodeEvent(FULL_EVENT);
+  const body = code.slice(CODE_PREFIX.length);
+  for (const marker of ["btcclub1:", "Btcclub1:", "BtcClub1:", CODE_PREFIX]) {
+    const back = decodeEvent(marker + body);
+    assert.equal(back.ok, true, marker + " — " + (back.error || ""));
+    assert.equal(back.event!.name, "Friday");
+  }
+});
+
+test("a code sent inside a message still works", () => {
+  const code = encodeEvent(FULL_EVENT);
+  const messages = [
+    "Here's Friday, see you at 8\n\n" + code,
+    "> forwarded\n" + code,
+    "  \t " + code,
+    code + "\n\nsent from my iPhone",
+    "Friday:\n" + code + "\ncheers",
+  ];
+  for (const m of messages) {
+    const back = decodeEvent(m);
+    assert.equal(back.ok, true, JSON.stringify(m.slice(0, 24)) + " — " + (back.error || ""));
+    assert.equal(back.event!.name, "Friday");
+    assert.deepEqual(back.event!.players, PLAYERS, "and the whole round came with it");
   }
 });
 

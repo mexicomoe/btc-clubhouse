@@ -230,38 +230,84 @@
    * ok, `error` says which part failed, so a man who pasted the wrong thing is
    * told what he pasted rather than just refused.
    */
+  const refuse = (error) => ({ ok: false, event: null, error });
+
+  /**
+   * Pull the payload out of a body that may have a signature, a "cheers", or a
+   * quoted reply stuck to the end of it. Trailing words cannot be told from the
+   * code by their letters — "cheers" is as valid a run of base64 as any — so
+   * when the whole thing will not read, characters are dropped from the end and
+   * it is tried again. base64 only decodes on a multiple of four, so the
+   * attempts are few and the search is bounded.
+   */
+  function readPayload(body) {
+    for (let end = body.length - (body.length % 4); end >= 8; end -= 4) {
+      try {
+        const payload = JSON.parse(fromBase64(body.slice(0, end)));
+        if (payload && typeof payload === "object") return payload;
+      } catch (err) { /* shorter, then */ }
+    }
+    return null;
+  }
+
+  /**
+   * Read a pasted code back.
+   *
+   * Deliberately forgiving about everything except the payload itself: the
+   * marker is matched in any case and found anywhere in the text, so a code
+   * sent inside a message still works and a phone that lowercased it on the way
+   * in is no obstacle. Whitespace and line breaks are taken back out.
+   *
+   * Returns { ok, event, error }, and when it is not ok the error says what was
+   * found rather than only what was wanted — a man who pasted the wrong thing
+   * needs to know which wrong thing it was.
+   */
   function decodeEvent(text) {
-    const raw = String(text == null ? "" : text).trim();
-    if (raw === "") return { ok: false, event: null, error: "Nothing pasted yet." };
+    const raw = String(text == null ? "" : text);
+    if (raw.trim() === "") return refuse("Nothing pasted yet.");
 
-    // Messaging apps love to wrap lines; join anything they broke apart.
-    const oneLine = raw.replace(/\s+/g, "");
-    if (oneLine.indexOf(CODE_PREFIX) !== 0) {
-      return { ok: false, event: null,
-        error: "That is not an event code — it should begin " + CODE_PREFIX };
+    const at = raw.toUpperCase().indexOf(CODE_PREFIX);
+    if (at === -1) {
+      const looksLikeCard = /\t/.test(raw) || /\d[\t ]+\d/.test(raw);
+      return refuse(looksLikeCard
+        ? "That looks like pasted scores, not an event code. Scores go on the Import tab; " +
+          "an event code begins " + CODE_PREFIX + " and comes from “Copy this event”."
+        : "No " + CODE_PREFIX + " marker in what you pasted, so this is not an event code. " +
+          "Copy it again from the other device with “Copy this event”.");
     }
 
-    let json;
-    try {
-      json = fromBase64(oneLine.slice(CODE_PREFIX.length));
-    } catch (err) {
-      return { ok: false, event: null,
-        error: "The code is damaged — some of it is missing or was altered in sending." };
+    // Everything after the marker, with every kind of whitespace a message or a
+    // mail client might have folded into it taken out again.
+    const body = raw.slice(at + CODE_PREFIX.length).replace(/\s+/g, "");
+    if (body === "") {
+      return refuse("The marker is there but nothing follows it — the code was cut off before it started.");
     }
 
-    let payload;
-    try {
-      payload = JSON.parse(json);
-    } catch (err) {
-      return { ok: false, event: null,
-        error: "The code is damaged — what it unpacked to was not readable." };
-    }
+    const payload = readPayload(body);
+    if (!payload) {
+      // Three different failures, and they want three different answers.
+      if (/[^A-Za-z0-9+/=]/.test(body)) {
+        return refuse("There are characters in that code which are not part of one — " +
+          "something was added to it, or a phone changed it on the way in. " +
+          "Copy it again and paste it without editing.");
+      }
+      let unpacked = null;
+      try { unpacked = fromBase64(body.slice(0, body.length - (body.length % 4))); }
+      catch (err) { /* it did not even unpack */ }
 
-    if (!payload || typeof payload !== "object") {
-      return { ok: false, event: null, error: "That code holds nothing." };
+      // A code cut off mid-way still unpacks — into the FRONT of the payload,
+      // which always opens with a brace. That is how a half-copied code is told
+      // from one that was never a code at all.
+      const looksTruncated = unpacked == null || unpacked.trim().charAt(0) === "{";
+      return refuse(looksTruncated
+        ? "This doesn't look like a complete event code — it was cut short. Only " +
+          body.length + " characters came through after the marker, and an event " +
+          "is usually several hundred. Copy the whole of it and paste it again."
+        : "That unpacked, but what came out was not an event — the code was altered on the way, " +
+          "or it was never an event code.");
     }
     if (!Array.isArray(payload.players)) {
-      return { ok: false, event: null, error: "That code holds no players, so it is not an event." };
+      return refuse("That code unpacked, but there are no players in it — it is not an event.");
     }
 
     return {

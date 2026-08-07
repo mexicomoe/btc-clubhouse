@@ -543,7 +543,8 @@ function copyEvent(){
 function showCodeToCopy(code){
   document.getElementById("eventTransfer").innerHTML =
     `<div class="field"><label for="eventCode">Copy this text</label>
-       <textarea id="eventCode" readonly>${esc(code)}</textarea>
+       <textarea id="eventCode" readonly spellcheck="false" autocorrect="off"
+         autocapitalize="off" autocomplete="off">${esc(code)}</textarea>
        <div class="cd" style="margin-top:10px;font-size:18px;font-weight:700">
          The clipboard was not available, so here it is to copy by hand.</div></div>`;
   const el = document.getElementById("eventCode");
@@ -554,7 +555,8 @@ function showCodeToCopy(code){
 function showPasteBox(){
   document.getElementById("eventTransfer").innerHTML =
     `<div class="field"><label for="pasteEvent">Paste the event code</label>
-       <textarea id="pasteEvent" spellcheck="false" autocapitalize="off" autocomplete="off"
+       <textarea id="pasteEvent" spellcheck="false" autocorrect="off"
+         autocapitalize="off" autocomplete="off"
          placeholder="${esc(XP.CODE_PREFIX)}…"></textarea>
        <div id="pasteMsg" class="err" style="padding:8px 0 0"></div></div>
      <div style="padding:0 0 12px"><button class="big solid" id="fTakePaste">Add this event</button></div>`;
@@ -1497,7 +1499,8 @@ function renderImport(){
     `<div class="pad">
        <div class="field" style="border:0;padding:0 0 12px">
          <label for="paste">Paste the player rows</label>
-         <textarea id="paste" spellcheck="false" autocapitalize="off" autocomplete="off"
+         <textarea id="paste" spellcheck="false" autocorrect="off" autocapitalize="off"
+           autocomplete="off"
            placeholder="Select the rows in the Golf Genius leaderboard, copy, and paste here."></textarea>
        </div>
        <div class="field" style="border:0;padding:0 0 12px">
