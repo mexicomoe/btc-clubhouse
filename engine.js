@@ -382,10 +382,19 @@
       return { strokes: gradeAtMost(total, ladder), detail: signed(total) + " vs par on the " + label, live: true };
     }
 
-    // 6 · Bounce Back
+    // 6 · Bounce Back — a net bogey or worse, answered by a net birdie or
+    // better on the very next hole.
+    //
+    // It used to need a net DOUBLE to recover from, which made the contest
+    // punish good play: a bogey-free round could not score it at all. Ten of
+    // sixty-three real rounds were shut out and the correlation with making net
+    // doubles was +0.69 — the better you played, the fewer chances you were
+    // given, which is the opposite of what Damage Control rewards. On the same
+    // sixty-three rounds the rule below shuts nobody out, 30% clear two or
+    // more, and the handicap correlation falls to −0.09.
     let bounces = 0;
     for (let i = 0; i < HOLES - 1; i++) {
-      if (played(i) && played(i + 1) && over(i) >= 2 && over(i + 1) <= 0) bounces++;
+      if (played(i) && played(i + 1) && over(i) >= 1 && over(i + 1) <= -1) bounces++;
     }
     const bounceBack = { strokes: gradeAtLeast(bounces, contests.bounceBack), detail: bounces + " bounce-back" + (bounces === 1 ? "" : "s"), live: true };
 

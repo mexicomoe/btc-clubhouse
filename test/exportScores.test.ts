@@ -14,6 +14,7 @@ import { ABERDEEN_TEE_IV, DEFAULT_CONTESTS } from "../src/courseConfig.ts";
 import { computeLeaderboard, type PlayerCard } from "../src/scoring.ts";
 import {
   eventToCsv, csvFilename, csvField, headerRow, eventSignature, changedSinceExport,
+  encodeEvent, decodeEvent, CODE_PREFIX,
 } from "../src/exportScores.ts";
 import { canonicalName } from "../src/importScores.ts";
 
@@ -342,4 +343,80 @@ test("a player who cannot be scored has no net columns either", () => {
     { displayNameOf: shown, holesOf: () => [] }).trim().split("\r\n").map(parseCsvLine);
   const stray = out[3];
   for (let h = 1; h <= 18; h++) assert.equal(cell(stray, "N" + h), "", "hole " + h);
+});
+
+/* ---- moving an event between devices ---- */
+
+const FULL_EVENT = {
+  name: "Friday", date: "2026-08-07", format: "Individual net",
+  allowancePercent: 85, skinsOn: false,
+  players: PLAYERS,
+  scores: { p1: PAR.map((p) => p), p2: PAR.map((p, i) => (i === 3 ? "X" : i === 17 ? null : p)) },
+  handicaps: { p1: 28 },
+};
+
+test("an event travels as one line of text", () => {
+  const code = encodeEvent(FULL_EVENT);
+  assert.ok(code.startsWith(CODE_PREFIX), "and says what it is");
+  assert.ok(!/\s/.test(code), "one line, no spaces — nothing to mangle in a message");
+});
+
+test("what comes back is what went in", () => {
+  const back = decodeEvent(encodeEvent(FULL_EVENT));
+  assert.equal(back.ok, true, back.error || "");
+  const e = back.event!;
+  assert.equal(e.name, "Friday");
+  assert.equal(e.date, "2026-08-07");
+  assert.equal(e.format, "Individual net");
+  assert.equal(e.allowancePercent, 85, "the allowance travels");
+  assert.equal(e.skinsOn, false, "and the skins switch");
+  assert.deepEqual(e.players, PLAYERS, "players, with picks, carts, flights and GHIN");
+  assert.deepEqual(e.scores, FULL_EVENT.scores, "every hole, X and blank included");
+  assert.deepEqual(e.handicaps, { p1: 28 }, "and the handicaps taken off a card");
+});
+
+test("a code survives a messaging app breaking the line", () => {
+  const code = encodeEvent(FULL_EVENT);
+  const mangled = code.slice(0, 40) + "\n  " + code.slice(40, 90) + "\n" + code.slice(90) + "\n";
+  const back = decodeEvent(mangled);
+  assert.equal(back.ok, true, back.error || "");
+  assert.equal(back.event!.name, "Friday");
+});
+
+test("an accented name survives the round trip", () => {
+  // btoa alone would throw on these; the code is UTF-8 before it is base64.
+  const e = { ...FULL_EVENT, name: "Fête", players: [{ ...PLAYERS[0], name: "Renée Ødegård" }] };
+  const back = decodeEvent(encodeEvent(e));
+  assert.equal(back.ok, true, back.error || "");
+  assert.equal(back.event!.name, "Fête");
+  assert.equal(back.event!.players![0].name, "Renée Ødegård");
+});
+
+test("anything that is not an event code is refused, and says why", () => {
+  const cases: [string, RegExp][] = [
+    ["", /Nothing pasted/],
+    ["   ", /Nothing pasted/],
+    ["hello", /not an event code/],
+    ["https://example.com/thing", /not an event code/],
+    [CODE_PREFIX + "!!!not base64!!!", /damaged/],
+    [CODE_PREFIX + btoa("not json at all"), /damaged/],
+    [CODE_PREFIX + btoa(JSON.stringify({ name: "x" })), /no players/],
+    [CODE_PREFIX + btoa(JSON.stringify("a string")), /holds nothing|no players/],
+  ];
+  for (const [text, why] of cases) {
+    const back = decodeEvent(text);
+    assert.equal(back.ok, false, JSON.stringify(text.slice(0, 30)));
+    assert.equal(back.event, null);
+    assert.match(back.error!, why, JSON.stringify(text.slice(0, 30)));
+  }
+});
+
+test("the device's own bookkeeping stays behind", () => {
+  // Which tab was open, and whether THIS phone has exported it, are not the
+  // round and must not travel with it.
+  const code = encodeEvent({ ...FULL_EVENT, exportedAt: "2026-08-07T12:00:00.000Z",
+    exportedSignature: "whatever" } as any);
+  const back = decodeEvent(code);
+  assert.equal(back.event!.exportedAt, undefined, "the other device has not exported it");
+  assert.equal(back.event!.exportedSignature, undefined);
 });

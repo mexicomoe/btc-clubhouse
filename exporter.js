@@ -183,7 +183,104 @@
     return stem + ".csv";
   }
 
+  /* ---- moving an event between devices ----
+     Everything lives in the browser, so an event set up on a laptop is not on
+     the phone. This puts one on the clipboard as a single line of text, which
+     can be messaged and pasted back — no file picker, which on a phone is the
+     part that makes people give up.
+
+     One line, no spaces, so nothing a messaging app does to whitespace can
+     break it, and a marker at the front so a wrong paste is refused with a
+     reason rather than half-read. */
+  const CODE_PREFIX = "BTCCLUB1:";
+
+  function toBase64(text) {
+    const bytes = new TextEncoder().encode(text);
+    let binary = "";
+    bytes.forEach((b) => { binary += String.fromCharCode(b); });
+    return btoa(binary);
+  }
+  function fromBase64(b64) {
+    const binary = atob(b64);
+    const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+    return new TextDecoder().decode(bytes);
+  }
+
+  /** The whole event as one line of text: players, scores, picks, everything. */
+  function encodeEvent(event) {
+    const e = event || {};
+    // What travels is the round itself. Which tab was open, and whether THIS
+    // device has exported it, belong to the device and are left behind.
+    const payload = {
+      v: 1,
+      name: e.name || "",
+      date: e.date || "",
+      format: e.format || "",
+      allowancePercent: typeof e.allowancePercent === "number" ? e.allowancePercent : 100,
+      skinsOn: e.skinsOn !== false,
+      players: e.players || [],
+      scores: e.scores || {},
+      handicaps: e.handicaps || {},
+    };
+    return CODE_PREFIX + toBase64(JSON.stringify(payload));
+  }
+
+  /**
+   * Read a pasted code back. Returns { ok, event, error } — and when it is not
+   * ok, `error` says which part failed, so a man who pasted the wrong thing is
+   * told what he pasted rather than just refused.
+   */
+  function decodeEvent(text) {
+    const raw = String(text == null ? "" : text).trim();
+    if (raw === "") return { ok: false, event: null, error: "Nothing pasted yet." };
+
+    // Messaging apps love to wrap lines; join anything they broke apart.
+    const oneLine = raw.replace(/\s+/g, "");
+    if (oneLine.indexOf(CODE_PREFIX) !== 0) {
+      return { ok: false, event: null,
+        error: "That is not an event code — it should begin " + CODE_PREFIX };
+    }
+
+    let json;
+    try {
+      json = fromBase64(oneLine.slice(CODE_PREFIX.length));
+    } catch (err) {
+      return { ok: false, event: null,
+        error: "The code is damaged — some of it is missing or was altered in sending." };
+    }
+
+    let payload;
+    try {
+      payload = JSON.parse(json);
+    } catch (err) {
+      return { ok: false, event: null,
+        error: "The code is damaged — what it unpacked to was not readable." };
+    }
+
+    if (!payload || typeof payload !== "object") {
+      return { ok: false, event: null, error: "That code holds nothing." };
+    }
+    if (!Array.isArray(payload.players)) {
+      return { ok: false, event: null, error: "That code holds no players, so it is not an event." };
+    }
+
+    return {
+      ok: true, error: null,
+      event: {
+        name: typeof payload.name === "string" ? payload.name : "",
+        date: typeof payload.date === "string" ? payload.date : "",
+        format: typeof payload.format === "string" ? payload.format : "",
+        allowancePercent: typeof payload.allowancePercent === "number" ? payload.allowancePercent : 100,
+        skinsOn: payload.skinsOn !== false,
+        players: payload.players,
+        scores: payload.scores && typeof payload.scores === "object" ? payload.scores : {},
+        handicaps: payload.handicaps && typeof payload.handicaps === "object" ? payload.handicaps : {},
+      },
+    };
+  }
+
   globalThis.ClubhouseExporter = {
+    encodeEvent, decodeEvent, CODE_PREFIX,
     eventToCsv, csvFilename, csvField, headerRow, CONTEST_COLUMNS,
     eventSignature, changedSinceExport,
   };

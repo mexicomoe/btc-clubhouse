@@ -519,6 +519,78 @@ function downloadFile(filename, text, mime){
   setTimeout(() => URL.revokeObjectURL(url), 30000);
 }
 
+/* ---------- moving an event between devices ---------- */
+
+/** Put the whole event on the clipboard as one line of text. */
+function copyEvent(){
+  const code = XP.encodeEvent(state);
+  const box = document.getElementById("eventTransfer");
+  const done = (msg) => {
+    box.innerHTML = `<div class="note">${esc(msg)}</div>`;
+  };
+  // The clipboard needs a tap behind it, which a button press is. Where it is
+  // refused anyway — an old browser, or a page not served securely — the code
+  // is put on screen to be copied by hand rather than lost.
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(code).then(
+      () => done("Copied. Message it to yourself, then use “Paste an event” on the other device."),
+      () => showCodeToCopy(code));
+  } else {
+    showCodeToCopy(code);
+  }
+}
+
+function showCodeToCopy(code){
+  document.getElementById("eventTransfer").innerHTML =
+    `<div class="field"><label for="eventCode">Copy this text</label>
+       <textarea id="eventCode" readonly>${esc(code)}</textarea>
+       <div class="cd" style="margin-top:10px;font-size:18px;font-weight:700">
+         The clipboard was not available, so here it is to copy by hand.</div></div>`;
+  const el = document.getElementById("eventCode");
+  el.focus(); el.select();
+}
+
+/** Open the box a code is pasted into. */
+function showPasteBox(){
+  document.getElementById("eventTransfer").innerHTML =
+    `<div class="field"><label for="pasteEvent">Paste the event code</label>
+       <textarea id="pasteEvent" spellcheck="false" autocapitalize="off" autocomplete="off"
+         placeholder="${esc(XP.CODE_PREFIX)}…"></textarea>
+       <div id="pasteMsg" class="err" style="padding:8px 0 0"></div></div>
+     <div style="padding:0 0 12px"><button class="big solid" id="fTakePaste">Add this event</button></div>`;
+  document.getElementById("fTakePaste").addEventListener("click", takePastedEvent);
+  document.getElementById("pasteEvent").focus();
+}
+
+function takePastedEvent(){
+  const text = document.getElementById("pasteEvent").value;
+  const read = XP.decodeEvent(text);
+  if(!read.ok){
+    document.getElementById("pasteMsg").textContent = read.error;
+    return;
+  }
+
+  // An event of the same name is almost certainly the same round, carried over
+  // from the other device. Replacing is what is wanted; doing it silently is not.
+  const wanted = (read.event.name || "").trim().toLowerCase();
+  const clash = store.events.find(e => (e.name || "").trim().toLowerCase() === wanted && wanted !== "");
+  if(clash){
+    const players = clash.players.length;
+    const ok = window.confirm(
+      "An event called “" + clash.name + "” is already on this device" +
+      (players ? ", with " + players + " player" + (players===1?"":"s") : "") + ".\n\n" +
+      "Replace it with the pasted one? Everything currently in it is lost." +
+      (XP.changedSinceExport(clash) ? "\n\nIt has not been exported since it last changed." : ""));
+    if(!ok) return;
+    store.events = store.events.filter(e => e.id !== clash.id);
+  }
+
+  const brought = normaliseEvent(Object.assign({}, read.event, { id: null }));
+  store.events.push(brought);
+  save();
+  openEvent(brought.id);
+}
+
 /** Events in date order, newest first — the one being played is near the top. */
 function eventsInOrder(){
   return store.events.slice().sort((a, b) =>
@@ -902,8 +974,10 @@ function showPlayer(name){
   html += `<div class="section-label">The contests</div>`;
 
   for(const key of CONTEST_ORDER){
-    const c = r.contests[key];
-    if(!c) continue;                       // skins is absent when nobody has a cart
+    // All seven, always. A contest the result has nothing for says so rather
+    // than vanishing: a missing line looks like a contest that doesn't exist,
+    // and a man cannot tell that from one that scored him nothing.
+    const c = r.contests[key] || { strokes: 0, live: false, detail: "not scored in this round" };
     const cls = !c.live ? "none" : c.strokes<0 ? "good" : c.strokes>0 ? "penalty" : "none";
     const shown = !c.live ? "—" : fmtStrokes(c.strokes);
     html +=
@@ -1027,6 +1101,9 @@ function drawEventPicker(){
      <div class="pad">
        <button class="big" id="fNewEvent">+ New event</button>
        <button class="big" id="fExportEvent">Export this event</button>
+       <button class="big" id="fCopyEvent">Copy this event</button>
+       <button class="big" id="fPasteEvent">Paste an event</button>
+       <div id="eventTransfer"></div>
        <button class="big danger" id="fDeleteEvent">Delete this event</button>
        <div class="cd" style="margin-top:10px;font-size:18px;font-weight:700">${esc(exportNote(e))}</div>
      </div>`;
@@ -1051,6 +1128,8 @@ function drawEventPicker(){
   });
   $("fNewEvent").addEventListener("click", addEvent);
   $("fExportEvent").addEventListener("click", exportEvent);
+  $("fCopyEvent").addEventListener("click", copyEvent);
+  $("fPasteEvent").addEventListener("click", showPasteBox);
   $("fDeleteEvent").addEventListener("click", () => removeEvent(state.id));
 }
 
@@ -1367,9 +1446,18 @@ function renderSkins(){
         `<div class="cd">${strokes === 0 ? "0.0" : fmtStrokes(strokes)}</div></div></div>`;
   }).join("");
 
-  html += `<div class="note">Most a cart can earn today: <b>${fmtStrokes(cap)}</b> —
-    an even share of the eighteen skins between ${carts.length} cart${carts.length===1?"":"s"}.
-    The fewer carts are out, the more the skins are worth.</div>`;
+  // Spelled out, because the cap moves with the field and a spreadsheet kept
+  // alongside may use a fixed one. If the two disagree this is where to look.
+  const evenShare = Math.round((18 / carts.length) * 10) / 10;
+  html += `<div class="note"><b>Cap in force today: ${fmtStrokes(cap)} a cart.</b><br>
+    18 skins ÷ ${carts.length} cart${carts.length===1?"":"s"} = ${evenShare} skins each,
+    × ${fmtStrokes(config.perSkin)} a skin = ${fmtStrokes(cap)}.<br>
+    The cap is one cart's even share of the round, so it tightens as the field
+    grows — ${fmtStrokes(E.skinCap(config, 2))} over two carts,
+    ${fmtStrokes(E.skinCap(config, 4))} over four,
+    ${fmtStrokes(E.skinCap(config, 6))} over six. A fixed cap cannot work: split
+    eighteen skins two ways and both carts clear any fixed ceiling, so the
+    contest pays everyone the same and decides nothing.</div>`;
 
   if(table.carried > 0){
     html += `<div class="note warn">${table.carried} skin${table.carried===1?"":"s"} still

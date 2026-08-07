@@ -54,6 +54,23 @@ export const eventToCsv: (
   event: ExportableEvent, results: PlayerResult[], options?: CsvOptions,
 ) => string = X.eventToCsv;
 
+/** The outcome of reading a pasted event code. */
+export interface DecodedEvent {
+  ok: boolean;
+  event: ExportableEvent | null;
+  /** Why it was refused, ready to show; null when `ok`. */
+  error: string | null;
+}
+
+/** The whole event as one line of text, for messaging to another device. */
+export const encodeEvent: (event: ExportableEvent) => string = X.encodeEvent;
+
+/** Read a pasted code back into an event, or say why it could not be. */
+export const decodeEvent: (text: string) => DecodedEvent = X.decodeEvent;
+
+/** The marker every event code begins with. */
+export const CODE_PREFIX: string = X.CODE_PREFIX;
+
 /** A fingerprint of everything the CSV would carry. */
 export const eventSignature: (event: ExportableEvent) => string = X.eventSignature;
 

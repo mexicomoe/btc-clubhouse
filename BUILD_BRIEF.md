@@ -99,11 +99,13 @@ The fairest contest in the set — correlation with handicap is +0.05. Works on 
 **5 · Get Shorty** — net vs par across the par 3s.
 `≤−2 → −1.5 · −1 → −1.0 · 0 → −0.5 · +1 or worse → 0`
 
-**6 · Bounce Back** — a net double answered by a net par or better on the very next hole.
+**6 · Bounce Back** — a net bogey or worse, answered by a **net birdie or better** on the very next hole.
 `3+ → −1.5 · 2 → −1.0 · 1 → −0.5 · 0 → 0`
 Consecutive holes only. Both must be played.
 
-**7 · Skins** — see the skins section. `−0.2 a skin, capped at −1.5`.
+*Retuned.* It used to need a net **double** to recover from, which made it punish good play: the fewer net doubles a man made the fewer chances he got, so a round without one could not score it at all. Ten of sixty-three real rounds were shut out and the correlation with making net doubles was **+0.69** — the opposite of what Damage Control rewards, in the same six-contest set. On the same sixty-three rounds the rule above shuts nobody out, **30% clear two or more**, and the handicap correlation falls to **−0.09**.
+
+**7 · Skins** — see the skins section. `−0.2 a skin`, capped at one cart's even share of the eighteen: `(18 ÷ carts) × −0.2`.
 
 ### Skins — by cart or by team
 
@@ -126,7 +128,7 @@ Lowest cart average wins the hole. **Tied holes carry over** — the next hole i
 
 **Skins needs an ON/OFF switch in the console.** Some rounds the groups won't divide sensibly and the organiser will want to skip it.
 
-**Skins now scores into FINAL.** Previously it sat outside the total, which made it a sideshow. **−0.2 a skin, capped at −1.5.**
+**Skins now scores into FINAL.** Previously it sat outside the total, which made it a sideshow. **−0.2 a skin**, capped at one cart's even share of the round — `(18 ÷ carts) × −0.2`, so −1.8 over two carts, −0.9 over four, −0.6 over six. A fixed cap cannot work: eighteen skins split two ways clear any fixed ceiling both ways, and the contest then pays everyone the same and decides nothing.
 
 ---
 
@@ -221,10 +223,10 @@ women    9 11 17  1  3  7  5 15 13   4 12 16 18  8  6 10 14  2
 
 | Player | Index | Course hcp | Gross | **Picks** | Net (capped) | Strokes off | FINAL |
 |---|---|---|---|---|---|---|---|
-| Abe Whitfield | 25.2 | 19 | 92 | 1 / 10 | 73 | 6.00 | **67.00** |
-| Ben Castellan | 24.8 | 19 | 93 | 2 / 11 | 74 | 6.50 | **67.50** |
+| Abe Whitfield | 25.2 | 19 | 92 | 1 / 10 | 73 | 7.00 | **66.00** |
+| Ben Castellan | 24.8 | 19 | 93 | 2 / 11 | 74 | 6.00 | **68.00** |
 | Dan Pemberton | 26.4 | 21 | 95 | 6 / 14 | 74 | 3.50 | **70.50** |
-| Eli Marsden | 23.6 | 18 | 92 | 9 / 15 | 74 | 3.50 | **70.50** |
+| Eli Marsden | 23.6 | 18 | 92 | 9 / 15 | 74 | 3.00 | **71.00** |
 | Cy Ashford | 24.0 | 18 | 93 | 5 / 12 | 75 | 4.00 | **71.00** |
 | Gus Thornbury | 25.4 | 20 | 97 | 1 / 10 | 76 | 4.50 | **71.50** |
 | Hal Brightwater | 25.1 | 19 | 95 | 2 / 11 | 76 | 3.00 | **73.00** |
@@ -311,14 +313,14 @@ Hoyt      7  5  4  8  8  4  8  4  6  5  6  7  4  7  5  5  4  6
 
 | Player | Course hcp | Gross | Picks | Net (capped) | Strokes off | FINAL |
 |---|---|---|---|---|---|---|
-| Dex | 23 | 93 | 6 / 14 | 70 | 5.00 | **65.00** |
-| Alex | 18 | 90 | 1 / 10 | 72 | 5.00 | **67.00** |
-| Finn | 26 | 99 | 1 / 10 | 73 | 4.50 | **68.50** |
+| Dex | 23 | 93 | 6 / 14 | 70 | 6.00 | **64.00** |
+| Alex | 18 | 90 | 1 / 10 | 72 | 4.50 | **67.50** |
+| Finn | 26 | 99 | 1 / 10 | 73 | 3.50 | **69.50** |
 | Boyd | 21 | 96 | 2 / 11 | 75 | 5.00 | **70.00** |
-| Emmet | 14 | 91 | 9 / 15 | 77 | 0.50 | **76.50** |
-| Chip | 15 | 94 | 5 / 12 | 79 | 1.50 | **77.50** |
+| Emmet | 14 | 91 | 9 / 15 | 77 | 1.00 | **76.00** |
+| Chip | 15 | 94 | 5 / 12 | 79 | 2.50 | **76.50** |
 | Grady | 34 | 113 | 2 / 11 | 79 | 0.50 | **78.50** |
-| Hoyt | 20 | 103 | 5 / 12 | 82 | 2.50 | **79.50** |
+| Hoyt | 20 | 103 | 5 / 12 | 82 | 1.50 | **80.50** |
 
 > ⚠️ **The Watch the Birdie picks above are invented, and every FINAL in this table depends on them.**
 >

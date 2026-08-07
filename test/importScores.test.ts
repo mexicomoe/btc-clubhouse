@@ -69,8 +69,8 @@ test("December import feeds the engine and reproduces section 9", () => {
     "Hal Brightwater": { front: 2, back: 11 }, "Ike Calloway":  { front: 5, back: 12 },
   };
   const expectedFinal: Record<string, number> = {
-    "Abe Whitfield": 67.0, "Ben Castellan": 67.5, "Cy Ashford": 71.0, "Dan Pemberton": 70.5,
-    "Eli Marsden": 70.5, "Gus Thornbury": 71.5, "Hal Brightwater": 73.0, "Ike Calloway": 76.0,
+    "Abe Whitfield": 66.0, "Ben Castellan": 68.0, "Cy Ashford": 71.0, "Dan Pemberton": 70.5,
+    "Eli Marsden": 71.0, "Gus Thornbury": 71.5, "Hal Brightwater": 73.0, "Ike Calloway": 76.0,
   };
 
   const { cards } = parseScores(read("december_demo.tsv"));
