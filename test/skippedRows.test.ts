@@ -105,3 +105,70 @@ test("a set-aside row is never graded", () => {
   assert.equal(errors.length, 0);
   assert.ok(cards.every((c) => c.mode === "unknown"), "left ungraded");
 });
+
+/* ---- the export's own label rows ---- */
+
+/**
+ * Golf Genius prints three rows for every player: his card, a "Net Score" row,
+ * a "To Par (net)" row, then a blank one. Those are the export talking about
+ * the card above, not people.
+ *
+ * Left in they are worse than noise. Their eighteen numbers sum to the total
+ * printed beside them, so each parses as a perfectly good GROSS card and lands
+ * in the import list as a phantom player waiting to be assigned — sixteen of
+ * them in an eight-man field, crowding out the two rows that genuinely need a
+ * decision. Assign a player to one by mistake and the real row is refused too,
+ * because two rows may not share a man.
+ */
+const REAL_PASTE = [
+  "Ridgeway, Rob (18)\t4\t5\t2\t5\t5\t4\t4\t2\t5\t36\t3\t4\t4\t3\t5\t5\t5\t2\t5\t36\t90\t72",
+  "Net Score\t4\t5\t2\t5\t5\t4\t4\t2\t5\t36\t3\t4\t4\t3\t5\t5\t5\t2\t5\t36\t72\t",
+  "To Par (net)\t0\t1\t-1\t0\t1\t0\t-1\t-1\t1\t0\t-1\t0\t0\t0\t1\t1\t0\t-1\t0\t0\t0\t",
+  "",
+  "Harkness, Fred (14)\t3\t4\t3\t6\t4\t4\t4\t4\t5\t37\t5\t3\t3\t3\t4\t5\t6\t4\t5\t38\t89\t75",
+  "Marlow, Andrew (30)\t4\t3\t3\t6\t5\t4\t6\t4\t3\t38\t4\t5\t3\t3\t5\t4\t5\t3\t7\t39\t107\t77",
+].join("\n");
+
+test("three rows a player yields one card a player", () => {
+  const { cards, errors } = parseScores(REAL_PASTE);
+  assert.equal(errors.length, 0, "the label rows are not errors either");
+  assert.deepEqual(cards.map((c) => c.name),
+    ["Ridgeway, Rob", "Harkness, Fred", "Marlow, Andrew"]);
+});
+
+test("a label row is not a player, however well it parses", () => {
+  // This is the trap: on its own it looks like a flawless gross card.
+  const alone = parseScores(
+    "Net Score\t4\t5\t2\t5\t5\t4\t4\t2\t5\t36\t3\t4\t4\t3\t5\t5\t5\t2\t5\t36\t72\t");
+  assert.equal(alone.cards.length, 0, "no card at all");
+  assert.equal(alone.errors.length, 0, "and nothing to report");
+});
+
+test("every label the export writes is refused", () => {
+  const holes = "\t4\t5\t2\t5\t5\t4\t4\t2\t5\t36\t3\t4\t4\t3\t5\t5\t5\t2\t5\t36\t72\t";
+  for (const label of ["Net Score", "net score", "NET SCORE",
+                       "To Par", "To Par (net)", "To Par (gross)", "  To Par  "]) {
+    const { cards } = parseScores(label + holes);
+    assert.equal(cards.length, 0, label);
+  }
+});
+
+test("a real player is never mistaken for a label", () => {
+  const holes = "\t4\t5\t2\t5\t5\t4\t4\t2\t5\t36\t3\t4\t4\t3\t5\t5\t5\t2\t5\t36\t72\t";
+  for (const name of ["Netherton, Sid (18)", "Parr, Ken (12)", "Score, Bill (9)"]) {
+    const { cards } = parseScores(name + holes);
+    assert.equal(cards.length, 1, name);
+  }
+});
+
+test("the cards that survive are read exactly as they should be", () => {
+  const { cards } = parseScores(REAL_PASTE);
+  const rob = cards[0];
+  assert.equal(rob.handicap, 18);
+  assert.equal(rob.holesPlayed, 18);
+  assert.equal(rob.mode, "net", "hole columns are net, as the low-net export writes them");
+  assert.equal(rob.grossTotal, 90);
+  assert.equal(rob.netTotal, 72);
+  assert.equal(rob.holes.reduce<number>((a, h) => a + (h as number), 0), 72,
+    "and the eighteen sum to the Net column");
+});

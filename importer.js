@@ -42,6 +42,20 @@
   const BLIND_NAME = /\(\s*blind\s*\)/i;
   const NO_CARD_TOTAL = /^\s*n\.?c\.?\s*$/i;
 
+  /**
+   * The export prints three rows for every player: his card, then a "Net Score"
+   * row and a "To Par (net)" row, then a blank one. Those are the export
+   * talking about the card above, not people — they carry no name and no
+   * handicap, and there is nobody they could belong to.
+   *
+   * They are dropped outright rather than carried through marked, which is what
+   * happens to a blind. A blind is a named entry someone might go looking for;
+   * these are furniture. Left in they are worse than noise: their eighteen
+   * numbers sum to the total beside them, so each one parses as a perfectly
+   * good gross card and lands in the list as a phantom player to be assigned.
+   */
+  const LABEL_ROW = /^\s*(net score|to par)\b/i;
+
   /** Section-10 fixed layout: name, 1–9, Out, 10–18, In, Total, Net. */
   const FIXED_LAYOUT = {
     holeCols: [1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19],
@@ -70,7 +84,8 @@
     for (const line of dataLines) {
       const cells = line.split("\t");
       const rawName = (cells[0] == null ? "" : cells[0]).trim();
-      if (rawName === "") continue; // stray blank-first-cell row
+      if (rawName === "") continue;        // the blank row between players
+      if (LABEL_ROW.test(rawName)) continue;  // "Net Score", "To Par (net)"
 
       const split = splitName(rawName);
       const name = split.name, handicap = split.handicap;
