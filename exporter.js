@@ -62,11 +62,6 @@
     return values.map(csvField).join(",");
   }
 
-  /** A hole he picked up on — anything on the card that is not a number. */
-  function isPickedUp(v) {
-    return v != null && typeof v !== "number";
-  }
-
   /**
    * Build the CSV for one event.
    *
@@ -117,11 +112,13 @@
       }
       // The capped net per hole, straight off the result — the figure every
       // contest was graded on, so nothing downstream has to allocate the
-      // strokes again. A pick-up shows X here as it does on the gross side; the
-      // net it scored is net double, which is par + 2 on that hole.
+      // strokes again. Every played hole carries its number, a pick-up
+      // included: that one is net double, and the gross column beside it
+      // already says X, so marking it twice would only cost the reader the
+      // figure the contest actually read. A hole not played is blank on both
+      // sides, which nothing can mistake for a score.
       const net = r && r.netByHole ? r.netByHole : null;
       for (let i = 0; i < HOLES; i++) {
-        if (isPickedUp(holes[i])) { cells.push(holes[i]); continue; }
         cells.push(net && net[i] != null ? net[i] : "");
       }
       cells.push(r && r.net != null ? r.net : "");

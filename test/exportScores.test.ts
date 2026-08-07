@@ -306,12 +306,33 @@ test("the net columns follow the man's own tee and card", () => {
   assert.equal(cell(sal, "N17"), String(r.netByHole[16]));
 });
 
-test("a pick-up and an unplayed hole read the same on both sides", () => {
+// The gross column flags the pick-up, so the net column is free to carry the
+// figure the contest actually read. Marking it X on both sides would only cost
+// the reader that number — and par is not in the file to work it back out from.
+test("a pick-up shows X in gross and its graded net beside it", () => {
+  const scored = board();
+  const r = scored.find((x) => x.name === "Sal Merrick")!;
   const sal = rows()[2];
-  assert.equal(cell(sal, "H4"), "X", "gross");
-  assert.equal(cell(sal, "N4"), "X", "and net, so a pick-up is never mistaken for a real net double");
+  assert.equal(cell(sal, "H4"), "X", "the gross column flags the pick-up");
+  assert.equal(cell(sal, "N4"), String(r.netByHole[3]), "and the net column carries the number");
+  assert.equal(cell(sal, "N4"), String(PAR[3] + 2), "which is net double, as picking up scores");
+});
+
+test("an unplayed hole is blank on both sides", () => {
+  const sal = rows()[2];
   assert.equal(cell(sal, "H18"), "", "not played");
-  assert.equal(cell(sal, "N18"), "", "blank on both sides");
+  assert.equal(cell(sal, "N18"), "", "and nothing can mistake it for a score");
+});
+
+test("no net column ever carries an X", () => {
+  // Every played hole has a number in it, so the block can be read as figures
+  // without special cases.
+  for (const row of rows().slice(1)) {
+    for (let h = 1; h <= 18; h++) {
+      const v = cell(row, "N" + h);
+      assert.ok(v === "" || /^-?\d+$/.test(v), "N" + h + " is a number or blank, got " + v);
+    }
+  }
 });
 
 test("a player who cannot be scored has no net columns either", () => {
