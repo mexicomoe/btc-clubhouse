@@ -206,23 +206,116 @@
     return new TextDecoder().decode(bytes);
   }
 
+  /* ---- packing a round small ----
+     The code has to survive a text message and a clipboard, and the first
+     attempt did not: an eight-man round came to 2,193 characters, because every
+     player carried the same ten field names and an id nobody needs on the other
+     side, and every hole was written as a number with a comma after it.
+
+     So nothing is named. A player is a list in a fixed order, a card is
+     eighteen characters, and the ids are dropped and made again on arrival.
+     The same round now takes about a third of that. */
+
+  /** One character a hole: 0–32 as a digit or letter, "." unplayed, "X" picked up. */
+  const HOLE_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVW";
+  const HOLE_UNPLAYED = ".";
+  const HOLE_PICKED_UP = "X";
+
+  function packHoles(holes) {
+    let out = "";
+    for (let i = 0; i < 18; i++) {
+      const v = holes ? holes[i] : null;
+      if (v == null) { out += HOLE_UNPLAYED; continue; }
+      if (typeof v !== "number") { out += HOLE_PICKED_UP; continue; }
+      const n = Math.max(0, Math.min(HOLE_CHARS.length - 1, Math.round(v)));
+      out += HOLE_CHARS.charAt(n);
+    }
+    return out;
+  }
+
+  function unpackHoles(text) {
+    const s = String(text == null ? "" : text);
+    const out = [];
+    for (let i = 0; i < 18; i++) {
+      const c = s.charAt(i);
+      if (c === HOLE_PICKED_UP) { out.push("X"); continue; }
+      const n = HOLE_CHARS.indexOf(c);
+      out.push(n === -1 ? null : n);       // "." and anything unexpected read as unplayed
+    }
+    return out;
+  }
+
+  /** Drop trailing nothings — they cost characters and carry no meaning. */
+  function trimTail(list) {
+    const out = list.slice();
+    while (out.length && (out[out.length - 1] === null || out[out.length - 1] === "")) out.pop();
+    return out;
+  }
+
   /** The whole event as one line of text: players, scores, picks, everything. */
   function encodeEvent(event) {
     const e = event || {};
+    const scores = e.scores || {};
+    const handicaps = e.handicaps || {};
+
+    // A player, in a fixed order. His id is left behind: it means nothing on
+    // the other device, and a new one is made when the round lands there.
+    const players = (e.players || []).map((p) => trimTail([
+      p.name == null ? "" : p.name,
+      p.ghin == null ? "" : p.ghin,
+      p.index == null ? null : p.index,
+      p.tee == null ? "" : p.tee,
+      p.gender == null ? "" : p.gender,
+      p.cart == null ? null : p.cart,
+      (p.flight || "").trim(),
+      p.front == null ? null : p.front,
+      p.back == null ? null : p.back,
+      packHoles(scores[p.id]),
+      handicaps[p.id] == null ? null : handicaps[p.id],
+    ]));
+
     // What travels is the round itself. Which tab was open, and whether THIS
     // device has exported it, belong to the device and are left behind.
-    const payload = {
-      v: 1,
-      name: e.name || "",
-      date: e.date || "",
-      format: e.format || "",
-      allowancePercent: typeof e.allowancePercent === "number" ? e.allowancePercent : 100,
-      skinsOn: e.skinsOn !== false,
-      players: e.players || [],
-      scores: e.scores || {},
-      handicaps: e.handicaps || {},
-    };
+    const payload = [
+      2,                                   // an array marks the packed form
+      e.name || "",
+      e.date || "",
+      e.format || "",
+      typeof e.allowancePercent === "number" ? e.allowancePercent : 100,
+      e.skinsOn === false ? 0 : 1,
+      players,
+    ];
     return CODE_PREFIX + toBase64(JSON.stringify(payload));
+  }
+
+  /** Read the packed form back into the shape the app stores. */
+  function unpackEvent(payload) {
+    const players = [], scores = {}, handicaps = {};
+    (payload[6] || []).forEach((row, i) => {
+      const id = "p" + (i + 1);            // ids are made fresh on this device
+      players.push({
+        id,
+        name: row[0] == null ? "" : row[0],
+        ghin: row[1] == null ? "" : row[1],
+        index: typeof row[2] === "number" ? row[2] : null,
+        tee: row[3] || "IV",
+        gender: row[4] === "F" ? "F" : "M",
+        cart: row[5] == null ? null : row[5],
+        flight: row[6] == null ? "" : row[6],
+        front: row[7] == null ? null : row[7],
+        back: row[8] == null ? null : row[8],
+      });
+      if (row[9]) scores[id] = unpackHoles(row[9]);
+      if (row[10] != null) handicaps[id] = row[10];
+    });
+    return {
+      name: typeof payload[1] === "string" ? payload[1] : "",
+      date: typeof payload[2] === "string" ? payload[2] : "",
+      format: typeof payload[3] === "string" ? payload[3] : "",
+      allowancePercent: typeof payload[4] === "number" ? payload[4] : 100,
+      skinsOn: payload[5] !== 0,
+      players, scores, handicaps,
+    };
   }
 
   /**
@@ -296,9 +389,10 @@
       catch (err) { /* it did not even unpack */ }
 
       // A code cut off mid-way still unpacks — into the FRONT of the payload,
-      // which always opens with a brace. That is how a half-copied code is told
-      // from one that was never a code at all.
-      const looksTruncated = unpacked == null || unpacked.trim().charAt(0) === "{";
+      // which always opens with a bracket (packed) or a brace (the older form).
+      // That is how a half-copied code is told from one that was never a code.
+      const opens = unpacked == null ? "" : unpacked.trim().charAt(0);
+      const looksTruncated = unpacked == null || opens === "[" || opens === "{";
       return refuse(looksTruncated
         ? "This doesn't look like a complete event code — it was cut short. Only " +
           body.length + " characters came through after the marker, and an event " +
@@ -306,6 +400,15 @@
         : "That unpacked, but what came out was not an event — the code was altered on the way, " +
           "or it was never an event code.");
     }
+    // An array is the packed form; an object is the first, wordy one. Codes
+    // made before the packing still read, which costs one branch.
+    if (Array.isArray(payload)) {
+      if (!Array.isArray(payload[6])) {
+        return refuse("That code unpacked, but there are no players in it — it is not an event.");
+      }
+      return { ok: true, error: null, event: unpackEvent(payload) };
+    }
+
     if (!Array.isArray(payload.players)) {
       return refuse("That code unpacked, but there are no players in it — it is not an event.");
     }

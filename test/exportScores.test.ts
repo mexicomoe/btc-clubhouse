@@ -370,7 +370,10 @@ test("what comes back is what went in", () => {
   assert.equal(e.format, "Individual net");
   assert.equal(e.allowancePercent, 85, "the allowance travels");
   assert.equal(e.skinsOn, false, "and the skins switch");
-  assert.deepEqual(e.players, PLAYERS, "players, with picks, carts, flights and GHIN");
+  // The packed form always writes a GHIN field, so a player who had none comes
+  // back with an empty one rather than none at all. Everything else is his.
+  assert.deepEqual(e.players, PLAYERS.map((p) => ({ ghin: "", ...p })),
+    "players, with picks, carts, flights and GHIN");
   assert.deepEqual(e.scores, FULL_EVENT.scores, "every hole, X and blank included");
   assert.deepEqual(e.handicaps, { p1: 28 }, "and the handicaps taken off a card");
 });
@@ -444,7 +447,8 @@ test("a code sent inside a message still works", () => {
     const back = decodeEvent(m);
     assert.equal(back.ok, true, JSON.stringify(m.slice(0, 24)) + " — " + (back.error || ""));
     assert.equal(back.event!.name, "Friday");
-    assert.deepEqual(back.event!.players, PLAYERS, "and the whole round came with it");
+    assert.deepEqual(back.event!.players, PLAYERS.map((p) => ({ ghin: "", ...p })),
+      "and the whole round came with it");
   }
 });
 
@@ -456,4 +460,84 @@ test("the device's own bookkeeping stays behind", () => {
   const back = decodeEvent(code);
   assert.equal(back.event!.exportedAt, undefined, "the other device has not exported it");
   assert.equal(back.event!.exportedSignature, undefined);
+});
+
+/* ---- packing it small enough to send ---- */
+
+/** A field of `n` players with full cards, as a real round would be. */
+function bigEvent(n: number) {
+  const players: any[] = [], scores: Record<string, (number | string | null)[]> = {};
+  for (let i = 0; i < n; i++) {
+    const id = "p" + (i + 1);
+    players.push({ id, name: "Ridgeway, Robert " + i, ghin: "12345" + i + "7",
+      index: 19.4 + i, tee: "IV", gender: "M", cart: 1 + Math.floor(i / 2),
+      flight: "A", front: 5, back: 14 });
+    scores[id] = PAR.map((p, h) => (h === 3 ? "X" : h === 17 ? null : p + (i % 3 ? 1 : 0)));
+  }
+  return { name: "Friday Medal", date: "2026-08-07", format: "Individual net",
+           allowancePercent: 85, skinsOn: true, players, scores, handicaps: { p1: 18 } };
+}
+
+// The first attempt spent 2,193 characters on eight players and was cut short
+// by a phone's clipboard. Nothing is named in the packed form, the ids are
+// dropped, and a card is eighteen characters rather than eighteen numbers.
+test("an eight-man round fits in about a third of what it did", () => {
+  const code = encodeEvent(bigEvent(8));
+  assert.ok(code.length < 1100, "eight players in " + code.length + " characters");
+  assert.ok(code.length < 2193 * 0.5, "less than half the old size");
+});
+
+test("the code grows in step with the field, not faster", () => {
+  const four = encodeEvent(bigEvent(4)).length;
+  const eight = encodeEvent(bigEvent(8)).length;
+  const sixteen = encodeEvent(bigEvent(16)).length;
+  assert.ok(eight < four * 2, "no fixed cost repeated per player");
+  assert.ok(sixteen < eight * 2);
+});
+
+test("a full field packs without losing anything", () => {
+  const big = bigEvent(24);
+  const back = decodeEvent(encodeEvent(big));
+  assert.equal(back.ok, true, back.error || "");
+  assert.equal(back.event!.players!.length, 24);
+  // The last man's card is as complete as the first's.
+  const last = back.event!.players![23];
+  assert.equal(last.name, "Ridgeway, Robert 23");
+  assert.equal(last.ghin, "12345237");
+  assert.deepEqual(back.event!.scores!["p24"], big.scores["p24"]);
+});
+
+test("every kind of hole survives the packing", () => {
+  const holes = [1, 4, 9, 10, 12, "X", null, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 15];
+  const e = { name: "H", date: "2026-08-07", format: "", allowancePercent: 100, skinsOn: true,
+    players: [{ id: "p1", name: "A", index: 10, tee: "IV", gender: "M" }],
+    scores: { p1: holes }, handicaps: {} };
+  const back = decodeEvent(encodeEvent(e as any));
+  assert.deepEqual(back.event!.scores!["p1"], holes,
+    "single figures, double figures, a pick-up and a hole not played");
+});
+
+test("ids are made fresh, so two devices never collide", () => {
+  const e = { ...bigEvent(2) };
+  e.players[0].id = "p99"; e.players[1].id = "zzz";
+  e.scores = { p99: PAR.map((p) => p), zzz: PAR.map((p) => p + 1) };
+  e.handicaps = { p99: 18 };
+  const back = decodeEvent(encodeEvent(e as any));
+  assert.deepEqual(back.event!.players!.map((p: any) => p.id), ["p1", "p2"]);
+  assert.ok(back.event!.scores!["p1"], "and the cards follow the new ids");
+  assert.equal(back.event!.handicaps!["p1"], 18);
+});
+
+test("a code from before the packing still reads", () => {
+  // The wordy first form, as a code already sent would still be written.
+  const old = CODE_PREFIX + btoa(JSON.stringify({
+    v: 1, name: "Old", date: "2026-08-01", format: "Individual net",
+    allowancePercent: 100, skinsOn: true,
+    players: [{ id: "p1", name: "Ken", index: 12, tee: "IV", gender: "M" }],
+    scores: { p1: PAR.map((p) => p) }, handicaps: {},
+  }));
+  const back = decodeEvent(old);
+  assert.equal(back.ok, true, back.error || "");
+  assert.equal(back.event!.name, "Old");
+  assert.equal(back.event!.players!.length, 1);
 });

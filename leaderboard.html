@@ -185,7 +185,7 @@
     display: block; font-size: 18px; font-weight: 800;
     text-transform: uppercase; letter-spacing: .4px; margin-bottom: 8px;
   }
-  input[type="text"], input[type="number"], select, textarea {
+  input[type="text"], input[type="number"], input[type="file"], select, textarea {
     display: block; width: 100%; min-height: 56px; padding: 12px;
     font-family: inherit; font-size: 22px; font-weight: 700;
     color: var(--ink); background: var(--paper);
@@ -521,12 +521,27 @@ function downloadFile(filename, text, mime){
 
 /* ---------- moving an event between devices ---------- */
 
+/* A code much longer than this has been seen to come through a phone's
+   clipboard with its head cut off. Below it, messaging is fine; above it, say
+   so and point at the file, which has no length to run out of. */
+const CODE_LENGTH_WARN = 1500;
+
+/** How long this event's code is, and whether that is asking for trouble. */
+function codeLengthNote(code){
+  const n = code.length;
+  return n > CODE_LENGTH_WARN
+    ? n + " characters — long. If it will not paste at the other end, send the file instead."
+    : n + " characters.";
+}
+
 /** Put the whole event on the clipboard as one line of text. */
 function copyEvent(){
   const code = XP.encodeEvent(state);
-  const box = document.getElementById("eventTransfer");
   const done = (msg) => {
-    box.innerHTML = `<div class="note">${esc(msg)}</div>`;
+    document.getElementById("eventTransfer").innerHTML =
+      `<div class="note">${esc(msg)}<br><b>${esc(codeLengthNote(code))}</b></div>` +
+      `<div style="padding:12px 0 0"><button class="big" id="fSaveFile">Send as a file instead</button></div>`;
+    document.getElementById("fSaveFile").addEventListener("click", saveEventFile);
   };
   // The clipboard needs a tap behind it, which a button press is. Where it is
   // refused anyway — an old browser, or a page not served securely — the code
@@ -538,6 +553,20 @@ function copyEvent(){
   } else {
     showCodeToCopy(code);
   }
+}
+
+/**
+ * The same code as a file, for AirDrop. A message can cut a long code short;
+ * a file cannot, so this is the way that always works — at the cost of the
+ * file picker at the far end.
+ */
+function saveEventFile(){
+  const code = XP.encodeEvent(state);
+  const name = XP.csvFilename(state.name, state.date).replace(/\.csv$/, ".btc");
+  downloadFile(name, code, "text/plain;charset=utf-8");
+  document.getElementById("eventTransfer").innerHTML =
+    `<div class="note">Saved as <b>${esc(name)}</b>. AirDrop it to the other device,
+      then use “Paste an event” there and choose <b>Open a .btc file</b>.</div>`;
 }
 
 function showCodeToCopy(code){
@@ -559,9 +588,30 @@ function showPasteBox(){
          autocapitalize="off" autocomplete="off"
          placeholder="${esc(XP.CODE_PREFIX)}…"></textarea>
        <div id="pasteMsg" class="err" style="padding:8px 0 0"></div></div>
-     <div style="padding:0 0 12px"><button class="big solid" id="fTakePaste">Add this event</button></div>`;
+     <div style="padding:0 0 12px"><button class="big solid" id="fTakePaste">Add this event</button></div>
+     <div class="field"><label for="fEventFile">…or open a .btc file</label>
+       <input type="file" id="fEventFile" accept=".btc,.txt,text/plain">
+       <div class="cd" style="margin-top:10px;font-size:18px;font-weight:700">
+         For a round too long to message: AirDrop the file, then open it here.</div></div>`;
   document.getElementById("fTakePaste").addEventListener("click", takePastedEvent);
+  document.getElementById("fEventFile").addEventListener("change", openEventFile);
   document.getElementById("pasteEvent").focus();
+}
+
+/** Read a .btc file into the paste box, then take it as if it had been pasted. */
+function openEventFile(ev){
+  const file = ev.target.files && ev.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    document.getElementById("pasteEvent").value = String(reader.result || "");
+    takePastedEvent();
+  };
+  reader.onerror = () => {
+    document.getElementById("pasteMsg").textContent =
+      "That file could not be read. Try AirDropping it again.";
+  };
+  reader.readAsText(file);
 }
 
 function takePastedEvent(){
