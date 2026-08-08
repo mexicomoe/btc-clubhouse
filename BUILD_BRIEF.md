@@ -166,7 +166,21 @@ Where it bites, by field size: **never** at two or three groups (a rout of all e
 
 ## 4. Screens
 
-**Setup** — course, then players: name, handicap index, cart number, and the two Watch the Birdie picks. Offer only the legal par 4s for each nine so an invalid pick cannot be entered. Course handicap displays as it's computed. Editable at any point. Done once before the round.
+**Setup** — organised by how often a thing is touched, not by how it was built. Every feature added to this screen wanted a place at the top of it, and unchecked that makes a wall of controls to scroll past to reach the one job the screen is actually for.
+
+*Always out:* the two figures checked first — **how many players, and whether the cards have come in** — then the player list, **+ Add player** and **Paste a list of players**.
+
+*Folded away,* shut on arrival and remembering whatever was left open (a property of the device, not of the event, so it never travels in an event code):
+
+- **Event settings** — which event, name, date, format, handicap allowance, skins on or off.
+- **Move this event** — export a CSV, copy, paste, open a .btc file, delete.
+- **About** — the build line and enough to answer "is it me or is it the phone?" over a telephone.
+
+Each shut heading carries a line saying what is inside, so the allowance and the skins switch — both of which move every man's score — can be read without opening anything.
+
+*A player row shows name, handicap index and tee, and nothing else.* Group, flight, picks, GHIN and sex all live in the player's own form, one tap away. At twenty-four rows every extra word costs a line. Offer only the legal par 4s for each nine so an invalid pick cannot be entered. Course handicap displays as it's computed — the played figure where a card supplied one, labelled as played. Editable at any point.
+
+**Colour helps the eye find things and is never the signal.** The three headings are tinted so they can be found by shape and place; a row with something missing is tinted amber with an amber bar — *and says the word "missing" followed by what is missing*. A man who cannot tell the tint from white in Florida sun loses nothing.
 
 **Import scores** — a paste box. See section 10 for the exact format. Show what was parsed before committing anything, so a bad paste is caught immediately. Re-pasting replaces the round; it never merges.
 

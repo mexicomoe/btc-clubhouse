@@ -18,6 +18,14 @@
     --penalty: #b0140a;   /* the one contest that can add strokes */
     --band: #0b2e13;      /* header band, deep green */
     --wash: #f0efe9;      /* the only fill that isn't white — still near-black text */
+    /* Colour is here to help the eye FIND things, never to carry meaning on its
+       own: every tinted thing also says in words what it is. These are all pale
+       enough to keep black text at full contrast in Florida sun. */
+    --amber: #8a5000;     /* something is missing — always beside the word */
+    --amberwash: #ffeec8;
+    --tint-event: #dfeee1;   /* Event settings */
+    --tint-move: #dee8f3;    /* Move this event */
+    --tint-about: #eae7f2;   /* About */
     font-size: 20px;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -46,13 +54,6 @@
   }
   nav.tabs button:last-child { border-right: 0; }
   nav.tabs button[aria-current="true"] { background: var(--ink); color: var(--paper); }
-
-  /* Which build this is. Quiet, but still at the 18px floor — it is read by the
-     same eyes as everything else, just far less often. */
-  .version {
-    padding: 20px 14px 28px; font-size: 18px; font-weight: 700;
-    font-variant-numeric: tabular-nums;
-  }
 
   /* Flight picker — only drawn when the field is actually divided */
   nav.flights { display: flex; flex-wrap: wrap; border-bottom: 3px solid var(--ink); }
@@ -160,6 +161,44 @@
   .big[disabled] { opacity: .45; cursor: default; }
   .big + .big { margin-top: 12px; }
 
+  /* Setup: the two things checked first, before anything is opened — how many
+     men are in, and whether their cards have arrived. */
+  .status { display: flex; border-bottom: 3px solid var(--ink); }
+  .status .stat {
+    flex: 1 1 0; min-width: 0; padding: 12px 14px;
+    border-right: 3px solid var(--ink);
+  }
+  .status .stat:last-child { border-right: 0; }
+  .status .statn { font-size: 30px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .status .statl { font-size: 18px; font-weight: 800; text-transform: uppercase; letter-spacing: .4px; margin-top: 2px; }
+  /* Amber says "not yet"; the words say it too, so the tint is never the signal. */
+  .status .stat.wait { background: var(--amberwash); box-shadow: inset 0 -6px 0 var(--amber); }
+
+  /* Collapsed sections — the settings, the transfers and the build line, each
+     out of the way until wanted. Native <details>, so it needs no script, works
+     offline and reads correctly to VoiceOver. */
+  details.fold { border-bottom: 3px solid var(--ink); }
+  details.fold > summary {
+    display: flex; align-items: center; gap: 10px;
+    min-height: 60px; padding: 14px 18px;
+    font-size: 22px; font-weight: 800; cursor: pointer;
+    border-top: 3px solid var(--ink);
+    list-style: none;
+  }
+  details.fold > summary::-webkit-details-marker { display: none; }
+  /* The open/shut mark is a shape, not a colour, and sits at the 18px floor. */
+  details.fold > summary::after {
+    content: "＋"; margin-left: auto; font-size: 26px; font-weight: 800;
+  }
+  details.fold[open] > summary::after { content: "－"; }
+  details.fold > summary .fsub {
+    display: block; font-size: 18px; font-weight: 700; margin-top: 3px;
+  }
+  details.fold > summary .fname { display: block; }
+  #foldEvent > summary { background: var(--tint-event); }
+  #foldMove  > summary { background: var(--tint-move); }
+  #foldAbout > summary { background: var(--tint-about); }
+
   /* Setup list */
   .prow {
     display: flex; align-items: center; gap: 10px; width: 100%;
@@ -168,6 +207,11 @@
     border: 0; border-bottom: 3px solid var(--ink);
     text-align: left; font: inherit; cursor: pointer;
   }
+  /* A row with something missing. The bar and the tint are there to catch the
+     eye across twenty-four rows; the word "missing" in the line below the name
+     is what actually says so, for anyone who cannot tell the tint from white. */
+  .prow.warn { background: var(--amberwash); box-shadow: inset 8px 0 0 var(--amber); padding-left: 22px; }
+  .prow .miss { font-weight: 800; }
   .prow:active { background: var(--ink); color: var(--paper); }
   .prow .pwho { flex: 1 1 auto; min-width: 0; }
   .prow .pname { display: block; font-size: 24px; font-weight: 800; white-space: nowrap; overflow: hidden; line-height: 1.15; }
@@ -185,7 +229,10 @@
     display: block; font-size: 18px; font-weight: 800;
     text-transform: uppercase; letter-spacing: .4px; margin-bottom: 8px;
   }
-  input[type="text"], input[type="number"], input[type="file"], select, textarea {
+  /* input[type=date] belongs here as much as the rest: left out of this list it
+     renders as bare 22px text, well under the 48px a thumb needs. */
+  input[type="text"], input[type="number"], input[type="file"], input[type="date"],
+  select, textarea {
     display: block; width: 100%; min-height: 56px; padding: 12px;
     font-family: inherit; font-size: 22px; font-weight: 700;
     color: var(--ink); background: var(--paper);
@@ -264,16 +311,37 @@
     <div class="sub" id="setupSub">Players for this round</div>
   </header>
   <nav class="tabs" data-tabs></nav>
-  <div id="eventBox"></div>
+
+  <!-- Always out: the two figures checked first, then the field itself and the
+       two ways of adding to it. Everything below here folds away, because it is
+       touched once a round at most. -->
+  <div id="setupStatus"></div>
   <div id="setupRows"></div>
   <div class="pad">
     <button class="big solid" id="addBtn">+ Add player</button>
     <button class="big" id="pastePlayersBtn">Paste a list of players</button>
   </div>
   <div id="rosterBox"></div>
-  <div id="allowanceBox"></div>
-  <div id="skinsSwitch"></div>
-  <div id="versionLine"></div>
+
+  <details class="fold" id="foldEvent">
+    <summary><span><span class="fname">Event settings</span>
+      <span class="fsub" id="foldEventSub"></span></span></summary>
+    <div id="eventBox"></div>
+    <div id="allowanceBox"></div>
+    <div id="skinsSwitch"></div>
+  </details>
+
+  <details class="fold" id="foldMove">
+    <summary><span><span class="fname">Move this event</span>
+      <span class="fsub" id="foldMoveSub"></span></span></summary>
+    <div id="moveBox"></div>
+  </details>
+
+  <details class="fold" id="foldAbout">
+    <summary><span><span class="fname">About</span>
+      <span class="fsub" id="foldAboutSub"></span></span></summary>
+    <div id="aboutBox"></div>
+  </details>
 </section>
 
 <section id="edit" class="screen">
@@ -668,6 +736,19 @@ function exportNote(e){
     : "Exported " + when + ", and unchanged since.";
 }
 
+/**
+ * The same fact as `exportNote`, put as what it costs to press Delete. The
+ * heading of the section already carries the plain version, so this one says
+ * what the button below it will do rather than repeating it.
+ */
+function deleteNote(e){
+  if(!e.exportedAt) return "Nothing has been saved off this phone yet — deleting loses the round.";
+  const when = niceDate(String(e.exportedAt).slice(0, 10));
+  return XP.changedSinceExport(e)
+    ? "Changed since it was exported on " + when + " — deleting loses those changes."
+    : "Exported " + when + " and unchanged since — safe to delete.";
+}
+
 /* ---------- small helpers ---------- */
 function esc(s){
   return String(s == null ? "" : s).replace(/[&<>"']/g, (c) =>
@@ -1053,56 +1134,135 @@ function showPlayer(name){
 }
 
 /* ---------- setup: the player list ---------- */
+/**
+ * What is missing from a player, in the words that go beside the amber. Only
+ * things that change what he scores are listed: a flight is a way of dividing
+ * the field and its absence means the one undivided field, which is not a fault.
+ */
+function missingFrom(p){
+  const gone = [];
+  if(!(p.name && p.name.trim())) gone.push("name");
+  if(p.index == null || !isFinite(p.index)) gone.push("handicap index");
+  if(!p.tee) gone.push("tee");
+  if(state.skinsOn && (p.cart == null || String(p.cart).trim() === "")) gone.push("group");
+  if(!(p.front && p.back)) gone.push("birdie picks");
+  return gone;
+}
+
+/** Whether a man's card has come in — any hole at all counts as started. */
+function hasScores(p){ return scoresFor(p).some(v => v != null); }
+
+/**
+ * The first thing looked at, every time, and the reason it is above everything
+ * that folds: how many men are in, and whether the cards have arrived.
+ */
+function drawStatus(){
+  const n = state.players.length;
+  const inn = state.players.filter(hasScores).length;
+  const waiting = n === 0 || inn < n;
+  const cards = n === 0 ? "None yet" : inn === 0 ? "None yet" : inn + " of " + n;
+  document.getElementById("setupStatus").innerHTML =
+    `<div class="status">
+       <div class="stat${n === 0 ? " wait" : ""}">
+         <div class="statn">${n}${n >= MAX_PLAYERS ? " · full" : ""}</div>
+         <div class="statl">player${n===1?"":"s"}</div></div>
+       <div class="stat${waiting ? " wait" : ""}">
+         <div class="statn">${esc(cards)}</div>
+         <div class="statl">${inn > 0 && inn === n ? "cards all in" : "cards in"}</div></div>
+     </div>`;
+}
+
 function renderSetup(){
   const wrap = document.getElementById("setupRows");
-  const sub = document.getElementById("setupSub");
   const n = state.players.length;
-  sub.textContent = n === 0 ? "No players yet"
-    : n + " player" + (n===1?"":"s") + (n >= MAX_PLAYERS ? " · full" : "");
 
   if(n === 0){
     wrap.innerHTML = `<div class="empty">Nobody set up yet. Add the players in this round —
       eight is typical, up to ${MAX_PLAYERS}.</div>`;
   } else {
+    // Name, index and tee, and nothing else. At twenty-four rows every extra
+    // word costs a line, and group, flight, picks, GHIN and sex are all one tap
+    // away in the player's own form — where there is room to read them.
     wrap.innerHTML = state.players.map(p => {
       const ch = chOf(p);
       const hcp = handicapOf(p);
       // The index gives one figure and the card another. When they disagree the
-      // played one is what scores, so the column shows both rather than quietly
-      // differing from the leaderboard.
+      // played one is what scores, so THAT is the number shown, labelled as
+      // played — the two-number column belongs on the player's own screen.
       const differs = hcp.source === "paste" && ch != null && hcp.value !== ch;
-      const picks = (p.front && p.back) ? "picks " + p.front + "/" + p.back : "no picks";
-      const bits = [
-        p.index == null ? "no index" : "idx " + E.formatHandicapIndex(p.index),
-        "Tee " + p.tee + (p.gender === "F" ? " ♀" : ""),
-        p.cart == null ? "no group" : "group " + p.cart,
-        (p.flight || "").trim() === "" ? "no flight" : "flight " + (p.flight || "").trim(),
-        picks,
-      ];
-      const allow = allowanceNote(p);
-      if(allow) bits.push(allow);
-      // A card's own handicap is always named, whether or not it differs from
-      // the index figure — it is the one that scores, and any allowance is
-      // already inside it.
-      if(hcp.source === "paste") bits.push("plays off " + hcp.value + " from the card");
-      return `<button class="prow" data-id="${p.id}">` +
+      const shown = differs ? hcp.value : ch;
+      const gone = missingFrom(p);
+      // Only what he HAS is listed here; what he lacks is said once, in the
+      // missing line, rather than twice in different words.
+      const bits = [];
+      if(p.index != null) bits.push("idx " + E.formatHandicapIndex(p.index));
+      if(p.tee) bits.push("Tee " + p.tee);
+      return `<button class="prow${gone.length ? " warn" : ""}" data-id="${p.id}">` +
         `<span class="pwho"><span class="pname">${esc(p.name || "(no name)")}</span>` +
-        `<span class="pmeta">${esc(bits.join(" · "))}</span></span>` +
+        `<span class="pmeta">${esc(bits.join(" · "))}` +
+        (gone.length ? `${bits.length ? " · " : ""}<span class="miss">missing ${esc(gone.join(", "))}</span>` : ``) +
+        `</span></span>` +
         `<span class="pch">` +
-          `<span class="pchn">${ch==null?"–":ch}</span>` +
-          `<span class="pchl">${differs ? "FROM INDEX" : "C.H."}</span>` +
-          (differs ? `<span class="pchn">${hcp.value}</span><span class="pchl">AS PLAYED</span>` : ``) +
+          `<span class="pchn">${shown==null?"–":shown}</span>` +
+          `<span class="pchl">${differs ? "AS PLAYED" : "C.H."}</span>` +
         `</span><span class="chev">›</span></button>`;
     }).join("");
     wrap.querySelectorAll(".prow").forEach(b =>
       b.addEventListener("click", () => editPlayer(b.dataset.id)));
   }
   document.getElementById("addBtn").disabled = n >= MAX_PLAYERS;
-  drawEventPicker();
+  drawStatus();
+  drawEventBox();
   drawAllowance();
   drawSkinsSwitch();
-  drawVersion();
+  drawMoveBox();
+  drawAbout();
+  drawFoldSubs();
   fitBoardNames();
+}
+
+/* ---------- the folded sections ----------
+   Closed on arrival, because none of them is touched more than once a round.
+   Whichever is left open comes back open: an organiser who is mid-way through
+   setting a round up should not have to find his place again. The choice is a
+   property of the DEVICE, not of the event, so it does not travel in an event
+   code and does not differ between Friday's round and Saturday's. */
+const FOLD_KEY = "btc.clubhouse.folds";
+
+function readFolds(){
+  try { return JSON.parse(localStorage.getItem(FOLD_KEY)) || {}; }
+  catch(e){ return {}; }
+}
+function wireFolds(){
+  const open = readFolds();
+  document.querySelectorAll("details.fold").forEach(d => {
+    d.open = open[d.id] === true;
+    d.addEventListener("toggle", () => {
+      const now = readFolds();
+      now[d.id] = d.open;
+      try { localStorage.setItem(FOLD_KEY, JSON.stringify(now)); } catch(e) { /* full or private — the fold simply forgets */ }
+    });
+  });
+}
+
+/**
+ * One line under each heading saying what is inside, so a shut section can still
+ * be checked at a glance. This is where the allowance and the skins switch get
+ * seen without being opened — both change every man's score, and neither should
+ * be able to hide.
+ */
+function drawFoldSubs(){
+  const carts = new Set(readyPlayers()
+    .filter(p => p.cart != null && String(p.cart).trim() !== "").map(p => String(p.cart)));
+  document.getElementById("foldEventSub").textContent =
+    [state.format || DEFAULT_FORMAT,
+     state.allowancePercent + "%",
+     state.skinsOn ? (carts.size < 2 ? "skins on, one group" : "skins on") : "skins off",
+    ].join(" · ");
+  document.getElementById("foldMoveSub").textContent = exportNote(state);
+  const v = window.ClubhouseVersion;
+  document.getElementById("foldAboutSub").textContent =
+    v && v.build ? "Build " + v.build : "Build unknown";
 }
 
 /**
@@ -1122,13 +1282,34 @@ function niceDate(iso){
   return Number(m[3]) + " " + MONTHS[Number(m[2]) - 1] + " " + m[1];
 }
 
-function drawVersion(){
+function drawAbout(){
   const v = window.ClubhouseVersion;
-  const text = v && v.build
-    ? "Build " + v.build + " · " + niceDate(v.date)
-    : "Build unknown — version.js is missing";
-  document.getElementById("versionLine").innerHTML =
-    `<div class="version">${esc(text)}</div>`;
+  const build = v && v.build
+    ? v.build + " · " + niceDate(v.date)
+    : "unknown — version.js is missing";
+
+  // Enough to answer "is it me or is it the phone?" over a telephone, and
+  // nothing that needs a cable or a laptop to read.
+  let stored = "unknown";
+  try {
+    const raw = localStorage.getItem(STORE_KEY) || "";
+    stored = raw ? Math.round(raw.length / 1024) + " KB" : "nothing saved";
+  } catch(e) { stored = "storage unavailable"; }
+
+  const facts = [
+    ["Build", build],
+    ["Events on this device", String(store.events.length)],
+    ["This event", state.players.length + " player" + (state.players.length===1?"":"s") +
+      ", " + state.players.filter(hasScores).length + " with cards"],
+    ["Saved data", stored],
+    ["Scoring engine", E ? "loaded" : "MISSING"],
+  ];
+  document.getElementById("aboutBox").innerHTML =
+    facts.map(([k, val]) =>
+      `<div class="contest"><div class="cname"><div class="cn">${esc(k)}</div></div>` +
+      `<div class="cd" style="text-align:right;font-size:18px">${esc(val)}</div></div>`).join("") +
+    `<div class="note">Everything is kept on this phone. Nothing is sent anywhere,
+      and the round keeps working with no signal at all.</div>`;
 }
 
 /**
@@ -1141,14 +1322,15 @@ function drawVersion(){
  * is no separate rename step to find. Neither redraws the screen under the
  * thumb; only the picker's own wording keeps up.
  */
-function drawEventPicker(){
+function drawEventBox(){
   const e = state;
   const options = eventsInOrder().map(x =>
     `<option value="${esc(x.id)}"${x.id===e.id?" selected":""}>${esc(eventLabel(x))}</option>`).join("");
 
   document.getElementById("eventBox").innerHTML =
     `<div class="field"><label for="fEvent">Event</label>
-       <select id="fEvent">${options}</select></div>
+       <select id="fEvent">${options}</select>
+       <div class="pad" style="padding:12px 0 0"><button class="big" id="fNewEvent">+ New event</button></div></div>
      <div class="field"><label for="fEventName">Name</label>
        <input type="text" id="fEventName" autocomplete="off" value="${esc(e.name || "")}"></div>
      <div class="field"><label for="fEventDate">Date</label>
@@ -1157,18 +1339,11 @@ function drawEventPicker(){
        <input type="text" id="fEventFormat" list="formatList" autocomplete="off"
          value="${esc(e.format || "")}">
        <datalist id="formatList">${COMMON_FORMATS.map(f =>
-         `<option value="${esc(f)}"></option>`).join("")}</datalist></div>
-     <div class="pad">
-       <button class="big" id="fNewEvent">+ New event</button>
-       <button class="big" id="fExportEvent">Export this event</button>
-       <button class="big" id="fCopyEvent">Copy this event</button>
-       <button class="big" id="fPasteEvent">Paste an event</button>
-       <div id="eventTransfer"></div>
-       <button class="big danger" id="fDeleteEvent">Delete this event</button>
-       <div class="cd" style="margin-top:10px;font-size:18px;font-weight:700">${esc(exportNote(e))}</div>
-     </div>`;
+         `<option value="${esc(f)}"></option>`).join("")}</datalist></div>`;
 
   const $ = (id) => document.getElementById(id);
+  // The band already names the open event, so a rename shows up there at once
+  // even with this section shut. Neither redraws the screen under the thumb.
   const refresh = () => {
     document.getElementById("setupSub").textContent = eventLabel(state);
     const opt = $("fEvent").querySelector(`option[value="${CSS.escape(state.id)}"]`);
@@ -1184,13 +1359,30 @@ function drawEventPicker(){
     state.date = ev.target.value; save(); refresh();
   });
   $("fEventFormat").addEventListener("input", (ev) => {
-    state.format = ev.target.value; save(); refresh();
+    state.format = ev.target.value; save(); refresh(); drawFoldSubs();
   });
   $("fNewEvent").addEventListener("click", addEvent);
-  $("fExportEvent").addEventListener("click", exportEvent);
-  $("fCopyEvent").addEventListener("click", copyEvent);
-  $("fPasteEvent").addEventListener("click", showPasteBox);
-  $("fDeleteEvent").addEventListener("click", () => removeEvent(state.id));
+}
+
+/**
+ * Getting a round off this phone, or onto it. All of it is once-a-round work
+ * and one of them cannot be undone, so it lives behind its own heading rather
+ * than under a thumb that is scrolling for a player.
+ */
+function drawMoveBox(){
+  document.getElementById("moveBox").innerHTML =
+    `<div class="pad">
+       <button class="big" id="fExportEvent">Export a spreadsheet (CSV)</button>
+       <button class="big" id="fCopyEvent">Copy this event</button>
+       <button class="big" id="fPasteEvent">Paste an event</button>
+       <div id="eventTransfer"></div>
+       <div class="cd" style="margin:16px 0 12px;font-size:18px;font-weight:700">${esc(deleteNote(state))}</div>
+       <button class="big danger" id="fDeleteEvent">Delete this event</button>
+     </div>`;
+  document.getElementById("fExportEvent").addEventListener("click", exportEvent);
+  document.getElementById("fCopyEvent").addEventListener("click", copyEvent);
+  document.getElementById("fPasteEvent").addEventListener("click", showPasteBox);
+  document.getElementById("fDeleteEvent").addEventListener("click", () => removeEvent(state.id));
 }
 
 /**
@@ -1953,6 +2145,7 @@ document.getElementById("pastePlayersBtn").addEventListener("click", showRosterB
 window.addEventListener("resize", fitBoardNames);
 
 load();
+wireFolds();
 buildTabs();
 renderBoard();
 renderSetup();
