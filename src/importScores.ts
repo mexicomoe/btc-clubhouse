@@ -65,6 +65,41 @@ export const grossCardToPlayer: (card: ImportedCard, picks?: BirdiePicks) => Pla
 /** The marker a picked-up hole carries in `holes` — Golf Genius prints it as X. */
 export const PICKED_UP: string = I.PICKED_UP;
 
+/** One line of a pasted roster, read but not yet committed. */
+export interface RosterRow {
+  name: string;
+  /** The handicap index exactly as typed — parsed by the caller, not here. */
+  indexText: string;
+  tee: string;
+  group: string;
+  front: number | "";
+  back: number | "";
+  /** Anything wrong with the row, ready to show. Empty means it is usable. */
+  problems: string[];
+}
+
+export interface RosterOptions {
+  /** Tee ids that exist on this course. */
+  tees?: string[];
+  /** The par 4s a front-nine pick may name. */
+  frontPicks?: number[];
+  /** The par 4s a back-nine pick may name. */
+  backPicks?: number[];
+  /** What to use when a row leaves the tee blank. */
+  defaultTee?: string;
+}
+
+/**
+ * Read a pasted roster: name, handicap index, tee, group, front pick, back pick,
+ * one player a line, tab or comma separated. Nothing is committed — every row
+ * comes back with whatever is wrong with it so the screen can show the lot first.
+ */
+export const parseRoster: (text: string, options?: RosterOptions) =>
+  { rows: RosterRow[]; ignored: number } = I.parseRoster;
+
+/** Split one line on commas, honouring quotes as a spreadsheet writes them. */
+export const splitCsvLine: (line: string) => string[] = I.splitCsvLine;
+
 /** Case- and spacing-insensitive key for matching a pasted row to a setup player. */
 export const normaliseName: (name: string) => string = I.normaliseName;
 

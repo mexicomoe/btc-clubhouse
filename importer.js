@@ -339,7 +339,114 @@
     return { index: -1, how: null };
   }
 
+  /* ---- pasting a roster ----
+     Sixteen men typed in by hand is a long job, and the organiser has them in a
+     spreadsheet already. One player a line:
+
+         name, handicap index, tee, group, front pick, back pick
+
+     Tab or comma separated. Tabs come from a spreadsheet and are unambiguous;
+     commas are what a typed list looks like, and there the name is the problem —
+     "Ridgeway, Ken" is one field with a comma in it. Quoted names are read
+     properly, and an unquoted one is rescued when the row is a field too long
+     and the second field is plainly not a handicap. */
+
+  /** Split one line on commas, honouring quotes the way a spreadsheet writes them. */
+  function splitCsvLine(line) {
+    const out = [];
+    let field = "", inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line.charAt(i);
+      if (inQuotes) {
+        if (c === '"' && line.charAt(i + 1) === '"') { field += '"'; i++; }
+        else if (c === '"') inQuotes = false;
+        else field += c;
+      } else if (c === '"') inQuotes = true;
+      else if (c === ",") { out.push(field); field = ""; }
+      else field += c;
+    }
+    out.push(field);
+    return out;
+  }
+
+  const looksNumeric = (s) => /^-?\d{1,2}([.,]\d{1,2})?$/.test(String(s == null ? "" : s).trim());
+
+  const ROSTER_HEADINGS = /^(name|player|handicap|index|hcp|tee|group|cart|team|front|back|pick)/i;
+
+  /**
+   * Read a pasted roster. Returns { rows, ignored } where every row carries what
+   * was read and a list of anything wrong with it — nothing is committed here,
+   * so the screen can show the lot before a man presses the button.
+   *
+   * `opts` supplies what only the course knows: { tees, frontPicks, backPicks,
+   * defaultTee }. Passing them in keeps this readable on its own and testable
+   * without the engine.
+   */
+  function parseRoster(text, options) {
+    const opts = options || {};
+    const tees = opts.tees || [];
+    const frontPicks = opts.frontPicks || [];
+    const backPicks = opts.backPicks || [];
+    const rows = [];
+    let ignored = 0;
+
+    const lines = String(text == null ? "" : text).split(/\r?\n/);
+    lines.forEach((line) => {
+      if (line.trim() === "") return;
+
+      // A spreadsheet paste is tabs; anything else is treated as a comma list.
+      let cells = line.indexOf("\t") !== -1 ? line.split("\t") : splitCsvLine(line);
+      cells = cells.map((c) => String(c == null ? "" : c).trim());
+
+      // "Ridgeway, Ken, 19.4, IV" — the name took two fields. Put it back when
+      // the row is one long and what follows the name is not a handicap.
+      if (line.indexOf("\t") === -1 && cells.length > 1 && !looksNumeric(cells[1]) && cells[1] !== "") {
+        const merged = [cells[0] + ", " + cells[1]].concat(cells.slice(2));
+        if (merged.length >= 1 && (merged.length < cells.length)) cells = merged;
+      }
+
+      if (cells[0] === "") { ignored++; return; }
+      // A heading row from the top of a spreadsheet is not a player.
+      if (ROSTER_HEADINGS.test(cells[0]) && !looksNumeric(cells[1] || "")) { ignored++; return; }
+
+      const row = {
+        name: cells[0],
+        indexText: cells[1] || "",
+        tee: cells[2] || "",
+        group: cells[3] || "",
+        front: cells[4] || "",
+        back: cells[5] || "",
+        problems: [],
+      };
+
+      if (row.tee !== "" && tees.indexOf(row.tee) === -1) {
+        row.problems.push("no tee called “" + row.tee + "”");
+        row.tee = "";
+      }
+      if (row.tee === "") row.tee = opts.defaultTee || (tees[0] || "");
+
+      if (row.group !== "" && !/^\d{1,2}$/.test(row.group)) {
+        row.problems.push("group “" + row.group + "” is not a number");
+        row.group = "";
+      }
+      for (const [key, legal, which] of [["front", frontPicks, "front"], ["back", backPicks, "back"]]) {
+        if (row[key] === "") continue;
+        const n = Number(row[key]);
+        if (!legal.length || legal.indexOf(n) === -1) {
+          row.problems.push(which + " pick " + row[key] + " is not a par 4 on that nine");
+          row[key] = "";
+        } else {
+          row[key] = n;
+        }
+      }
+      rows.push(row);
+    });
+
+    return { rows, ignored };
+  }
+
   globalThis.ClubhouseImporter = {
+    parseRoster, splitCsvLine,
     parseScores, splitName, grossCardToPlayer,
     normaliseName, unreverseName, stripHandicap, canonicalName, initialKey, matchName,
     PICKED_UP,

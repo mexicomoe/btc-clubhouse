@@ -266,7 +266,11 @@
   <nav class="tabs" data-tabs></nav>
   <div id="eventBox"></div>
   <div id="setupRows"></div>
-  <div class="pad"><button class="big solid" id="addBtn">+ Add player</button></div>
+  <div class="pad">
+    <button class="big solid" id="addBtn">+ Add player</button>
+    <button class="big" id="pastePlayersBtn">Paste a list of players</button>
+  </div>
+  <div id="rosterBox"></div>
   <div id="allowanceBox"></div>
   <div id="skinsSwitch"></div>
   <div id="versionLine"></div>
@@ -354,7 +358,7 @@ function blankEvent(name, date){
     date: date || todayISO(),
     format: DEFAULT_FORMAT,
     nextId: 1, players: [], scores: {}, handicaps: {},
-    skinsOn: true, allowancePercent: 100, flight: "", tab: "setup",
+    skinsOn: true, allowancePercent: 100, flight: "", lastTee: "IV", tab: "setup",
     exportedAt: null, exportedSignature: null,
   };
 }
@@ -373,6 +377,7 @@ function normaliseEvent(e, fallbackName){
     skinsOn: e.skinsOn !== false,            // on unless it was switched off
     allowancePercent: typeof e.allowancePercent === "number" ? e.allowancePercent : 100,
     flight: typeof e.flight === "string" ? e.flight : "",
+    lastTee: typeof e.lastTee === "string" ? e.lastTee : "IV",
     tab: e.tab === "setup" || e.tab === "import" || e.tab === "skins" ? e.tab : "board",
     // Carried through, or the delete warning would forget an export had happened.
     exportedAt: typeof e.exportedAt === "string" ? e.exportedAt : null,
@@ -711,7 +716,10 @@ function fitBoardNames(){
 
 /* ---------- player records ---------- */
 function blankPlayer(){
-  return { id: "p" + (state.nextId++), name: "", ghin: "", index: null, tee: "IV", gender: "M",
+  // Almost every round is men off the same tee, so a new man arrives set that
+  // way and the organiser changes it only when it is not true.
+  return { id: "p" + (state.nextId++), name: "", ghin: "", index: null,
+           tee: state.lastTee || "IV", gender: "M",
            cart: null, flight: "", front: null, back: null };
 }
 /**
@@ -1262,6 +1270,132 @@ function drawSkinsSwitch(){
     }));
 }
 
+/* ---------- setup: a whole list of players at once ----------
+   Sixteen men typed in by hand is a long job, and the organiser has them in a
+   spreadsheet already. Nothing is added until the list has been read back to
+   him, the same way a paste of scores is. */
+
+let rosterPreview = null;
+
+function showRosterBox(){
+  document.getElementById("rosterBox").innerHTML =
+    `<div class="field"><label for="rosterPaste">One player a line</label>
+       <textarea id="rosterPaste" spellcheck="false" autocorrect="off"
+         autocapitalize="off" autocomplete="off"
+         placeholder="Ridgeway, Ken&#9;19.4&#9;IV&#9;1&#9;5&#9;14"></textarea>
+       <div class="cd" style="margin-top:10px;font-size:18px;font-weight:700">
+         Name, handicap index, tee, group, front pick, back pick — tab or comma
+         separated. Anything after the name may be left out.</div></div>
+     <div style="padding:0 0 12px"><button class="big solid" id="rosterRead">Show what this contains</button></div>
+     <div id="rosterOut"></div>`;
+  document.getElementById("rosterRead").addEventListener("click", readRoster);
+  document.getElementById("rosterPaste").focus();
+}
+
+/** What the course allows, so the parser can refuse a tee or a pick outright. */
+function rosterRules(){
+  const legal = E.birdiePickHoles(E.courseForTee(state.lastTee || "IV", "M"));
+  return { tees: E.TEE_IDS, frontPicks: legal.front, backPicks: legal.back,
+           defaultTee: state.lastTee || "IV" };
+}
+
+function readRoster(){
+  const text = document.getElementById("rosterPaste").value;
+  const parsed = IMP.parseRoster(text, rosterRules());
+
+  // The handicap index is read by the same rule the form uses, so a comma
+  // decimal behaves here exactly as it does when typed in by hand.
+  parsed.rows.forEach(row => {
+    const read = E.parseHandicapIndex(row.indexText);
+    row.index = read.value;
+    if(!read.ok) row.problems = row.problems.concat([read.error]);
+    else if(read.value == null) row.problems = row.problems.concat(["no handicap index"]);
+
+    const already = state.players.some(p =>
+      IMP.normaliseName(p.name) === IMP.normaliseName(row.name));
+    if(already) row.problems = row.problems.concat(["already on the list"]);
+  });
+
+  rosterPreview = parsed;
+  drawRosterPreview();
+}
+
+function drawRosterPreview(){
+  const out = document.getElementById("rosterOut");
+  const rows = rosterPreview ? rosterPreview.rows : [];
+  if(rows.length === 0){
+    out.innerHTML = `<div class="note warn">No players read from that yet.</div>`;
+    return;
+  }
+
+  const good = rows.filter(r => r.problems.length === 0);
+  const bad = rows.filter(r => r.problems.length > 0);
+  const room = MAX_PLAYERS - state.players.length;
+  const willAdd = Math.min(good.length, room);
+
+  const line = (r) => {
+    const bits = [
+      r.index == null ? "no index" : "idx " + E.formatHandicapIndex(r.index),
+      "Tee " + r.tee,
+      r.group === "" ? "no group" : "group " + r.group,
+      (r.front === "" || r.back === "") ? "no picks" : "picks " + r.front + "/" + r.back,
+    ];
+    const bad = r.problems.length > 0;
+    return `<div class="prev"><div class="pv">` +
+      `<div class="pvn">${esc(r.name)}</div>` +
+      `<div class="pvd">${esc(bad ? r.problems.join(" · ") : bits.join(" · "))}</div></div>` +
+      `<div class="pvt"><span class="tag${bad?" no":""}">${bad ? "skip" : "add"}</span></div></div>`;
+  };
+
+  let html = "";
+  if(good.length){
+    html += `<div class="section-label">${good.length} to add</div>` + good.map(line).join("");
+  }
+  if(bad.length){
+    html += `<div class="section-label">${bad.length} left out</div>` + bad.map(line).join("");
+  }
+  if(rosterPreview.ignored){
+    html += `<div class="note">${rosterPreview.ignored} line${rosterPreview.ignored===1?"":"s"}
+      ignored — a heading row, or nothing on it.</div>`;
+  }
+  if(willAdd < good.length){
+    html += `<div class="note warn">Only ${willAdd} can be added: ${MAX_PLAYERS} players is the
+      most an event holds, and there are already ${state.players.length}.</div>`;
+  }
+  html += `<div style="padding:12px 0"><button class="big solid" id="rosterAdd"${willAdd?"":" disabled"}>` +
+    (willAdd ? "Add " + willAdd + " player" + (willAdd===1?"":"s") : "Nothing to add") + `</button>` +
+    `<button class="big" id="rosterCancel">Discard this list</button></div>`;
+
+  out.innerHTML = html;
+  const add = document.getElementById("rosterAdd");
+  if(add) add.addEventListener("click", commitRoster);
+  document.getElementById("rosterCancel").addEventListener("click", () => {
+    rosterPreview = null;
+    document.getElementById("rosterBox").innerHTML = "";
+  });
+}
+
+function commitRoster(){
+  if(!rosterPreview) return;
+  const good = rosterPreview.rows.filter(r => r.problems.length === 0);
+  for(const r of good){
+    if(state.players.length >= MAX_PLAYERS) break;
+    const p = blankPlayer();
+    p.name = r.name;
+    p.index = r.index;
+    p.tee = r.tee || p.tee;
+    p.cart = r.group === "" ? null : Number(r.group);
+    p.front = r.front === "" ? null : r.front;
+    p.back = r.back === "" ? null : r.back;
+    if(p.tee) state.lastTee = p.tee;
+    state.players.push(p);
+  }
+  rosterPreview = null;
+  save();
+  renderSetup(); renderBoard();
+  document.getElementById("rosterBox").innerHTML = "";
+}
+
 /* ---------- setup: one player's form ---------- */
 let editing = null;   // a working copy; nothing is saved until Save is pressed
 
@@ -1400,6 +1534,8 @@ function saveEditing(){
   const rec = { id: p.id, name: p.name, ghin: (p.ghin || "").trim(),
                 index: p.index, tee: p.tee, gender: p.gender,
                 cart: p.cart, flight: (p.flight || "").trim(), front: p.front, back: p.back };
+  // The tee just used becomes the one the next man starts on.
+  if(rec.tee) state.lastTee = rec.tee;
   const at = state.players.findIndex(x => x.id === p.id);
   if(at === -1) state.players.push(rec); else state.players[at] = rec;
   editing = null;
@@ -1808,6 +1944,7 @@ document.getElementById("addBtn").addEventListener("click", () => {
   if(state.players.length >= MAX_PLAYERS) return;
   editPlayer(null);
 });
+document.getElementById("pastePlayersBtn").addEventListener("click", showRosterBox);
 // Re-fit names when the viewport changes (rotation, split-view, browser resize).
 window.addEventListener("resize", fitBoardNames);
 
