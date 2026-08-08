@@ -61,12 +61,17 @@ export interface BirdiePayout {
  */
 export interface SkinsConfig {
   /**
-   * What a skin is worth, before the field is taken into account: the value of
-   * one skin is `skinBudget / groups`. So a skin is worth more in a small field
-   * and less in a large one — two groups −0.40, four −0.20, six −0.13, eight
-   * −0.10 — and there is no ceiling, so winning more always pays more.
+   * What an EVEN SHARE of the eighteen on offer is worth, at any field size.
+   * One skin is therefore `fairShare × groups / 18` to the hundredth: two
+   * groups −0.09, four −0.18, six −0.27, twelve −0.53.
    */
-  skinBudget: number;
+  fairShare: number;
+  /**
+   * The most Skins may take off one man's card, or null for no ceiling. The
+   * winning group's haul does not shrink as the field grows, so without this
+   * the contest would outgrow the other seven in a large field.
+   */
+  maxSkinStrokes: number | null;
 }
 
 /** Contest thresholds. Agony/Damage/Long/Shorty grade `<=`; Bounce grades `>=`. */

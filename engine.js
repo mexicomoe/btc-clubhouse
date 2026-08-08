@@ -128,15 +128,19 @@
     // A "group" is whatever the round is played in — carts of two some weeks,
     // teams of four others. The field is one and the same either way.
     //
-    // A skin is worth `skinBudget / groups`, so it is worth more in a small
-    // field and less in a large one: two groups −0.40 a skin, four −0.20, six
-    // −0.13, eight −0.10.
+    // A skin is worth `fairShare × groups / 18`, rounded to a hundredth. That
+    // is the value at which an EVEN SHARE of the eighteen on offer — 18/groups
+    // skins — is worth `fairShare` whatever the size of the field: two groups
+    // −0.09 a skin, four −0.18, six −0.27, twelve −0.53.
     //
-    // There is no ceiling. A cap did almost nothing at four groups and, when it
-    // did bite, it bit a genuine winner — the group that went out and won the
-    // most holes was the one held back. Scaling the value instead means winning
-    // more always pays more.
-    skins: { skinBudget: -0.8 },
+    // The winner is not on an even share, though, and that is the thing to
+    // watch. The best group's haul barely moves with the field — six or seven
+    // skins over four groups, six or seven over twelve — because more groups
+    // both split the eighteen finer AND give more chances for one group to run
+    // hot, and the two effects cancel. So the winner's PAY rises with the field
+    // even though a fair share's does not, which is what maxSkinStrokes is for:
+    // no one contest may outweigh Agony Alley's 2.5, however large the field.
+    skins: { fairShare: -0.8, maxSkinStrokes: -2.5 },
   };
 
   /* ---- Reading a handicap index that someone typed in ----
@@ -541,25 +545,39 @@
   }
 
   /**
-   * The most Skins can be worth in a field of `cartCount` carts: one cart's
-   * even share of the eighteen on offer. Rounded to a tenth like every other
-   * value in the game. With no carts to divide by, the whole board is the cap.
+   * What ONE skin is worth in a field of `groupCount` groups: the value that
+   * makes an even share of the eighteen — 18/groupCount skins — come to
+   * `fairShare` at every field size. So a skin is worth LESS in a small field,
+   * where each group's share of the eighteen is larger, and more in a big one.
+   *
+   * Rounded to a hundredth, because this is the figure printed on the Skins
+   * tab and a man checking five skins against it must get the number the board
+   * paid him. The unrounded value would pay 0.09 a skin and total as if it were
+   * 0.0889, and the difference shows up over a dozen skins.
+   *
+   * With no groups out there is nothing to divide the eighteen between, so a
+   * skin is simply worth the fair share.
    */
   function skinValue(config, groupCount) {
-    return groupCount > 0 ? config.skinBudget / groupCount : config.skinBudget;
+    if (!(groupCount > 0)) return config.fairShare;
+    return Math.round((config.fairShare * groupCount / 18) * 100) / 100;
   }
 
   /**
-   * What a count of skins is worth in a field of this many groups. No ceiling:
-   * the value is scaled instead, so the group that wins the most always earns
-   * the most.
+   * What a count of skins is worth in a field of this many groups, in tenths
+   * like every other value in the game.
    *
-   * The per-skin figure is kept whole here and only the total is rounded, so
-   * six groups at −0.1333 a skin still pays in tenths like everything else
-   * rather than in hundredths, which look wrong on a golf scoreboard.
+   * Capped at `maxSkinStrokes`. Skins is the one contest that scales with the
+   * field, and unchecked it would dwarf the other seven: the best group's haul
+   * holds at six or seven skins however many groups are out, so at twelve
+   * groups the ordinary winner would take 3.2 and a hot one 6.9, against Agony
+   * Alley's hardest-earned 2.5. The cap is slack at the field sizes this club
+   * plays — over four groups it is past the 99th percentile of anything seen in
+   * the record, so winning more still pays more all the way up.
    */
   function skinStrokes(count, config, groupCount) {
-    return toTenth(count * skinValue(config, groupCount));
+    const raw = toTenth(count * skinValue(config, groupCount));
+    return config.maxSkinStrokes == null ? raw : Math.max(raw, config.maxSkinStrokes);
   }
 
   /** Score a field, sorted by final (lowest first). Ties are left as ties. */

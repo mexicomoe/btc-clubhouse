@@ -19,7 +19,7 @@ import {
   computeLeaderboard, computeFlights, flightOf, flightsInUse, sortFlights,
   scorePlayer, type PlayerCard,
 } from "../src/scoring.ts";
-import { skinValue } from "../src/skins.ts";
+import { skinStrokes } from "../src/skins.ts";
 
 const PAR = ABERDEEN_TEE_IV.par;
 
@@ -145,7 +145,7 @@ test("carts only face carts in their own flight", () => {
 test("a skin is worth what the FLIGHT's size says, not the whole field's", () => {
   const config = DEFAULT_CONTESTS.skins!;
   // Six groups in the field, but only two in flight A. A skin in A is worth the
-  // two-group figure (−0.40), not the six-group one (−0.13).
+  // two-group figure (−0.09), not the six-group one (−0.27).
   const field = [
     card("A1", { flight: "A", cart: 1 }, (g) => { for (let i = 0; i < 18; i++) g[i] = (g[i] as number) - 1; }),
     card("A2", { flight: "A", cart: 2 }),
@@ -155,16 +155,12 @@ test("a skin is worth what the FLIGHT's size says, not the whole field's", () =>
   const board = computeLeaderboard(field, ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
   const a1 = board.find((r) => r.name === "A1")!;
   // A1's group won all eighteen inside flight A.
-  assert.equal(a1.contests.skins!.strokes, skinStrokesFor(18, 2), "two groups in this flight");
-  assert.equal(skinStrokesFor(18, 2), -7.2);
-  assert.notEqual(skinStrokesFor(18, 6), skinStrokesFor(18, 2),
-    "and six groups would have paid a third of it");
+  assert.equal(a1.contests.skins!.strokes, skinStrokes(18, config, 2),
+    "two groups in this flight");
+  assert.equal(skinStrokes(18, config, 2), -1.6, "and a small flight pays a small figure");
+  // Read against the whole field it would have been worth the ceiling instead.
+  assert.notEqual(skinStrokes(18, config, 6), skinStrokes(18, config, 2));
 });
-
-/** What `n` skins pay in a field of `groups`, for reading a flight's figures. */
-function skinStrokesFor(n: number, groups: number) {
-  return Math.round(n * skinValue(DEFAULT_CONTESTS.skins!, groups) * 10) / 10;
-}
 
 test("a flight with one group skips skins while the others play", () => {
   const field = [

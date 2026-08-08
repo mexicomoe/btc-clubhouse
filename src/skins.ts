@@ -76,5 +76,5 @@ export const teamSkins: (entries: TeamEntry[], course?: CourseConfig) => SkinsRe
 /** What a count of skins is worth in strokes, in a field of this many groups. */
 export const skinStrokes: (count: number, config: SkinsConfig, groupCount: number) => number = E.skinStrokes;
 
-/** What ONE skin is worth in a field of this many groups — `skinBudget / groups`. */
+/** What ONE skin is worth in a field of this many groups — `fairShare × groups / 18`. */
 export const skinValue: (config: SkinsConfig, groupCount: number) => number = E.skinValue;

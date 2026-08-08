@@ -1639,15 +1639,19 @@ function renderSkins(){
   // Spelled out, because the value moves with the field. A spreadsheet kept
   // alongside on a fixed figure will disagree, and this is where to see why.
   const per = (g) => Math.abs(E.skinValue(config, g)).toFixed(2);
+  const cap = config.maxSkinStrokes == null ? null : Math.abs(config.maxSkinStrokes);
+  const capAt = cap == null ? 0 : Math.ceil(cap / Math.abs(perSkin));
   html += `<div class="note"><b>${per(carts.length)} a skin today —
     ${carts.length} group${carts.length===1?"":"s"} out.</b><br>
-    ${Math.abs(config.skinBudget).toFixed(1)} ÷ ${carts.length} = ${per(carts.length)} a skin.
-    A skin is worth more in a small field and less in a large one —
-    ${per(2)} over two groups, ${per(4)} over four, ${per(6)} over six,
-    ${per(8)} over eight.<br>
-    <b>There is no ceiling.</b> Win more and it pays more: a cap did almost
-    nothing at four groups, and when it did bite it held back the group that had
-    won the most holes.</div>`;
+    ${Math.abs(config.fairShare).toFixed(1)} × ${carts.length} ÷ 18 = ${per(carts.length)} a skin.
+    An even share of the eighteen is worth ${Math.abs(config.fairShare).toFixed(1)}
+    whatever the size of the field, so a skin is worth less in a small field and
+    more in a large one — ${per(2)} over two groups, ${per(4)} over four,
+    ${per(6)} over six, ${per(12)} over twelve.` +
+    (cap == null ? `` : `<br>
+    <b>${cap.toFixed(1)} is the most Skins can take off a card</b>${capAt <= 18
+      ? `, reached at ${capAt} skin${capAt===1?"":"s"} today` : ``}.
+    No one contest may outweigh Agony Alley.`) + `</div>`;
 
   if(table.carried > 0){
     html += `<div class="note warn">${table.carried} skin${table.carried===1?"":"s"} still

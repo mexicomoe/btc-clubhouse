@@ -105,7 +105,7 @@ Consecutive holes only. Both must be played.
 
 *Retuned.* It used to need a net **double** to recover from, which made it punish good play: the fewer net doubles a man made the fewer chances he got, so a round without one could not score it at all. Ten of sixty-three real rounds were shut out and the correlation with making net doubles was **+0.69** — the opposite of what Damage Control rewards, in the same six-contest set. On the same sixty-three rounds the rule above shuts nobody out, **30% clear two or more**, and the handicap correlation falls to **−0.09**.
 
-**7 · Skins** — see the skins section. A skin is worth `0.8 ÷ groups`, with **no ceiling**.
+**7 · Skins** — see the skins section. A skin is worth `0.8 × groups ÷ 18`, capped at **2.5**.
 
 ### Skins — by cart or by team
 
@@ -132,11 +132,17 @@ Lowest cart average wins the hole. **Tied holes carry over** — the next hole i
 
 **Skins now scores into FINAL.** Previously it sat outside the total, which made it a sideshow.
 
-> **a skin is worth `0.8 ÷ groups`**
+> **a skin is worth `0.8 × groups ÷ 18`, to the hundredth**
 
-So −0.40 a skin over two groups, −0.20 over four, −0.13 over six, −0.10 over eight: worth more in a small field, less in a large one.
+So −0.09 a skin over two groups, −0.18 over four, −0.27 over six, −0.53 over twelve: worth *less* in a small field and more in a large one.
 
-**No ceiling.** A cap did almost nothing at four groups, and when it did bite it held back the group that had gone out and won the most holes — the opposite of what the contest is for. Scaling the value instead means winning more always pays more. The per-skin figure is kept whole and only the total is rounded, so six groups at −0.1333 a skin still pays in tenths.
+That is the value at which an **even share of the eighteen on offer is worth 0.8 whatever the size of the field**. Over two groups an even share is nine skins (9 × 0.09 = 0.8); over twelve it is one and a half (1.5 × 0.53 = 0.8). It is the flatness that makes the figure defensible: a group that does its fair share is worth the same to the day whether four are out or twelve.
+
+The per-skin figure is rounded to a hundredth *before* it multiplies up, because it is printed on the Skins tab and a man checking five skins against it must reach the number the board paid him. Totals are then in tenths like everything else.
+
+**Capped at 2.5 — the same as Agony Alley's most.** This is the one figure that cannot be reasoned out from a fair share, because *the winner is never on a fair share*. The best group's haul barely moves with the field: over twenty thousand shuffles of the club's own cards it is six or seven skins over four groups and six or seven over twelve, because more groups both split the eighteen finer and give more chances for one group to run hot, and the two cancel. So the winner's pay would climb with the field even though a fair share's does not — 1.3 at four groups, 3.2 at twelve, against Agony Alley's hardest-earned 2.5. The cap holds Skins level with the other contests.
+
+Where it bites, by field size: **never** at two or three groups (a rout of all eighteen pays 1.6 and 2.3); **14 skins** at four; 10 at six; 7 at eight; 5 at twelve. At the sizes this club plays it is slack — 14 skins is past the 99th percentile of anything in the record — so winning more still pays more all the way up. In a very large field it binds on the ordinary winner, which is the point.
 
 **A "group" is whatever the round is played in** — carts of two some weeks, teams of four others. One engine either way; only the membership changes. The app calls it a **group** throughout for that reason.
 
