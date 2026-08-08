@@ -82,7 +82,7 @@ test("the columns are the ones the brief asks for, in order", () => {
   assert.deepEqual(head.slice(0, 14), [
     "Event", "Date", "Format",
     "Name", "Name as entered", "GHIN",
-    "Handicap index", "Tee", "Gender", "Cart", "Flight",
+    "Handicap index", "Tee", "Gender", "Group", "Flight",
     "Front pick", "Back pick", "Course handicap",
   ]);
   assert.deepEqual(head.slice(14, 32), Array.from({ length: 18 }, (_, i) => "H" + (i + 1)));
@@ -90,7 +90,7 @@ test("the columns are the ones the brief asks for, in order", () => {
   assert.deepEqual(head.slice(50, 52), ["Net", "Gross"]);
   assert.deepEqual(head.slice(52, 59), [
     "Watch the Birdie", "Agony Alley", "Damage Control",
-    "Go Long", "Get Shorty", "Bounce Back", "Cart Skins",
+    "Go Long", "Get Shorty", "Bounce Back", "Skins",
   ]);
   assert.equal(head[59], "Final");
   assert.equal(head.length, 60);
@@ -132,7 +132,7 @@ test("the setup fields come out as they were entered", () => {
   assert.equal(cell(ken, "Handicap index"), "19.4", "index keeps its tenth");
   assert.equal(cell(ken, "Tee"), "IV");
   assert.equal(cell(ken, "Gender"), "M");
-  assert.equal(cell(ken, "Cart"), "1");
+  assert.equal(cell(ken, "Group"), "1");
   assert.equal(cell(ken, "Flight"), "A");
   assert.equal(cell(ken, "Front pick"), "5");
   assert.equal(cell(ken, "Back pick"), "14");

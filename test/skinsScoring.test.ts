@@ -1,18 +1,20 @@
 /**
- * Skins scoring into FINAL — −0.2 a skin, capped at one cart's share.
+ * Skins scoring into FINAL — what a skin is worth, and to whom.
  *
  * Skins is the one contest that cannot be settled on a single card: it needs the
- * whole field, cart against cart. So it is added by `computeLeaderboard` rather
- * than by `scorePlayer`, and it sits outside `maxContestStrokes`, which governs
- * the six individual contests, with a cap of its own.
+ * whole field, group against group. So it is added by `computeLeaderboard`
+ * rather than by `scorePlayer`, and it sits outside `maxContestStrokes`, which
+ * governs the six individual contests.
  *
- * That cap has to scale with the field. Eighteen skins split two ways clear any
- * fixed ceiling both ways, so a fixed cap pays both carts the same and the
- * contest decides nothing. The cap is therefore an even share of the eighteen —
- * (18 ÷ carts) × −0.2 — which is −1.8 over two carts, −0.9 over four, −0.6 over
- * six, and tightens as the field grows.
+ * A "group" is whatever the round is played in — carts of two some weeks, teams
+ * of four others. The engine does not care which; only the membership changes.
  *
- * The hole-by-hole engine (averaging, carryovers, the one-man cart) is covered
+ * A skin is worth `skinBudget / groups`: −0.40 over two groups, −0.20 over four,
+ * −0.13 over six, −0.10 over eight. There is NO ceiling. A cap did almost
+ * nothing at four groups and, when it did bite, it held back the group that had
+ * gone out and won the most holes.
+ *
+ * The hole-by-hole engine (averaging, carryovers, the group of one) is covered
  * in cartSkins.test.ts. This is about what the skins are then worth.
  */
 
@@ -21,7 +23,7 @@ import assert from "node:assert/strict";
 
 import { ABERDEEN_TEE_IV, DEFAULT_CONTESTS } from "../src/courseConfig.ts";
 import { computeLeaderboard, type PlayerCard } from "../src/scoring.ts";
-import { cartSkins, skinStrokes, skinCap } from "../src/skins.ts";
+import { cartSkins, skinStrokes, skinValue } from "../src/skins.ts";
 
 const PAR = ABERDEEN_TEE_IV.par;
 
@@ -31,77 +33,60 @@ function card(name: string, cart: number | null, edit: (g: (number | null)[]) =>
   return { name, courseHandicap: 0, gross, cart: cart == null ? undefined : cart };
 }
 
-/* ---- the rate and the cap ---- */
+/* ---- what a skin is worth ---- */
 
-test("a skin is worth −0.2", () => {
+// A skin is worth `skinBudget / groups`, so it is worth more in a small field
+// and less in a large one. There is NO ceiling: a cap did almost nothing at
+// four groups and, when it did bite, it held back the group that had gone out
+// and won the most holes — which is the opposite of what the contest is for.
+test("a skin is worth the budget divided by the groups out", () => {
   const config = DEFAULT_CONTESTS.skins!;
-  assert.equal(config.perSkin, -0.2);
-  assert.equal(config.capSkins, 18, "eighteen skins are on offer");
+  assert.equal(config.skinBudget, -0.8);
 
-  assert.equal(skinStrokes(0, config, 4), 0);
-  assert.equal(skinStrokes(1, config, 4), -0.2);
-  // Three skins in a six-cart field: −0.6, and exactly at that field's cap.
-  assert.equal(skinStrokes(3, config, 6), -0.6, "no floating-point crumbs");
+  const per = (g: number) => Number(skinValue(config, g).toFixed(2));
+  assert.equal(per(2), -0.40, "two groups");
+  assert.equal(per(4), -0.20, "four groups");
+  assert.equal(per(6), -0.13, "six groups");
+  assert.equal(per(8), -0.10, "eight groups");
 });
 
-// Math.round takes −4.5 to −4 but 4.5 to 5, so a cap and a credit of the same
-// size would round different ways. Every value rounds on its magnitude instead.
-test("a half rounds the same way either side of zero", () => {
+test("winning more always pays more — there is no ceiling", () => {
   const config = DEFAULT_CONTESTS.skins!;
-  // Eight carts: 18/8 = 2.25 skins each, × −0.2 = −0.45, which must land on −0.5.
-  assert.equal(skinCap(config, 8), -0.5);
-  assert.equal(skinCap(config, 16), -0.2, "18/16 × −0.2 = −0.225");
-});
-
-// A fixed cap breaks with a small field: eighteen skins split two ways clear
-// any fixed ceiling both ways, so the contest pays both carts the same and
-// decides nothing. The cap is one cart's even share of the eighteen instead.
-test("the cap is one cart's share of the eighteen, so it tightens with the field", () => {
-  const config = DEFAULT_CONTESTS.skins!;
-  assert.equal(skinCap(config, 2), -1.8, "two carts");
-  assert.equal(skinCap(config, 4), -0.9, "four carts");
-  assert.equal(skinCap(config, 6), -0.6, "six carts");
-  assert.equal(skinCap(config, 3), -1.2);
-  assert.equal(skinCap(config, 9), -0.4);
-  // Rounded to a tenth like every other value in the game.
-  for (let carts = 1; carts <= 12; carts++) {
-    const cap = skinCap(config, carts);
-    assert.equal(Math.round(cap * 10) / 10, cap, `${carts} carts is a clean tenth`);
+  for (const groups of [2, 4, 6, 8]) {
+    let last = 0;
+    for (let n = 1; n <= 18; n++) {
+      const v = skinStrokes(n, config, groups);
+      assert.ok(v <= last, `${groups} groups: ${n} skins is worth at least ${n - 1}`);
+      last = v;
+    }
+    // The old cap would have flattened the top of that range. Nothing does now.
+    assert.ok(skinStrokes(18, config, groups) < skinStrokes(9, config, groups),
+      `${groups} groups: a rout still beats an even split`);
   }
 });
 
-test("two carts are separated rather than both being pinned at the cap", () => {
+test("the same haul is worth less in a bigger field", () => {
   const config = DEFAULT_CONTESTS.skins!;
-  // The split that used to break it: 10 skins against 8. Under a fixed −1.5
-  // both came out at −1.5. Under the field's own cap of −1.8 they differ.
-  assert.equal(skinStrokes(10, config, 2), -1.8, "capped, but at the field's cap");
-  assert.equal(skinStrokes(8, config, 2), -1.6, "and this one is not capped at all");
-  assert.notEqual(skinStrokes(10, config, 2), skinStrokes(8, config, 2),
-    "the contest still decides something");
+  const six = skinStrokes(6, config, 2);
+  assert.ok(six < skinStrokes(6, config, 4));
+  assert.ok(skinStrokes(6, config, 4) < skinStrokes(6, config, 8));
 });
 
-test("the cap bites at each field size", () => {
+test("every total is a clean tenth, at every field size", () => {
+  // The per-skin figure is kept whole and only the TOTAL is rounded, so six
+  // groups at −0.1333 a skin still pays in tenths rather than hundredths.
   const config = DEFAULT_CONTESTS.skins!;
-  // Two carts: an even 9 each is exactly the cap.
-  assert.equal(skinStrokes(9, config, 2), -1.8);
-  assert.equal(skinStrokes(18, config, 2), -1.8, "and holds above it");
-  // Four carts: the even share is 4.5 skins, so 5 is over and 4 is under.
-  assert.equal(skinStrokes(4, config, 4), -0.8, "under the cap");
-  assert.equal(skinStrokes(5, config, 4), -0.9, "over it, so capped");
-  // Six carts: an even 3 each.
-  assert.equal(skinStrokes(3, config, 6), -0.6);
-  assert.equal(skinStrokes(4, config, 6), -0.6, "capped");
-  assert.equal(skinStrokes(2, config, 6), -0.4, "under");
-});
-
-test("every skin value is a multiple of a tenth, at every field size", () => {
-  const config = DEFAULT_CONTESTS.skins!;
-  for (let carts = 1; carts <= 12; carts++) {
+  for (let groups = 1; groups <= 12; groups++) {
     for (let n = 0; n <= 18; n++) {
-      const v = skinStrokes(n, config, carts);
-      assert.equal(Math.round(v * 10) / 10, v, `${n} skins over ${carts} carts`);
+      const v = skinStrokes(n, config, groups);
+      assert.equal(Math.round(v * 10) / 10, v, `${n} skins over ${groups} groups`);
     }
   }
+});
+
+test("nought skins is nought, never a negative nought", () => {
+  const config = DEFAULT_CONTESTS.skins!;
+  for (const groups of [1, 2, 4, 8]) assert.equal(skinStrokes(0, config, groups), 0);
 });
 
 /* ---- into the final ---- */
@@ -114,11 +99,10 @@ test("skins are added to the final and shown as a contest", () => {
   const by = Object.fromEntries(board.map((r) => [r.name, r]));
 
   assert.equal(by["Strong"].skins, 18, "all eighteen");
-  // Two carts, so the cap is one cart's share of the eighteen: −1.8.
-  assert.equal(by["Strong"].contests.skins!.strokes, -1.8, "capped at the field's cap");
+  // Two groups, so a skin is worth −0.40 and eighteen of them −7.2. Nothing held back.
+  assert.equal(by["Strong"].contests.skins!.strokes, -7.2);
   assert.equal(by["Strong"].contests.skins!.live, true);
-  assert.match(by["Strong"].contests.skins!.detail, /18 skins for cart 1/);
-  assert.match(by["Strong"].contests.skins!.detail, /capped/, "and says so");
+  assert.match(by["Strong"].contests.skins!.detail, /18 skins for group 1/);
 
   assert.equal(by["Weak"].skins, 0);
   assert.equal(by["Weak"].contests.skins!.strokes, 0);
@@ -164,8 +148,8 @@ function field(carts: number): PlayerCard[] {
   return players;
 }
 
-for (const [carts, cap] of [[2, -1.8], [4, -0.9], [6, -0.6]] as const) {
-  test(`a ${carts}-cart field caps skins at ${cap}`, () => {
+for (const [carts, eighteen] of [[2, -7.2], [4, -3.6], [6, -2.4]] as const) {
+  test(`a ${carts}-group rout pays ${eighteen}, with nothing held back`, () => {
     const board = computeLeaderboard(field(carts), ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
     const winners = board.filter((r) => r.skins === 18);
     const losers = board.filter((r) => r.skins === 0);
@@ -174,19 +158,16 @@ for (const [carts, cap] of [[2, -1.8], [4, -0.9], [6, -0.6]] as const) {
     assert.equal(losers.length, (carts - 1) * 2, "everyone else");
 
     for (const r of winners) {
-      assert.equal(r.contests.skins!.strokes, cap, "capped at this field's cap");
-      assert.match(r.contests.skins!.detail, /capped/);
+      assert.equal(r.contests.skins!.strokes, eighteen, "all eighteen, uncapped");
+      assert.match(r.contests.skins!.detail, /18 skins for group 1/);
     }
-    for (const r of losers) {
-      assert.equal(r.contests.skins!.strokes, 0);
-      assert.doesNotMatch(r.contests.skins!.detail, /capped/, "nothing to cap");
-    }
-    // The cap really is the number the field size implies.
-    assert.equal(skinCap(DEFAULT_CONTESTS.skins!, carts), cap);
+    for (const r of losers) assert.equal(r.contests.skins!.strokes, 0);
+    // Which is exactly eighteen times what one skin is worth in this field.
+    assert.equal(eighteen, Math.round(18 * skinValue(DEFAULT_CONTESTS.skins!, carts) * 10) / 10);
   });
 }
 
-test("a two-cart field is decided rather than levelled", () => {
+test("a two-group field is decided rather than levelled", () => {
   // Cart 1 takes the odd holes, cart 2 the even ones, so the skins split 9–9...
   const even = [
     card("One A", 1, (g) => { for (let i = 0; i < 18; i += 2) g[i] = (g[i] as number) - 1; }),
@@ -194,7 +175,7 @@ test("a two-cart field is decided rather than levelled", () => {
   ];
   const level = computeLeaderboard(even, ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
   assert.deepEqual(level.map((r) => r.skins).sort(), [9, 9], "nine skins each");
-  assert.ok(level.every((r) => r.contests.skins!.strokes === -1.8), "and both at the cap");
+  assert.ok(level.every((r) => r.contests.skins!.strokes === -3.6), "and both paid the same");
 
   // ...but tilt it and the contest separates them, which a fixed −1.5 could not.
   const tilted = [
@@ -217,7 +198,7 @@ test("a player with no cart scores zero from skins rather than breaking", () => 
 
   assert.equal(by["No cart"].contests.skins!.strokes, 0);
   assert.equal(by["No cart"].contests.skins!.live, false, "shown as not competing");
-  assert.equal(by["No cart"].contests.skins!.detail, "no cart");
+  assert.equal(by["No cart"].contests.skins!.detail, "no group");
   assert.ok(by["No cart"].final != null, "and the round still scores");
   // The carts that did enter are unaffected by him.
   assert.equal(by["Carted"].skins, 1);
@@ -233,7 +214,7 @@ test("one cart out means no skins at all", () => {
   for (const r of board) {
     assert.equal(r.contests.skins!.strokes, 0, `${r.name} is paid nothing`);
     assert.equal(r.contests.skins!.live, false, "and it is shown as not running");
-    assert.equal(r.contests.skins!.detail, "only one cart out");
+    assert.equal(r.contests.skins!.detail, "only one group out");
     assert.equal(r.skins, undefined, "no skin count to report");
   }
   // The rest of the round is untouched.
@@ -257,9 +238,9 @@ test("one cart among uncarted players still pays nobody", () => {
     ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
   const by = Object.fromEntries(board.map((r) => [r.name, r]));
   assert.equal(by["Carted"].contests.skins!.strokes, 0, "no free cap for the only cart");
-  assert.equal(by["Carted"].contests.skins!.detail, "only one cart out");
+  assert.equal(by["Carted"].contests.skins!.detail, "only one group out");
   assert.equal(by["Loose"].contests.skins!.strokes, 0);
-  assert.equal(by["Loose"].contests.skins!.detail, "no cart");
+  assert.equal(by["Loose"].contests.skins!.detail, "no group");
 });
 
 test("nobody in a cart at all leaves the round scoring as before", () => {

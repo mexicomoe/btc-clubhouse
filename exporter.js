@@ -23,7 +23,7 @@
     ["goLong", "Go Long"],
     ["getShorty", "Get Shorty"],
     ["bounceBack", "Bounce Back"],
-    ["skins", "Cart Skins"],
+    ["skins", "Skins"],
   ];
 
   function headerRow() {
@@ -34,7 +34,7 @@
                   // the one as entered is what Golf Genius will match on, and
                   // only the organiser's own typing will do for that.
                   "Name", "Name as entered", "GHIN",
-                  "Handicap index", "Tee", "Gender", "Cart", "Flight",
+                  "Handicap index", "Tee", "Gender", "Group", "Flight",
                   "Front pick", "Back pick", "Course handicap"];
     // Gross per hole, then the capped net per hole beside it. The net columns
     // are what the contests are actually graded on, so anything reading this

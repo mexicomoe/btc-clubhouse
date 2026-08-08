@@ -48,11 +48,11 @@ export interface SkinsResult {
   carried: number;
   /** How many groups competed; set when scored through `computeLeaderboard`. */
   cartCount?: number;
-  /** The cap this field's size produced, in strokes. */
-  cap?: number;
+  /** What one skin is worth in a field this size, in strokes. */
+  skinValue?: number;
 }
 
-/** Two players per cart, cart against cart. */
+/** A player and the group he plays skins in — his cart, or his team. */
 export interface CartEntry {
   card: PlayerCard;
   cart: string | number;
@@ -67,14 +67,14 @@ export interface TeamEntry {
 /** Run skins over any grouping of a field. */
 export const skinsByGroup: (entries: SkinsEntry[], course?: CourseConfig) => SkinsResult = E.skinsByGroup;
 
-/** Cart Skins: group by cart. */
+/** Skins grouped by the `cart` field, whatever the club is calling it this week. */
 export const cartSkins: (entries: CartEntry[], course?: CourseConfig) => SkinsResult = E.cartSkins;
 
 /** Team Skins: identical engine, grouped by team instead of cart. */
 export const teamSkins: (entries: TeamEntry[], course?: CourseConfig) => SkinsResult = E.teamSkins;
 
-/** What a count of skins is worth in strokes, at the configured rate and the field's cap. */
-export const skinStrokes: (count: number, config: SkinsConfig, cartCount: number) => number = E.skinStrokes;
+/** What a count of skins is worth in strokes, in a field of this many groups. */
+export const skinStrokes: (count: number, config: SkinsConfig, groupCount: number) => number = E.skinStrokes;
 
-/** The most Skins can pay in a field of this many carts — one cart's even share. */
-export const skinCap: (config: SkinsConfig, cartCount: number) => number = E.skinCap;
+/** What ONE skin is worth in a field of this many groups — `skinBudget / groups`. */
+export const skinValue: (config: SkinsConfig, groupCount: number) => number = E.skinValue;

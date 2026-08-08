@@ -19,7 +19,7 @@ import {
   computeLeaderboard, computeFlights, flightOf, flightsInUse, sortFlights,
   scorePlayer, type PlayerCard,
 } from "../src/scoring.ts";
-import { skinCap } from "../src/skins.ts";
+import { skinValue } from "../src/skins.ts";
 
 const PAR = ABERDEEN_TEE_IV.par;
 
@@ -142,10 +142,10 @@ test("carts only face carts in their own flight", () => {
   assert.equal(by["B2"].skins, 0);
 });
 
-test("the cap is set by the carts in the flight, not the whole field", () => {
+test("a skin is worth what the FLIGHT's size says, not the whole field's", () => {
   const config = DEFAULT_CONTESTS.skins!;
-  // Six carts in the field, but only two in flight A: A's cap is the two-cart
-  // one (−1.8), not the six-cart one (−0.6).
+  // Six groups in the field, but only two in flight A. A skin in A is worth the
+  // two-group figure (−0.40), not the six-group one (−0.13).
   const field = [
     card("A1", { flight: "A", cart: 1 }, (g) => { for (let i = 0; i < 18; i++) g[i] = (g[i] as number) - 1; }),
     card("A2", { flight: "A", cart: 2 }),
@@ -154,12 +154,19 @@ test("the cap is set by the carts in the flight, not the whole field", () => {
   ];
   const board = computeLeaderboard(field, ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
   const a1 = board.find((r) => r.name === "A1")!;
-  assert.equal(a1.contests.skins!.strokes, skinCap(config, 2), "two carts in this flight");
-  assert.equal(skinCap(config, 2), -1.8);
-  assert.notEqual(skinCap(config, 6), skinCap(config, 2), "and six would have been dearer");
+  // A1's group won all eighteen inside flight A.
+  assert.equal(a1.contests.skins!.strokes, skinStrokesFor(18, 2), "two groups in this flight");
+  assert.equal(skinStrokesFor(18, 2), -7.2);
+  assert.notEqual(skinStrokesFor(18, 6), skinStrokesFor(18, 2),
+    "and six groups would have paid a third of it");
 });
 
-test("a flight with one cart skips skins while the others play", () => {
+/** What `n` skins pay in a field of `groups`, for reading a flight's figures. */
+function skinStrokesFor(n: number, groups: number) {
+  return Math.round(n * skinValue(DEFAULT_CONTESTS.skins!, groups) * 10) / 10;
+}
+
+test("a flight with one group skips skins while the others play", () => {
   const field = [
     card("Lonely1", { flight: "A", cart: 1 }, (g) => { g[0] = 3; }),
     card("Lonely2", { flight: "A", cart: 1 }),
@@ -169,8 +176,8 @@ test("a flight with one cart skips skins while the others play", () => {
   const board = computeLeaderboard(field, ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
   const by = Object.fromEntries(board.map((r) => [r.name, r]));
 
-  assert.equal(by["Lonely1"].contests.skins!.live, false, "one cart in flight A");
-  assert.equal(by["Lonely1"].contests.skins!.detail, "only one cart out");
+  assert.equal(by["Lonely1"].contests.skins!.live, false, "one group in flight A");
+  assert.equal(by["Lonely1"].contests.skins!.detail, "only one group out");
   assert.equal(by["Lonely1"].contests.skins!.strokes, 0);
   // Flight B is unaffected and plays its skins as normal.
   assert.equal(by["B1"].contests.skins!.live, true, "flight B still plays");

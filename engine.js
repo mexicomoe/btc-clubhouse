@@ -123,13 +123,20 @@
     ],
     maxContestStrokes: 11.0,
     // Skins scores into FINAL. It sits outside maxContestStrokes, which governs
-    // the six contests, and carries its own cap. Set to null to switch it off.
+    // the six individual contests. Set to null to switch it off.
     //
-    // The cap is one cart's even share of the eighteen skins, so it tightens as
-    // the field grows: two carts −1.8, four −0.9, six −0.6. A fixed cap cannot
-    // work — split eighteen skins two ways and both carts clear any fixed
-    // ceiling, so the contest pays everyone the same and decides nothing.
-    skins: { perSkin: -0.2, capSkins: 18 },
+    // A "group" is whatever the round is played in — carts of two some weeks,
+    // teams of four others. The field is one and the same either way.
+    //
+    // A skin is worth `skinBudget / groups`, so it is worth more in a small
+    // field and less in a large one: two groups −0.40 a skin, four −0.20, six
+    // −0.13, eight −0.10.
+    //
+    // There is no ceiling. A cap did almost nothing at four groups and, when it
+    // did bite, it bit a genuine winner — the group that went out and won the
+    // most holes was the one held back. Scaling the value instead means winning
+    // more always pays more.
+    skins: { skinBudget: -0.8 },
   };
 
   /* ---- Reading a handicap index that someone typed in ----
@@ -538,17 +545,21 @@
    * even share of the eighteen on offer. Rounded to a tenth like every other
    * value in the game. With no carts to divide by, the whole board is the cap.
    */
-  function skinCap(config, cartCount) {
-    const share = cartCount > 0 ? config.capSkins / cartCount : config.capSkins;
-    return toTenth(share * config.perSkin);
+  function skinValue(config, groupCount) {
+    return groupCount > 0 ? config.skinBudget / groupCount : config.skinBudget;
   }
 
-  /** What a count of skins is worth, at the configured rate and the field's cap. */
-  function skinStrokes(count, config, cartCount) {
-    const raw = toTenth(count * config.perSkin);
-    if (raw === 0) return 0;                  // never hand back a negative zero
-    const cap = skinCap(config, cartCount);
-    return raw < cap ? cap : raw;
+  /**
+   * What a count of skins is worth in a field of this many groups. No ceiling:
+   * the value is scaled instead, so the group that wins the most always earns
+   * the most.
+   *
+   * The per-skin figure is kept whole here and only the total is rounded, so
+   * six groups at −0.1333 a skin still pays in tenths like everything else
+   * rather than in hundredths, which look wrong on a golf scoreboard.
+   */
+  function skinStrokes(count, config, groupCount) {
+    return toTenth(count * skinValue(config, groupCount));
   }
 
   /** Score a field, sorted by final (lowest first). Ties are left as ties. */
@@ -699,8 +710,8 @@
       cards.forEach((card, i) => {
         const r = results[i];
         if (r.holesPlayed === 0) r.contests.skins = { strokes: 0, detail: "no card", live: false };
-        else if (!hasCart(card)) r.contests.skins = { strokes: 0, detail: "no cart", live: false };
-        else r.contests.skins = { strokes: 0, detail: "only one cart out", live: false };
+        else if (!hasCart(card)) r.contests.skins = { strokes: 0, detail: "no group", live: false };
+        else r.contests.skins = { strokes: 0, detail: "only one group out", live: false };
       });
       return null;
     }
@@ -710,26 +721,23 @@
     // number of players — two men in a cart share one cart's share.
     const cartCount = table.skins.size;
     table.cartCount = cartCount;
-    table.cap = skinCap(contests.skins, cartCount);
+    table.skinValue = skinValue(contests.skins, cartCount);
     cards.forEach((card, i) => {
       const r = results[i];
       if (r.holesPlayed === 0) {
-        // His cart may well have won skins; he did not play for any of them.
+        // His group may well have won skins; he did not play for any of them.
         r.contests.skins = { strokes: 0, detail: "no card", live: false };
         return;
       }
       if (card.cart == null || String(card.cart).trim() === "") {
-        r.contests.skins = { strokes: 0, detail: "no cart", live: false };
+        r.contests.skins = { strokes: 0, detail: "no group", live: false };
         return;
       }
       const count = table.skins.get(String(card.cart)) || 0;
       const strokes = skinStrokes(count, contests.skins, cartCount);
-      const capped = count > 0 && strokes === table.cap
-        && Math.round(count * contests.skins.perSkin * 10) / 10 < table.cap;
       r.contests.skins = {
         strokes, live: true,
-        detail: count + " skin" + (count === 1 ? "" : "s") + " for cart " + card.cart
-          + (capped ? " · capped" : ""),
+        detail: count + " skin" + (count === 1 ? "" : "s") + " for group " + card.cart,
       };
       r.skins = count;
       r.strokesEarned = Math.round((r.strokesEarned + strokes) * 100) / 100;
@@ -760,7 +768,7 @@
     courseForTee, courseFor, grossFromNet,
     parseHandicapIndex, formatHandicapIndex,
     PICKED_UP_OVER_PAR, NET_DOUBLE_OVER_PAR, isPickedUp, grossOnHole, netForHole,
-    skinsByGroup, cartSkins, teamSkins, skinStrokes, skinCap, matchOfCards, CARD_MATCH,
+    skinsByGroup, cartSkins, teamSkins, skinStrokes, skinValue, matchOfCards, CARD_MATCH,
     courseHandicap, fullCourseHandicap, FULL_ALLOWANCE,
     resolveCourseHandicap, strokesOnHole, netOnHole, cappedNetByHole,
     birdiePickHoles,

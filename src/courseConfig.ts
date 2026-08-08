@@ -56,20 +56,17 @@ export interface BirdiePayout {
 
 /**
  * What a skin is worth. Skins sits outside `maxContestStrokes` — that governs
- * the six contests — and carries its own cap. Set the whole thing to null to
- * switch Skins off for a round.
+ * the six individual contests. Set the whole thing to null to switch Skins off
+ * for a round.
  */
 export interface SkinsConfig {
-  /** What one skin is worth. */
-  perSkin: number;
   /**
-   * The skins on offer over a round — 18. The cap is one cart's even share of
-   * them, `(capSkins / carts) × perSkin`, so it tightens as the field grows:
-   * two carts −1.8, four −0.9, six −0.6. A fixed cap cannot work, because
-   * eighteen skins split two ways clear any fixed ceiling both ways and the
-   * contest then pays everyone the same.
+   * What a skin is worth, before the field is taken into account: the value of
+   * one skin is `skinBudget / groups`. So a skin is worth more in a small field
+   * and less in a large one — two groups −0.40, four −0.20, six −0.13, eight
+   * −0.10 — and there is no ceiling, so winning more always pays more.
    */
-  capSkins: number;
+  skinBudget: number;
 }
 
 /** Contest thresholds. Agony/Damage/Long/Shorty grade `<=`; Bounce grades `>=`. */

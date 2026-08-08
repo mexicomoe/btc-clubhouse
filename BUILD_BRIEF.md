@@ -105,7 +105,7 @@ Consecutive holes only. Both must be played.
 
 *Retuned.* It used to need a net **double** to recover from, which made it punish good play: the fewer net doubles a man made the fewer chances he got, so a round without one could not score it at all. Ten of sixty-three real rounds were shut out and the correlation with making net doubles was **+0.69** — the opposite of what Damage Control rewards, in the same six-contest set. On the same sixty-three rounds the rule above shuts nobody out, **30% clear two or more**, and the handicap correlation falls to **−0.09**.
 
-**7 · Skins** — see the skins section. `−0.2 a skin`, capped at one cart's even share of the eighteen: `(18 ÷ carts) × −0.2`.
+**7 · Skins** — see the skins section. A skin is worth `0.8 ÷ groups`, with **no ceiling**.
 
 ### Skins — by cart or by team
 
@@ -115,6 +115,8 @@ Consecutive holes only. Both must be played.
 |---|---|---|
 | **Team** | 3 or 4 players | **The common case.** The club plays team matches whenever there are 3+ teams. |
 | **Cart** | 2 players, sometimes 1 | Less often. Build it, but it is not the default. |
+
+One field on the player carries whichever it is, and the app labels it **Group**.
 
 The logic is identical either way — only the membership changes. Do not write two implementations.
 
@@ -128,7 +130,15 @@ Lowest cart average wins the hole. **Tied holes carry over** — the next hole i
 
 **Skins needs an ON/OFF switch in the console.** Some rounds the groups won't divide sensibly and the organiser will want to skip it.
 
-**Skins now scores into FINAL.** Previously it sat outside the total, which made it a sideshow. **−0.2 a skin**, capped at one cart's even share of the round — `(18 ÷ carts) × −0.2`, so −1.8 over two carts, −0.9 over four, −0.6 over six. A fixed cap cannot work: eighteen skins split two ways clear any fixed ceiling both ways, and the contest then pays everyone the same and decides nothing.
+**Skins now scores into FINAL.** Previously it sat outside the total, which made it a sideshow.
+
+> **a skin is worth `0.8 ÷ groups`**
+
+So −0.40 a skin over two groups, −0.20 over four, −0.13 over six, −0.10 over eight: worth more in a small field, less in a large one.
+
+**No ceiling.** A cap did almost nothing at four groups, and when it did bite it held back the group that had gone out and won the most holes — the opposite of what the contest is for. Scaling the value instead means winning more always pays more. The per-skin figure is kept whole and only the total is rounded, so six groups at −0.1333 a skin still pays in tenths.
+
+**A "group" is whatever the round is played in** — carts of two some weeks, teams of four others. One engine either way; only the membership changes. The app calls it a **group** throughout for that reason.
 
 ---
 
