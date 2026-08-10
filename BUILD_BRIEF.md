@@ -78,10 +78,33 @@ All thresholds must live in a config object, not in code. They are calibrated fr
 
 **Every value in the game is a multiple of 0.1.** No hundredths — they look wrong on a golf scoreboard. If a proposed threshold produces 0.75, round it to a tenth rather than allowing the third decimal in.
 
-**1 · Watch the Birdie** — two par 4s nominated before the round, one on each nine.
-`−1.0 per nominated hole birdied` — a net birdie or better. Both picks pay, so up to −2.0.
+**1 · Watch the Birdie** — **six** holes nominated before the round: a par 3, a par 4 and a par 5 on each nine.
+`net birdie −0.5 · net eagle −1.0`, per nominated hole.
 
-Paid **per pick**, not by counting them, so a hard hole can later be made worth more than an easy one without touching code. The legal picks are derived from the course's par, never hardcoded — at Aberdeen that is front **1, 2, 5, 6, 9** and back **10, 11, 12, 14, 15**. Reject a pick that is not a par 4 on the right nine. An unplayed nominated hole scores 0. Works on a partial round.
+A hole pays the **best single result on it**. A net eagle pays 1.0 and does not also collect the 0.5 underneath it. A net par pays nothing.
+
+Paid **per pick**, not by counting them, so a hard hole can later be made worth more than an easy one without touching code. An unplayed nominated hole scores 0. Works on a partial round.
+
+The legal holes are derived from the course's par and its barred list, never hardcoded:
+
+| Slot | Aberdeen |
+|---|---|
+| front par 3 | 3, 8 |
+| front par 4 | 1, 2, 9 |
+| front par 5 | 4, 7 |
+| back par 3 | 13, 17 |
+| back par 4 | 10, 14, 15 |
+| back par 5 | 16, 18 |
+
+**Holes 5, 6, 11 and 12 are barred.** 5 and 6 are Agony Alley's par 4s. Hole 4 is an Agony Alley hole too and stays legal, because the front nine has only two par 5s and barring it would leave hole 7 as the only one — a slot with one legal hole in it is not a choice. Hole 13 stays for the same reason. **The rule is that every slot keeps at least two holes in it.**
+
+Reject a hole outside its slot's list, by name. Reject the same hole nominated twice — and say *that*, not "not a legal front par 4", because the six lists never overlap so a duplicate is always illegal for one of them and the duplicate is what the man actually did.
+
+**Six net eagles is 6.0. That ceiling is arithmetic, not a target** — do not tune against it. Across both calibration rounds the best card takes 1.5 and the field averages 0.7.
+
+**Picks arrive by text**, one man a line: `Ridgeway, Ken — 8, 2, 4, 13, 14, 16`. Six bare numbers, always in slot order. Nothing in the line says which is which, so the order is the whole of the format and any other count of numbers is refused rather than guessed at. A block of those lines is pasted in together and read back before anything is applied. **A name is matched, never guessed** — and the first-name-plus-initial rule is accepted only when the line was written that way, or a misspelled surname would reduce to its first letter and write silently to the wrong man's card.
+
+*A round stored with the two-pick form still opens: front and back were both par 4s, so they become the par 4 slots. A pick on a hole since barred is dropped rather than refused — it was chosen under the old rules and there is nothing to guess at.*
 
 *Replaced Call Your Number, which rewarded hitting a predicted number rather than playing well — a man could profit from a bad score.*
 
@@ -253,16 +276,18 @@ women    9 11 17  1  3  7  5 15 13   4 12 16 18  8  6 10 14  2
 
 | Player | Index | Course hcp | Gross | **Picks** | Net (capped) | Strokes off | FINAL |
 |---|---|---|---|---|---|---|---|
-| Abe Whitfield | 25.2 | 19 | 92 | 1 / 10 | 73 | 7.00 | **66.00** |
-| Ben Castellan | 24.8 | 19 | 93 | 2 / 11 | 74 | 6.00 | **68.00** |
-| Dan Pemberton | 26.4 | 21 | 95 | 6 / 14 | 74 | 3.50 | **70.50** |
-| Eli Marsden | 23.6 | 18 | 92 | 9 / 15 | 74 | 3.00 | **71.00** |
-| Cy Ashford | 24.0 | 18 | 93 | 5 / 12 | 75 | 4.00 | **71.00** |
-| Gus Thornbury | 25.4 | 20 | 97 | 1 / 10 | 76 | 4.50 | **71.50** |
-| Hal Brightwater | 25.1 | 19 | 95 | 2 / 11 | 76 | 3.00 | **73.00** |
-| Ike Calloway | 20.8 | 15 | 94 | 5 / 12 | 79 | 3.00 | **76.00** |
+| Abe Whitfield | 25.2 | 19 | 92 | 3,1,4,13,10,16 | 73 | 8.00 | **65.00** |
+| Ben Castellan | 24.8 | 19 | 93 | 8,2,7,17,14,18 | 74 | 5.50 | **68.50** |
+| Cy Ashford | 24.0 | 18 | 93 | 3,9,4,13,15,16 | 75 | 4.50 | **70.50** |
+| Dan Pemberton | 26.4 | 21 | 95 | 8,1,7,17,10,18 | 74 | 3.50 | **70.50** |
+| Gus Thornbury | 25.4 | 20 | 97 | 8,9,7,17,15,18 | 76 | 5.50 | **70.50** |
+| Eli Marsden | 23.6 | 18 | 92 | 3,2,4,13,14,16 | 74 | 2.50 | **71.50** |
+| Hal Brightwater | 25.1 | 19 | 95 | 3,1,4,13,10,16 | 76 | 3.00 | **73.00** |
+| Ike Calloway | 20.8 | 15 | 94 | 8,2,7,17,14,18 | 79 | 2.50 | **76.50** |
 
-**The picks are an input, not something you can compute** — and the ones above are invented. See the warning in section 11: the club recorded no Watch the Birdie picks for this round, so these are demo values and every FINAL in the table depends on them. Watch the Birdie paid: Ben −1.0 · Dan −1.0 · Eli −1.0 · Ike −1.0, and nothing to the other four.
+**The picks are an input, not something you can compute** — and the ones above are invented. See the warning in section 11: the club recorded no Watch the Birdie picks for this round, so these are demo values and every FINAL in the table depends on them. Watch the Birdie paid: Abe −1.0 · Dan −1.0 · Gus −1.0 · Ben −0.5 · Cy −0.5 · Eli −0.5 · Ike −0.5, and nothing to Hal.
+
+**Cy, Dan and Gus finish level on 70.50** — a three-way tie, settled by the card match of section 8. This is the first reference round to produce one, and it is worth keeping for that.
 
 **Cart assignments for the skins check:** 1, 1, 2, 2, 3, 3, 4, 4 in the order Ike, Eli, Cy, Ben, Hal, Abe, Gus, Dan.
 
@@ -343,18 +368,18 @@ Hoyt      7  5  4  8  8  4  8  4  6  5  6  7  4  7  5  5  4  6
 
 | Player | Course hcp | Gross | Picks | Net (capped) | Strokes off | FINAL |
 |---|---|---|---|---|---|---|
-| Dex | 23 | 93 | 6 / 14 | 70 | 6.00 | **64.00** |
-| Alex | 18 | 90 | 1 / 10 | 72 | 4.50 | **67.50** |
-| Finn | 26 | 99 | 1 / 10 | 73 | 3.50 | **69.50** |
-| Boyd | 21 | 96 | 2 / 11 | 75 | 5.00 | **70.00** |
-| Emmet | 14 | 91 | 9 / 15 | 77 | 1.00 | **76.00** |
-| Chip | 15 | 94 | 5 / 12 | 79 | 2.50 | **76.50** |
-| Grady | 34 | 113 | 2 / 11 | 79 | 0.50 | **78.50** |
-| Hoyt | 20 | 103 | 5 / 12 | 82 | 1.50 | **80.50** |
+| Dex | 23 | 93 | 3,1,4,13,10,16 | 70 | 7.50 | **62.50** |
+| Alex | 18 | 90 | 8,2,7,17,14,18 | 72 | 6.00 | **66.00** |
+| Finn | 26 | 99 | 3,9,4,13,15,16 | 73 | 4.50 | **68.50** |
+| Boyd | 21 | 96 | 8,1,7,17,10,18 | 75 | 5.50 | **69.50** |
+| Emmet | 14 | 91 | 3,2,4,13,14,16 | 77 | 1.00 | **76.00** |
+| Chip | 15 | 94 | 8,9,7,17,15,18 | 79 | 2.00 | **77.00** |
+| Grady | 34 | 113 | 3,1,4,13,10,16 | 79 | 1.50 | **77.50** |
+| Hoyt | 20 | 103 | 8,2,7,17,14,18 | 82 | 2.00 | **80.00** |
 
 > ⚠️ **The Watch the Birdie picks above are invented, and every FINAL in this table depends on them.**
 >
-> The contest postdates both reference rounds, so the club recorded no picks for either. These were assigned mechanically — rotating through the legal par 4s (front 1, 2, 5, 6, 9 · back 10, 11, 12, 14, 15) in finishing order — and were **not** chosen to produce any particular result. Only one pick paid in this round: Chip's hole 12, a net eagle, for −1.0.
+> The contest postdates both reference rounds, so the club recorded no picks for either. These were assigned mechanically — each of the six slots rotating through its own legal holes in finishing order — and were **not** chosen to produce any particular result.
 >
 > Change a single pick and the finals move, and so can the order. **Get the real picks before treating any number here as a reference.** The same warning applies to the section 9 table.
 

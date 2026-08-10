@@ -17,7 +17,7 @@ import { readFileSync } from "node:fs";
 
 import { parseScores, grossCardToPlayer, splitName } from "../src/importScores.ts";
 import { ABERDEEN_TEE_IV, DEFAULT_CONTESTS } from "../src/courseConfig.ts";
-import { scorePlayer, type BirdiePicks } from "../src/scoring.ts";
+import { scorePlayer, birdiePickHoles, PICK_SLOTS, type BirdiePicks } from "../src/scoring.ts";
 
 const read = (name: string) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), "utf8");
 
@@ -62,15 +62,15 @@ test("December export: hole columns detected as GROSS", () => {
 test("December import feeds the engine and reproduces section 9", () => {
   // Picks are a setup input, not part of the export — same demo picks as the
   // section 9 unit test, so the finals must agree with it exactly.
-  const picks: Record<string, BirdiePicks> = {
-    "Abe Whitfield": { front: 1, back: 10 }, "Ben Castellan":   { front: 2, back: 11 },
-    "Cy Ashford":    { front: 5, back: 12 }, "Dan Pemberton":   { front: 6, back: 14 },
-    "Eli Marsden":   { front: 9, back: 15 }, "Gus Thornbury":   { front: 1, back: 10 },
-    "Hal Brightwater": { front: 2, back: 11 }, "Ike Calloway":  { front: 5, back: 12 },
-  };
+  const order = ["Abe Whitfield", "Ben Castellan", "Cy Ashford", "Dan Pemberton",
+                 "Eli Marsden", "Gus Thornbury", "Hal Brightwater", "Ike Calloway"];
+  const legal = birdiePickHoles(ABERDEEN_TEE_IV);
+  const picks: Record<string, BirdiePicks> = Object.fromEntries(order.map((name, i) => [name,
+    Object.fromEntries(PICK_SLOTS.map((s) =>
+      [s.key, legal[s.key][i % legal[s.key].length]])) as BirdiePicks]));
   const expectedFinal: Record<string, number> = {
-    "Abe Whitfield": 66.0, "Ben Castellan": 68.0, "Cy Ashford": 71.0, "Dan Pemberton": 70.5,
-    "Eli Marsden": 71.0, "Gus Thornbury": 71.5, "Hal Brightwater": 73.0, "Ike Calloway": 76.0,
+    "Abe Whitfield": 65.0, "Ben Castellan": 68.5, "Cy Ashford": 70.5, "Dan Pemberton": 70.5,
+    "Eli Marsden": 71.5, "Gus Thornbury": 70.5, "Hal Brightwater": 73.0, "Ike Calloway": 76.5,
   };
 
   const { cards } = parseScores(read("december_demo.tsv"));

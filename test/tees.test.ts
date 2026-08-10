@@ -79,9 +79,15 @@ test("course handicap moves with the tee and with the field", () => {
   assert.equal(courseHandicap(20, courseForTee("IV", "F")), 21);
 });
 
-test("the birdie picks are the same par 4s whichever tee is played", () => {
+// Nine tees and two stroke indexes, but one set of pars — so the six slots
+// offer the same holes to everybody. A man off Tee I and a woman off Tee IX
+// choose from the same list.
+test("the birdie picks are the same holes whichever tee is played", () => {
+  const expected = { f3: [3, 8], f4: [1, 2, 9], f5: [4, 7],
+                     b3: [13, 17], b4: [10, 14, 15], b5: [16, 18] };
   for (const id of TEE_IDS) {
-    assert.deepEqual(birdiePickHoles(courseForTee(id, "F")), { front: [1, 2, 5, 6, 9], back: [10, 11, 12, 14, 15] });
+    assert.deepEqual(birdiePickHoles(courseForTee(id, "F")), expected, "Tee " + id + ", women");
+    assert.deepEqual(birdiePickHoles(courseForTee(id, "M")), expected, "Tee " + id + ", men");
   }
 });
 

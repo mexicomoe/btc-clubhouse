@@ -22,10 +22,10 @@ const PAR = ABERDEEN_TEE_IV.par;
 
 const PLAYERS = [
   { id: "p1", name: "Ridgeway, Ken", ghin: "1234567", index: 19.4, tee: "IV", gender: "M",
-    cart: 1, flight: "A", front: 5, back: 14 },
+    cart: 1, flight: "A", f3: 3, f4: 2, f5: 4, b3: 13, b4: 14, b5: 16 },
   // No GHIN: the club does not have one for every man.
   { id: "p2", name: "Merrick, Sal", index: 22.7, tee: "I", gender: "F",
-    cart: 2, flight: "A", front: 2, back: 11 },
+    cart: 2, flight: "A", f3: 8, f4: 9, f5: 7, b3: 17, b4: 15, b5: 18 },
 ];
 const EVENT = { name: "Friday", date: "2026-08-07", format: "Individual net",
                 players: PLAYERS, allowancePercent: 100, skinsOn: true };
@@ -38,7 +38,7 @@ function board() {
   const cards: PlayerCard[] = PLAYERS.map((p) => ({
     name: canonicalName(p.name), handicapIndex: p.index, tee: p.tee, gender: p.gender as "M" | "F",
     cart: p.cart, flight: p.flight, gross: HOLES[p.id],
-    picks: { front: p.front, back: p.back },
+    picks: { f3: p.f3, f4: p.f4, f5: p.f5, b3: p.b3, b4: p.b4, b5: p.b5 },
   }));
   return computeLeaderboard(cards, undefined, DEFAULT_CONTESTS);
 }
@@ -79,21 +79,23 @@ test("the columns are the ones the brief asks for, in order", () => {
   const head = headerRow();
   // The event's own columns lead, and repeat on every row, so several rounds
   // can be piled into one sheet and still be told apart.
-  assert.deepEqual(head.slice(0, 14), [
+  assert.deepEqual(head.slice(0, 18), [
     "Event", "Date", "Format",
     "Name", "Name as entered", "GHIN",
     "Handicap index", "Tee", "Gender", "Group", "Flight",
-    "Front pick", "Back pick", "Course handicap",
+    "Front pick", "Back pick",
+    "Front par 3 pick", "Front par 5 pick", "Back par 3 pick", "Back par 5 pick",
+    "Course handicap",
   ]);
-  assert.deepEqual(head.slice(14, 32), Array.from({ length: 18 }, (_, i) => "H" + (i + 1)));
-  assert.deepEqual(head.slice(32, 50), Array.from({ length: 18 }, (_, i) => "N" + (i + 1)));
-  assert.deepEqual(head.slice(50, 52), ["Net", "Gross"]);
-  assert.deepEqual(head.slice(52, 59), [
+  assert.deepEqual(head.slice(18, 36), Array.from({ length: 18 }, (_, i) => "H" + (i + 1)));
+  assert.deepEqual(head.slice(36, 54), Array.from({ length: 18 }, (_, i) => "N" + (i + 1)));
+  assert.deepEqual(head.slice(54, 56), ["Net", "Gross"]);
+  assert.deepEqual(head.slice(56, 63), [
     "Watch the Birdie", "Agony Alley", "Damage Control",
     "Go Long", "Get Shorty", "Bounce Back", "Skins",
   ]);
-  assert.equal(head[59], "Final");
-  assert.equal(head.length, 60);
+  assert.equal(head[63], "Final");
+  assert.equal(head.length, 64);
 });
 
 test("the event is stamped on every row", () => {
@@ -122,7 +124,7 @@ test("a row for every player, and a header", () => {
   assert.equal(r[0][0], "Event");
   assert.deepEqual(r.slice(1).map((x) => cell(x, "Name as entered")),
     ["Ridgeway, Ken", "Merrick, Sal"]);
-  for (const row of r) assert.equal(row.length, 60, "every row is the full width");
+  for (const row of r) assert.equal(row.length, 64, "every row is the full width");
 });
 
 /* ---- what is in it ---- */
@@ -134,7 +136,14 @@ test("the setup fields come out as they were entered", () => {
   assert.equal(cell(ken, "Gender"), "M");
   assert.equal(cell(ken, "Group"), "1");
   assert.equal(cell(ken, "Flight"), "A");
-  assert.equal(cell(ken, "Front pick"), "5");
+  // "Front pick" and "Back pick" keep their places and their meaning — the par
+  // 4 on each nine. The four new slots are appended after them, never inserted.
+  assert.equal(cell(ken, "Front pick"), "2");
+  assert.equal(cell(ken, "Back pick"), "14");
+  assert.equal(cell(ken, "Front par 3 pick"), "3");
+  assert.equal(cell(ken, "Front par 5 pick"), "4");
+  assert.equal(cell(ken, "Back par 3 pick"), "13");
+  assert.equal(cell(ken, "Back par 5 pick"), "16");
   assert.equal(cell(ken, "Back pick"), "14");
 });
 
@@ -169,7 +178,7 @@ test("a woman's row records the card she played off", () => {
 test("a player with no index is still in the export", () => {
   // He is in the event. An export that dropped him would misreport who was there.
   const withStray = PLAYERS.concat([{ id: "p3", name: "No Index", index: null as any,
-    tee: "IV", gender: "M", cart: null as any, flight: "", front: null as any, back: null as any }]);
+    tee: "IV", gender: "M", cart: null as any, flight: "" }]);
   const out = eventToCsv({ ...EVENT, players: withStray }, board(),
     { displayNameOf: shown, holesOf: () => [] })
     .trim().split("\r\n").map(parseCsvLine);
@@ -179,7 +188,7 @@ test("a player with no index is still in the export", () => {
   assert.equal(cell(stray, "Handicap index"), "", "no index");
   assert.equal(cell(stray, "Course handicap"), "", "and so no course handicap");
   assert.equal(cell(stray, "Final"), "", "and no final");
-  assert.equal(stray.length, 60, "still the full width");
+  assert.equal(stray.length, 64, "still the full width");
 });
 
 /* ---- escaping ---- */
@@ -199,8 +208,8 @@ test("a name with a comma survives the round trip", () => {
   // rather than an edge case.
   const line = csv().trim().split("\r\n")[1];
   assert.ok(line.includes('"Ridgeway, Ken"'), "quoted, so the comma is not a column break");
-  assert.equal(line.split(",").length, 61, "split naively it comes apart...");
-  assert.equal(parseCsvLine(line).length, 60, "...but read properly it is one field");
+  assert.equal(line.split(",").length, 65, "split naively it comes apart...");
+  assert.equal(parseCsvLine(line).length, 64, "...but read properly it is one field");
   assert.equal(cell(parseCsvLine(line), "Name as entered"), "Ridgeway, Ken",
     "and the comma is still in the name");
 });
@@ -338,7 +347,7 @@ test("no net column ever carries an X", () => {
 
 test("a player who cannot be scored has no net columns either", () => {
   const withStray = PLAYERS.concat([{ id: "p3", name: "No Index", index: null as any,
-    tee: "IV", gender: "M", cart: null as any, flight: "", front: null as any, back: null as any }]);
+    tee: "IV", gender: "M", cart: null as any, flight: "" }]);
   const out = eventToCsv({ ...EVENT, players: withStray }, board(),
     { displayNameOf: shown, holesOf: () => [] }).trim().split("\r\n").map(parseCsvLine);
   const stray = out[3];
@@ -471,7 +480,7 @@ function bigEvent(n: number) {
     const id = "p" + (i + 1);
     players.push({ id, name: "Ridgeway, Robert " + i, ghin: "12345" + i + "7",
       index: 19.4 + i, tee: "IV", gender: "M", cart: 1 + Math.floor(i / 2),
-      flight: "A", front: 5, back: 14 });
+      flight: "A", f3: 3, f4: 2, f5: 4, b3: 13, b4: 14, b5: 16 });
     scores[id] = PAR.map((p, h) => (h === 3 ? "X" : h === 17 ? null : p + (i % 3 ? 1 : 0)));
   }
   return { name: "Friday Medal", date: "2026-08-07", format: "Individual net",

@@ -65,10 +65,34 @@ export interface PlayerCard {
   picks?: BirdiePicks;
 }
 
-/** One nominated par 4 on each nine. Both must be par 4s or scoring throws. */
+/**
+ * The six nominated holes: a par 3, a par 4 and a par 5 on each nine. Every one
+ * must be legal for its slot or scoring throws.
+ *
+ * `front`/`back` is the two-pick form that came before six slots. It is read so
+ * that a round already on a phone still opens; a pick on a hole since barred is
+ * dropped rather than refused.
+ */
 export interface BirdiePicks {
-  front: number;
-  back: number;
+  f3?: number | null;
+  f4?: number | null;
+  f5?: number | null;
+  b3?: number | null;
+  b4?: number | null;
+  b5?: number | null;
+  /** @deprecated the two-pick form — read on the way in, never written. */
+  front?: number | null;
+  /** @deprecated the two-pick form — read on the way in, never written. */
+  back?: number | null;
+}
+
+/** One slot of Watch the Birdie, in the order the paste expects them. */
+export interface PickSlot {
+  key: "f3" | "f4" | "f5" | "b3" | "b4" | "b5";
+  par: 3 | 4 | 5;
+  nine: "front" | "back";
+  /** "front par 3" — what an error message calls it. */
+  label: string;
 }
 
 export interface ContestResult {
@@ -183,7 +207,17 @@ export const strokesOnHole: (strokeIndex: number, courseHcp: number) => number =
 export const netOnHole: (gross: number | null, par: number, strokeIndex: number, courseHcp: number) => number | null = E.netOnHole;
 export const cappedNetByHole: (card: PlayerCard, course: CourseConfig) => (number | null)[] = E.cappedNetByHole;
 /** The par 4s nominatable on each nine, derived from the course's par. */
-export const birdiePickHoles: (course: CourseConfig) => { front: number[]; back: number[] } = E.birdiePickHoles;
+export const birdiePickHoles: (course: CourseConfig) => Record<string, number[]> = E.birdiePickHoles;
+
+/** The six slots, in the order the paste reads them. */
+export const PICK_SLOTS: PickSlot[] = E.PICK_SLOTS;
+
+/** Read the two-pick form into the six-slot one; null when there are no picks. */
+export const migratePicks: (picks: BirdiePicks | null | undefined) => BirdiePicks | null = E.migratePicks;
+
+/** The six picks as holes, throwing on anything outside the table. */
+export const readPicks: (picks: BirdiePicks, course: CourseConfig, who: string) =>
+  Record<string, number | null> = E.readPicks;
 /** Rebuild gross holes from Golf Genius's net ones, so the engine can score them. */
 export const grossFromNet: (netHoles: (number | null)[], course: CourseConfig, courseHcp: number) => (number | null)[] = E.grossFromNet;
 /** Resolve which course a card is scored against. */

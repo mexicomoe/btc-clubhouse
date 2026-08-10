@@ -72,6 +72,16 @@
       slope: tee[g].slope,
       courseRating: tee[g].courseRating,
       agonyHoles: [4, 5, 6],
+      // Holes that may not be nominated for Watch the Birdie, whatever their
+      // par. Kept beside the course rather than in the contest because it is
+      // the COURSE that says which holes are already spoken for.
+      //
+      // 5 and 6 are Agony Alley's par 4s. 4 is an Agony Alley hole too and is
+      // NOT barred, because the front nine has only two par 5s and barring it
+      // would leave hole 7 as the only one — a slot with a single legal hole is
+      // not a choice, it is a formality. Hole 13 stays legal for the same
+      // reason. The rule is that every slot keeps at least two holes in it.
+      barredPicks: [5, 6, 11, 12],
       floor: null,
     };
   }
@@ -97,9 +107,16 @@
      Graded first-match: Agony/Damage/Long/Shorty use `<=`, Bounce uses `>=`.
      Watch the Birdie is not graded — each pick pays its own value. */
   const DEFAULT_CONTESTS = {
-    // Paid per nominated hole, so both picks can pay. One value today; making a
-    // hard hole worth more than an easy one is a change here, not in the code.
-    watchTheBirdie: { perPick: -1.0 },
+    // Six nominated holes — a par 3, a par 4 and a par 5 on each nine — each
+    // paid on its own. A net birdie pays the birdie rate, a net eagle or better
+    // the eagle rate, and a hole pays ONE of them, never both. Net par pays
+    // nothing. `byHole` overrides the pair for a named hole, so a hard hole can
+    // be made worth more than an easy one without touching code.
+    //
+    // The ceiling of six eagles — 6.0 — is theoretical and not what this is
+    // tuned against. A realistic good round is nearer 3.0 and the field average
+    // nearer 0.4.
+    watchTheBirdie: { birdie: -0.5, eagle: -1.0 },
     agonyAlley: [
       { threshold: 12, strokes: -2.5 }, { threshold: 13, strokes: -1.5 },
       { threshold: 14, strokes: -0.5 }, { threshold: 15, strokes: 0 },
@@ -293,27 +310,115 @@
   }
 
   /**
-   * What one nominated hole pays for a net birdie. Flat today; `byHole` is the
-   * hook for making a hard hole worth more than an easy one, with `perPick` as
-   * the fallback, and needs no change here to start working.
+   * What one nominated hole pays, given how far under par it was played. A hole
+   * pays the BEST single result on it — a net eagle pays the eagle rate and not
+   * the birdie rate as well.
    */
-  function pickValue(hole, config) {
-    const byHole = config.byHole && config.byHole[hole];
-    return byHole == null ? config.perPick : byHole;
+  function pickValue(hole, config, over) {
+    const rates = (config.byHole && config.byHole[hole]) || config;
+    if (over <= -2) return rates.eagle;
+    if (over === -1) return rates.birdie;
+    return 0;
   }
 
   /**
-   * The par 4s a player may nominate for Watch the Birdie, one list per nine.
-   * Derived from the course's par, never hardcoded — at Aberdeen this is
-   * front 1, 2, 5, 6, 9 and back 10, 11, 12, 14, 15.
+   * The six slots a player nominates for Watch the Birdie: a par 3, a par 4 and
+   * a par 5 on each nine. Always in this order — the paste reads six bare
+   * numbers and has nothing else to go on.
+   */
+  const PICK_SLOTS = [
+    { key: "f3", par: 3, nine: "front", label: "front par 3" },
+    { key: "f4", par: 4, nine: "front", label: "front par 4" },
+    { key: "f5", par: 5, nine: "front", label: "front par 5" },
+    { key: "b3", par: 3, nine: "back",  label: "back par 3"  },
+    { key: "b4", par: 4, nine: "back",  label: "back par 4"  },
+    { key: "b5", par: 5, nine: "back",  label: "back par 5"  },
+  ];
+
+  /**
+   * Which holes each slot allows. Derived from the course's par and its barred
+   * list, never hardcoded — at Aberdeen that gives front 3/8, 1/2/9, 4/7 and
+   * back 13/17, 10/14/15, 16/18.
+   *
+   * Every hole falls in at most one slot, so the six lists never overlap: a
+   * hole nominated twice is caught as a duplicate before anything else.
    */
   function birdiePickHoles(course) {
-    const front = [], back = [];
-    for (let i = 0; i < HOLES; i++) {
-      if (course.par[i] !== 4) continue;
-      (i < 9 ? front : back).push(i + 1);
+    const barred = course.barredPicks || [];
+    const out = {};
+    for (const slot of PICK_SLOTS) {
+      out[slot.key] = [];
+      for (let i = 0; i < HOLES; i++) {
+        const hole = i + 1;
+        if (course.par[i] !== slot.par) continue;
+        if ((i < 9 ? "front" : "back") !== slot.nine) continue;
+        if (barred.includes(hole)) continue;
+        out[slot.key].push(hole);
+      }
     }
-    return { front, back };
+    return out;
+  }
+
+  /**
+   * Read whatever shape a card's picks arrive in.
+   *
+   * The six named slots are what the app stores now. `{ front, back }` is the
+   * two-pick form that came before, kept readable so a round already on a phone
+   * — or in an event code already messaged to someone — still opens. Those two
+   * were always par 4s, so they map to the par 4 slots.
+   *
+   * A legacy pick on a hole since barred is DROPPED rather than refused. It was
+   * chosen under the old rules and there is nothing to guess at; refusing would
+   * take a played round off the phone, which is far worse than one slot of a
+   * contest going unpaid. A pick given by NAME is a deliberate statement and is
+   * validated strictly instead — see `readPicks`.
+   */
+  function migratePicks(picks) {
+    if (picks == null) return null;
+    if (PICK_SLOTS.some((s) => picks[s.key] != null)) return picks;
+    if (picks.front == null && picks.back == null) return null;
+    return { f4: picks.front == null ? null : picks.front,
+             b4: picks.back == null ? null : picks.back, legacy: true };
+  }
+
+  /**
+   * The six picks as holes, refusing anything outside the table. `legacy` marks
+   * picks read from the old two-pick form, whose out-of-table holes are dropped
+   * rather than thrown on.
+   */
+  function readPicks(picks, course, who) {
+    const legal = birdiePickHoles(course);
+    const out = {};
+
+    // Duplicates first. No hole belongs to two slots, so a hole nominated twice
+    // is ALSO illegal for one of them — and "hole 8 is not a legal front par 4"
+    // is a baffling thing to be told about a line that plainly says 8 twice.
+    // Legacy picks skip this: front and back were on different nines and could
+    // never collide.
+    if (!picks.legacy) {
+      const seen = new Map();
+      for (const slot of PICK_SLOTS) {
+        const hole = picks[slot.key];
+        if (hole == null) continue;
+        if (seen.has(hole)) {
+          throw new Error(who + ": hole " + hole + " is nominated twice, as " +
+            seen.get(hole) + " and " + slot.label);
+        }
+        seen.set(hole, slot.label);
+      }
+    }
+
+    for (const slot of PICK_SLOTS) {
+      const hole = picks[slot.key];
+      if (hole == null) { out[slot.key] = null; continue; }
+      if (!legal[slot.key].includes(hole)) {
+        if (picks.legacy) { out[slot.key] = null; continue; }
+        throw new Error(who + ": hole " + hole + " is not a legal " + slot.label +
+          " — " + legal[slot.key].join(", "));
+      }
+      out[slot.key] = hole;
+    }
+    return out;
   }
 
   /* ---- Score one card ---- */
@@ -344,30 +449,34 @@
       }
     }
 
-    // 1 · Watch the Birdie — two par 4s nominated before the round, one per nine.
-    // A net birdie or better on a nominated hole pays; both picks can pay.
+    // 1 · Watch the Birdie — six holes nominated before the round, a par 3, a
+    // par 4 and a par 5 on each nine. Each is settled on its own: a net birdie
+    // pays 0.5, a net eagle 1.0, and the hole pays one of them, never both.
+    //
+    // A hole he picked up on has already become net double above, so it is a
+    // played hole that cannot possibly be a birdie — it pays nothing rather
+    // than leaving a gap. A hole never played pays nothing either, and neither
+    // takes the contest off the card.
     let watchTheBirdie;
-    const picks = card.picks;
-    if (picks == null || picks.front == null || picks.back == null) {
+    const picks = migratePicks(card.picks);
+    const chosen = picks == null ? [] : (() => {
+      const read = readPicks(picks, course, card.name);
+      return PICK_SLOTS.map((s) => read[s.key]).filter((h) => h != null);
+    })();
+    if (chosen.length === 0) {
       watchTheBirdie = { strokes: 0, detail: "no picks made", live: false };
     } else {
-      const legal = birdiePickHoles(course);
-      if (!legal.front.includes(picks.front)) {
-        throw new Error(card.name + ": front-nine pick must be a par 4 — " + legal.front.join(", "));
-      }
-      if (!legal.back.includes(picks.back)) {
-        throw new Error(card.name + ": back-nine pick must be a par 4 — " + legal.back.join(", "));
-      }
-      // Each pick is settled on its own — an unplayed nominated hole just
-      // doesn't pay, and a per-hole value can differ from its partner's.
       let birdieStrokes = 0, paid = 0;
-      for (const h of [picks.front, picks.back]) {
-        if (played(h - 1) && over(h - 1) <= -1) {
-          birdieStrokes += pickValue(h, contests.watchTheBirdie);
-          paid++;
-        }
+      for (const h of chosen) {
+        if (!played(h - 1)) continue;
+        const value = pickValue(h, contests.watchTheBirdie, over(h - 1));
+        if (value !== 0) { birdieStrokes += value; paid++; }
       }
-      watchTheBirdie = { strokes: birdieStrokes, detail: paid + " of 2 picks", live: true };
+      watchTheBirdie = {
+        strokes: toTenth(birdieStrokes),
+        detail: paid + " of " + chosen.length + " pick" + (chosen.length === 1 ? "" : "s"),
+        live: true,
+      };
     }
 
     // 2 · Agony Alley (needs the stretch holes)
@@ -771,14 +880,14 @@
 
   /* ---- Section 11 round: the leaderboard's initial data (31 July) ---- */
   const SAMPLE_ROUND = [
-    { name: "Alex",  courseHandicap: 18, picks: { front: 1, back: 10 }, gross: [5,5,3,6,5,5,6,3,5,7,5,5,4,4,6,6,3,7] },
-    { name: "Boyd",  courseHandicap: 21, picks: { front: 2, back: 11 }, gross: [6,5,4,7,6,5,7,4,5,6,6,5,4,5,7,4,4,6] },
-    { name: "Chip",  courseHandicap: 15, picks: { front: 5, back: 12 }, gross: [6,5,4,8,6,5,5,4,5,5,6,3,5,6,6,5,4,6] },
-    { name: "Dex",   courseHandicap: 23, picks: { front: 6, back: 14 }, gross: [5,5,4,6,6,6,7,3,5,4,4,6,3,6,6,6,6,5] },
-    { name: "Emmet", courseHandicap: 14, picks: { front: 9, back: 15 }, gross: [6,5,3,7,7,6,5,3,5,4,5,5,3,5,6,7,3,6] },
-    { name: "Finn",  courseHandicap: 26, picks: { front: 1, back: 10 }, gross: [5,6,6,7,5,4,7,4,7,6,7,5,3,5,5,6,4,7] },
-    { name: "Grady", courseHandicap: 34, picks: { front: 2, back: 11 }, gross: [7,6,4,9,7,7,7,5,5,6,7,7,3,8,6,7,3,9] },
-    { name: "Hoyt",  courseHandicap: 20, picks: { front: 5, back: 12 }, gross: [7,5,4,8,8,4,8,4,6,5,6,7,4,7,5,5,4,6] },
+    { name: "Alex",  courseHandicap: 18, picks: { f3: 8, f4: 2, f5: 7, b3: 17, b4: 14, b5: 18 }, gross: [5,5,3,6,5,5,6,3,5,7,5,5,4,4,6,6,3,7] },
+    { name: "Boyd",  courseHandicap: 21, picks: { f3: 8, f4: 1, f5: 7, b3: 17, b4: 10, b5: 18 }, gross: [6,5,4,7,6,5,7,4,5,6,6,5,4,5,7,4,4,6] },
+    { name: "Chip",  courseHandicap: 15, picks: { f3: 8, f4: 9, f5: 7, b3: 17, b4: 15, b5: 18 }, gross: [6,5,4,8,6,5,5,4,5,5,6,3,5,6,6,5,4,6] },
+    { name: "Dex",   courseHandicap: 23, picks: { f3: 3, f4: 1, f5: 4, b3: 13, b4: 10, b5: 16 }, gross: [5,5,4,6,6,6,7,3,5,4,4,6,3,6,6,6,6,5] },
+    { name: "Emmet", courseHandicap: 14, picks: { f3: 3, f4: 2, f5: 4, b3: 13, b4: 14, b5: 16 }, gross: [6,5,3,7,7,6,5,3,5,4,5,5,3,5,6,7,3,6] },
+    { name: "Finn",  courseHandicap: 26, picks: { f3: 3, f4: 9, f5: 4, b3: 13, b4: 15, b5: 16 }, gross: [5,6,6,7,5,4,7,4,7,6,7,5,3,5,5,6,4,7] },
+    { name: "Grady", courseHandicap: 34, picks: { f3: 3, f4: 1, f5: 4, b3: 13, b4: 10, b5: 16 }, gross: [7,6,4,9,7,7,7,5,5,6,7,7,3,8,6,7,3,9] },
+    { name: "Hoyt",  courseHandicap: 20, picks: { f3: 8, f4: 2, f5: 7, b3: 17, b4: 14, b5: 18 }, gross: [7,5,4,8,8,4,8,4,6,5,6,7,4,7,5,5,4,6] },
   ];
 
   const api = {
@@ -789,7 +898,7 @@
     skinsByGroup, cartSkins, teamSkins, skinStrokes, skinValue, matchOfCards, CARD_MATCH,
     courseHandicap, fullCourseHandicap, FULL_ALLOWANCE,
     resolveCourseHandicap, strokesOnHole, netOnHole, cappedNetByHole,
-    birdiePickHoles,
+    birdiePickHoles, PICK_SLOTS, migratePicks, readPicks,
     scorePlayer, scoreField, computeLeaderboard,
     computeFlights, flightOf, flightsInUse, sortFlights,
   };

@@ -19,7 +19,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { ABERDEEN_TEE_IV, DEFAULT_CONTESTS } from "../src/courseConfig.ts";
-import { scorePlayer, type PlayerCard, type BirdiePicks } from "../src/scoring.ts";
+import { scorePlayer, birdiePickHoles, PICK_SLOTS,
+         type PlayerCard, type BirdiePicks } from "../src/scoring.ts";
 import { cartSkins, teamSkins, type CartEntry, type TeamEntry } from "../src/skins.ts";
 
 interface Reference {
@@ -31,16 +32,23 @@ interface Reference {
   final: number;
 }
 
+/** The same mechanical rotation as section 9 — see the note there. */
+function picks(i: number): BirdiePicks {
+  const legal = birdiePickHoles(ABERDEEN_TEE_IV);
+  return Object.fromEntries(
+    PICK_SLOTS.map((s) => [s.key, legal[s.key][i % legal[s.key].length]])) as BirdiePicks;
+}
+
 // name | course hcp | picks | 18 gross | expected: gross, net, off, final
 const REFERENCE: Reference[] = [
-  ref("Dex",   23, { front: 6, back: 14 }, [5,5,4,6,6,6,7,3,5,4,4,6,3,6,6,6,6,5], 93, 70, 6.00, 64.00),
-  ref("Alex",  18, { front: 1, back: 10 }, [5,5,3,6,5,5,6,3,5,7,5,5,4,4,6,6,3,7], 90, 72, 4.50, 67.50),
-  ref("Finn",  26, { front: 1, back: 10 }, [5,6,6,7,5,4,7,4,7,6,7,5,3,5,5,6,4,7], 99, 73, 3.50, 69.50),
-  ref("Boyd",  21, { front: 2, back: 11 }, [6,5,4,7,6,5,7,4,5,6,6,5,4,5,7,4,4,6], 96, 75, 5.00, 70.00),
-  ref("Emmet", 14, { front: 9, back: 15 }, [6,5,3,7,7,6,5,3,5,4,5,5,3,5,6,7,3,6], 91, 77, 1.00, 76.00),
-  ref("Chip",  15, { front: 5, back: 12 }, [6,5,4,8,6,5,5,4,5,5,6,3,5,6,6,5,4,6], 94, 79, 2.50, 76.50),
-  ref("Grady", 34, { front: 2, back: 11 }, [7,6,4,9,7,7,7,5,5,6,7,7,3,8,6,7,3,9], 113,79, 0.50, 78.50),
-  ref("Hoyt",  20, { front: 5, back: 12 }, [7,5,4,8,8,4,8,4,6,5,6,7,4,7,5,5,4,6], 103,82, 1.50, 80.50),
+  ref("Dex",   23, picks(0), [5,5,4,6,6,6,7,3,5,4,4,6,3,6,6,6,6,5], 93, 70, 7.50, 62.50),
+  ref("Alex",  18, picks(1), [5,5,3,6,5,5,6,3,5,7,5,5,4,4,6,6,3,7], 90, 72, 6.00, 66.00),
+  ref("Finn",  26, picks(2), [5,6,6,7,5,4,7,4,7,6,7,5,3,5,5,6,4,7], 99, 73, 4.50, 68.50),
+  ref("Boyd",  21, picks(3), [6,5,4,7,6,5,7,4,5,6,6,5,4,5,7,4,4,6], 96, 75, 5.50, 69.50),
+  ref("Emmet", 14, picks(4), [6,5,3,7,7,6,5,3,5,4,5,5,3,5,6,7,3,6], 91, 77, 1.00, 76.00),
+  ref("Chip",  15, picks(5), [6,5,4,8,6,5,5,4,5,5,6,3,5,6,6,5,4,6], 94, 79, 2.00, 77.00),
+  ref("Grady", 34, picks(6), [7,6,4,9,7,7,7,5,5,6,7,7,3,8,6,7,3,9], 113,79, 1.50, 77.50),
+  ref("Hoyt",  20, picks(7), [7,5,4,8,8,4,8,4,6,5,6,7,4,7,5,5,4,6], 103,82, 2.00, 80.00),
 ];
 
 function ref(

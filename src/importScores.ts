@@ -124,3 +124,35 @@ export type MatchHow = "exact" | "reversed" | "initial" | "ambiguous" | null;
  * or when an initial key is shared — those come back for a person to decide.
  */
 export const matchName: (exportName: string, names: string[]) => { index: number; how: MatchHow } = I.matchName;
+
+/** One line of a pasted block of Watch the Birdie picks, read but not applied. */
+export interface PickRow {
+  /** The name exactly as the line had it. */
+  name: string;
+  /** Index into the roster passed in, or -1 when nothing matched. */
+  index: number;
+  how: MatchHow;
+  /** The slots that were read cleanly. Empty when the line was refused. */
+  picks: Record<string, number>;
+  /** The six numbers as typed, for showing a bad line back. */
+  holes: number[];
+  /** Anything wrong with the line. Empty means it can be applied. */
+  problems: string[];
+}
+
+/** What the course allows, per slot, in the order the paste expects. */
+export interface PickSlotRule {
+  key: string;
+  label: string;
+  legal: number[];
+}
+
+/**
+ * Read a pasted block of picks, one player a line: a name, a separator, then six
+ * hole numbers in slot order. Nothing is applied — every line comes back with
+ * whatever is wrong with it, and a name is matched rather than guessed.
+ */
+export const parseBirdiePicks: (
+  text: string,
+  options: { names: string[]; slots: PickSlotRule[] },
+) => { rows: PickRow[]; ignored: number } = I.parseBirdiePicks;

@@ -212,6 +212,10 @@
      is what actually says so, for anyone who cannot tell the tint from white. */
   .prow.warn { background: var(--amberwash); box-shadow: inset 8px 0 0 var(--amber); padding-left: 22px; }
   .prow .miss { font-weight: 800; }
+  /* Six pick dropdowns, each labelled with the slot it fills. */
+  .pickrow { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+  .pickrow .picklab { flex: 0 0 42%; font-size: 18px; font-weight: 800; }
+  .pickrow select { flex: 1 1 auto; min-width: 0; }
   .prow:active { background: var(--ink); color: var(--paper); }
   .prow .pwho { flex: 1 1 auto; min-width: 0; }
   .prow .pname { display: block; font-size: 24px; font-weight: 800; white-space: nowrap; overflow: hidden; line-height: 1.15; }
@@ -320,8 +324,10 @@
   <div class="pad">
     <button class="big solid" id="addBtn">+ Add player</button>
     <button class="big" id="pastePlayersBtn">Paste a list of players</button>
+    <button class="big" id="pastePicksBtn">Paste birdie picks</button>
   </div>
   <div id="rosterBox"></div>
+  <div id="picksBox"></div>
 
   <details class="fold" id="foldEvent">
     <summary><span><span class="fname">Event settings</span>
@@ -431,6 +437,30 @@ function blankEvent(name, date){
   };
 }
 
+/**
+ * Bring one stored player up to date. Watch the Birdie went from two picks to
+ * six, and a round already on a phone — or in an event code already messaged to
+ * someone — carries the old `front`/`back` pair. Both were par 4s, so they
+ * become the par 4 slots.
+ *
+ * A pick on a hole since barred is dropped. It was chosen under the old rules
+ * and there is nothing to guess at; the man is shown as missing that slot,
+ * which is true, rather than being refused his round.
+ */
+function normalisePlayer(p){
+  const out = Object.assign({}, p);
+  const legal = E.birdiePickHoles(courseOf(out));
+  const old = { f4: out.front, b4: out.back };
+  E.PICK_SLOTS.forEach(sl => {
+    let v = out[sl.key];
+    if(v == null && old[sl.key] != null) v = old[sl.key];
+    out[sl.key] = (v != null && legal[sl.key].indexOf(v) !== -1) ? v : null;
+  });
+  delete out.front;
+  delete out.back;
+  return out;
+}
+
 /** Fill in anything a stored event is missing, so an old blob still opens. */
 function normaliseEvent(e, fallbackName){
   return {
@@ -439,7 +469,7 @@ function normaliseEvent(e, fallbackName){
     date: /^\d{4}-\d{2}-\d{2}$/.test(e.date) ? e.date : todayISO(),
     format: typeof e.format === "string" && e.format.trim() ? e.format : DEFAULT_FORMAT,
     nextId: e.nextId || (Array.isArray(e.players) ? e.players.length + 1 : 1),
-    players: Array.isArray(e.players) ? e.players : [],
+    players: (Array.isArray(e.players) ? e.players : []).map(normalisePlayer),
     scores: e.scores || {},
     handicaps: e.handicaps || {},
     skinsOn: e.skinsOn !== false,            // on unless it was switched off
@@ -801,7 +831,8 @@ function blankPlayer(){
   // way and the organiser changes it only when it is not true.
   return { id: "p" + (state.nextId++), name: "", ghin: "", index: null,
            tee: state.lastTee || "IV", gender: "M",
-           cart: null, flight: "", front: null, back: null };
+           cart: null, flight: "",
+           f3: null, f4: null, f5: null, b3: null, b4: null, b5: null };
 }
 /**
  * The thresholds this round is scored on. The only thing the organiser can
@@ -919,7 +950,11 @@ function cardOf(p){
     // Placings and Skins are settled inside a flight; the six contests ignore it.
     flight: (p.flight || "").trim(),
     gross: scoresFor(p),
-    picks: (p.front && p.back) ? { front: p.front, back: p.back } : undefined,
+    // Whatever slots he has filled. A man with none simply doesn't score the
+    // contest; a man with three scores those three.
+    picks: E.PICK_SLOTS.some(sl => p[sl.key] != null)
+      ? Object.fromEntries(E.PICK_SLOTS.map(sl => [sl.key, p[sl.key] == null ? null : p[sl.key]]))
+      : undefined,
   };
 }
 function readyPlayers(){ return state.players.filter(isReady); }
@@ -1145,7 +1180,11 @@ function missingFrom(p){
   if(p.index == null || !isFinite(p.index)) gone.push("handicap index");
   if(!p.tee) gone.push("tee");
   if(state.skinsOn && (p.cart == null || String(p.cart).trim() === "")) gone.push("group");
-  if(!(p.front && p.back)) gone.push("birdie picks");
+  const picked = E.PICK_SLOTS.filter(sl => p[sl.key] != null).length;
+  if(picked < E.PICK_SLOTS.length){
+    gone.push(picked === 0 ? "birdie picks"
+      : "birdie picks (" + picked + " of " + E.PICK_SLOTS.length + ")");
+  }
   return gone;
 }
 
@@ -1476,7 +1515,7 @@ function showRosterBox(){
          autocapitalize="off" autocomplete="off"
          placeholder="Ridgeway, Ken&#9;19.4&#9;IV&#9;1&#9;5&#9;14"></textarea>
        <div class="cd" style="margin-top:10px;font-size:18px;font-weight:700">
-         Name, handicap index, tee, group, front pick, back pick — tab or comma
+         Name, handicap index, tee, group, front par 4, back par 4 — tab or comma
          separated. Anything after the name may be left out.</div></div>
      <div style="padding:0 0 12px"><button class="big solid" id="rosterRead">Show what this contains</button></div>
      <div id="rosterOut"></div>`;
@@ -1487,7 +1526,9 @@ function showRosterBox(){
 /** What the course allows, so the parser can refuse a tee or a pick outright. */
 function rosterRules(){
   const legal = E.birdiePickHoles(E.courseForTee(state.lastTee || "IV", "M"));
-  return { tees: E.TEE_IDS, frontPicks: legal.front, backPicks: legal.back,
+  // The roster paste carries the two par 4 picks, as it always has; the other
+  // four come from the picks paste further down the screen.
+  return { tees: E.TEE_IDS, frontPicks: legal.f4, backPicks: legal.b4,
            defaultTee: state.lastTee || "IV" };
 }
 
@@ -1577,8 +1618,8 @@ function commitRoster(){
     p.index = r.index;
     p.tee = r.tee || p.tee;
     p.cart = r.group === "" ? null : Number(r.group);
-    p.front = r.front === "" ? null : r.front;
-    p.back = r.back === "" ? null : r.back;
+    p.f4 = r.front === "" ? null : r.front;
+    p.b4 = r.back === "" ? null : r.back;
     if(p.tee) state.lastTee = p.tee;
     state.players.push(p);
   }
@@ -1586,6 +1627,108 @@ function commitRoster(){
   save();
   renderSetup(); renderBoard();
   document.getElementById("rosterBox").innerHTML = "";
+}
+
+/* ---------- setup: a block of Watch the Birdie picks ----------
+   The men message their picks in, one line each, and the organiser has sixteen
+   of those in a thread by Thursday night. Pasted together here rather than
+   opened sixteen times.
+
+   A name is matched, never guessed: the same rule the score import uses —
+   exact, then "Last, First" reversed, then first name and last initial — and
+   anything that fits two men equally comes back for a person to settle. */
+
+let picksPreview = null;
+
+function showPicksBox(){
+  const legal = E.birdiePickHoles(E.courseForTee(state.lastTee || "IV", "M"));
+  const order = E.PICK_SLOTS.map(sl => sl.label + " " + legal[sl.key].join("/")).join(" · ");
+  document.getElementById("picksBox").innerHTML =
+    `<div class="field"><label for="picksPaste">One player a line</label>
+       <textarea id="picksPaste" spellcheck="false" autocorrect="off"
+         autocapitalize="off" autocomplete="off"
+         placeholder="Ridgeway, Ken — 8, 2, 4, 13, 14, 16"></textarea>
+       <div class="cd" style="margin-top:10px;font-size:18px;font-weight:700">
+         Six numbers in this order: ${esc(order)}</div></div>
+     <div style="padding:0 0 12px"><button class="big solid" id="picksRead">Show what this contains</button></div>
+     <div id="picksOut"></div>`;
+  document.getElementById("picksRead").addEventListener("click", readPicksPaste);
+  document.getElementById("picksPaste").focus();
+}
+
+/** The slots and their legal holes, as the parser wants them. */
+function pickSlotRules(){
+  const legal = E.birdiePickHoles(E.courseForTee(state.lastTee || "IV", "M"));
+  return E.PICK_SLOTS.map(sl => ({ key: sl.key, label: sl.label, legal: legal[sl.key] }));
+}
+
+function readPicksPaste(){
+  const text = document.getElementById("picksPaste").value;
+  picksPreview = IMP.parseBirdiePicks(text, {
+    names: state.players.map(p => p.name),
+    slots: pickSlotRules(),
+  });
+  drawPicksPreview();
+}
+
+function drawPicksPreview(){
+  const out = document.getElementById("picksOut");
+  const rows = picksPreview ? picksPreview.rows : [];
+  if(rows.length === 0){
+    out.innerHTML = `<div class="note warn">No picks read from that yet.</div>`;
+    return;
+  }
+
+  const good = rows.filter(r => r.problems.length === 0);
+  const bad = rows.filter(r => r.problems.length > 0);
+
+  const line = (r) => {
+    const isBad = r.problems.length > 0;
+    const who = r.index >= 0 ? state.players[r.index].name : r.name;
+    const said = isBad ? r.problems.join(" · ")
+      : E.PICK_SLOTS.map(sl => r.picks[sl.key]).join(", ") +
+        (r.how && r.how !== "exact" ? " · matched on the " + r.how + " name" : "");
+    return `<div class="prev"><div class="pv">` +
+      `<div class="pvn">${esc(who)}</div>` +
+      `<div class="pvd">${esc(said)}</div></div>` +
+      `<div class="pvt"><span class="tag${isBad?" no":""}">${isBad ? "skip" : "set"}</span></div></div>`;
+  };
+
+  let html = "";
+  if(good.length){
+    html += `<div class="section-label">${good.length} to set</div>` + good.map(line).join("");
+  }
+  if(bad.length){
+    html += `<div class="section-label">${bad.length} left out</div>` + bad.map(line).join("");
+  }
+  if(picksPreview.ignored){
+    html += `<div class="note">${picksPreview.ignored} line${picksPreview.ignored===1?"":"s"}
+      ignored — a heading row, or nothing on it.</div>`;
+  }
+  html += `<div class="pad">` +
+    (good.length ? `<button class="big solid" id="picksApply">Set picks for ${good.length} player${good.length===1?"":"s"}</button>` : ``) +
+    `<button class="big" id="picksDrop">Discard this list</button></div>`;
+  out.innerHTML = html;
+
+  if(good.length) document.getElementById("picksApply").addEventListener("click", commitPicks);
+  document.getElementById("picksDrop").addEventListener("click", () => {
+    picksPreview = null;
+    document.getElementById("picksBox").innerHTML = "";
+  });
+}
+
+function commitPicks(){
+  if(!picksPreview) return;
+  for(const r of picksPreview.rows){
+    if(r.problems.length > 0) continue;
+    const p = state.players[r.index];
+    if(!p) continue;
+    E.PICK_SLOTS.forEach(sl => { p[sl.key] = r.picks[sl.key] == null ? null : r.picks[sl.key]; });
+  }
+  picksPreview = null;
+  save();
+  renderSetup(); renderBoard();
+  document.getElementById("picksBox").innerHTML = "";
 }
 
 /* ---------- setup: one player's form ---------- */
@@ -1646,10 +1789,13 @@ function drawEdit(){
       <div class="cd" style="margin-top:10px;font-size:18px;font-weight:700">${esc(flightHint(p))}</div></div>
 
      <div class="field"><span class="flab">Watch the Birdie picks</span>
-      <div class="two">
-        <select id="fFront" aria-label="Front nine pick">${pickOpts(legal.front, p.front)}</select>
-        <select id="fBack" aria-label="Back nine pick">${pickOpts(legal.back, p.back)}</select>
-      </div></div>
+      ${E.PICK_SLOTS.map(sl => `<div class="pickrow">
+        <span class="picklab">${esc(sl.label)}</span>
+        <select id="fPick_${sl.key}" aria-label="${esc(sl.label)} pick">${pickOpts(legal[sl.key], p[sl.key])}</select>
+      </div>`).join("")}
+      <div class="cd" style="margin-top:10px;font-size:18px;font-weight:700">
+        A par 3, a par 4 and a par 5 on each nine. Each one pays 0.5 for a net
+        birdie and 1.0 for a net eagle.</div></div>
 
      <div id="fErr" class="err"></div>
      <div class="pad">
@@ -1694,8 +1840,11 @@ function drawEdit(){
     editing.flight = e.target.value;
     document.querySelector("#fFlight").parentElement.querySelector(".cd").textContent = flightHint(editing);
   });
-  $("fFront").addEventListener("change", e => { editing.front = e.target.value ? Number(e.target.value) : null; });
-  $("fBack").addEventListener("change", e => { editing.back = e.target.value ? Number(e.target.value) : null; });
+  E.PICK_SLOTS.forEach(sl => {
+    $("fPick_" + sl.key).addEventListener("change", e => {
+      editing[sl.key] = e.target.value ? Number(e.target.value) : null;
+    });
+  });
   $("fGender").querySelectorAll("button").forEach(b =>
     b.addEventListener("click", () => {
       editing.gender = b.dataset.g;
@@ -1725,7 +1874,8 @@ function saveEditing(){
   p.name = p.name.trim();
   const rec = { id: p.id, name: p.name, ghin: (p.ghin || "").trim(),
                 index: p.index, tee: p.tee, gender: p.gender,
-                cart: p.cart, flight: (p.flight || "").trim(), front: p.front, back: p.back };
+                cart: p.cart, flight: (p.flight || "").trim() };
+  E.PICK_SLOTS.forEach(sl => { rec[sl.key] = p[sl.key] == null ? null : p[sl.key]; });
   // The tee just used becomes the one the next man starts on.
   if(rec.tee) state.lastTee = rec.tee;
   const at = state.players.findIndex(x => x.id === p.id);
@@ -2141,6 +2291,7 @@ document.getElementById("addBtn").addEventListener("click", () => {
   editPlayer(null);
 });
 document.getElementById("pastePlayersBtn").addEventListener("click", showRosterBox);
+document.getElementById("pastePicksBtn").addEventListener("click", showPicksBox);
 // Re-fit names when the viewport changes (rotation, split-view, browser resize).
 window.addEventListener("resize", fitBoardNames);
 

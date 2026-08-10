@@ -1,105 +1,275 @@
 /**
- * Watch the Birdie — two par 4s nominated before the round, one per nine.
- * A net birdie or better on a nominated hole pays; both picks can pay, so the
- * contest is worth up to −2.0.
+ * Watch the Birdie — six nominated holes, a par 3, a par 4 and a par 5 on each
+ * nine, each paying on its own.
  *
- * The legal picks are derived from the course's par, never hardcoded, so a
- * course with different par 4s offers different picks with no code change.
+ *   net birdie  −0.5
+ *   net eagle   −1.0
+ *
+ * A hole pays the BEST single result on it. A net eagle pays 1.0 and not 1.5:
+ * it does not also collect the birdie underneath it.
+ *
+ * The legal holes come off the course's par and its barred list, never a
+ * hardcoded table. At Aberdeen that is front 3/8, 1/2/9, 4/7 and back 13/17,
+ * 10/14/15, 16/18 — holes 5, 6, 11 and 12 are spoken for by other contests.
+ * Hole 4 is an Agony Alley hole and stays legal anyway, because the front nine
+ * has only two par 5s and a slot with one legal hole in it is not a choice.
+ *
+ * The ceiling of six net eagles — 6.0 — is arithmetic, not a target. Across the
+ * two calibration rounds the best card takes 1.5 and the field averages 0.7.
  */
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { ABERDEEN_TEE_IV, DEFAULT_CONTESTS } from "../src/courseConfig.ts";
-import { scorePlayer, birdiePickHoles, type PlayerCard } from "../src/scoring.ts";
+import { scorePlayer, birdiePickHoles, PICK_SLOTS, migratePicks, cappedNetByHole,
+         type PlayerCard, type BirdiePicks } from "../src/scoring.ts";
 
 const PAR = ABERDEEN_TEE_IV.par;
+const LEGAL = birdiePickHoles(ABERDEEN_TEE_IV);
 
-/** Level par on every hole. Off an 18 handicap that is a stroke a hole, so every
- *  hole nets one under par — a birdie on whichever holes get nominated. */
-function levelPar(picks?: { front: number; back: number }, unplayed: number[] = []): PlayerCard {
-  const gross: (number | null)[] = PAR.map((p) => p);
-  for (const h of unplayed) gross[h - 1] = null;
-  return { name: "Test Player", courseHandicap: 18, gross, picks };
+/** One legal pick in every slot: 3, 2, 4, 13, 14, 16. */
+const SIX: BirdiePicks = { f3: 3, f4: 2, f5: 4, b3: 13, b4: 14, b5: 16 };
+
+/**
+ * A level-par card with the given picks. `edit` moves individual holes; holes
+ * listed in `unplayed` are left blank, and `pickedUp` are marked X.
+ */
+function card(picks: BirdiePicks | undefined, opts: {
+  edit?: (g: (number | string | null)[]) => void;
+  unplayed?: number[];
+  pickedUp?: number[];
+} = {}): PlayerCard {
+  const gross = PAR.slice() as (number | string | null)[];
+  if (opts.edit) opts.edit(gross);
+  for (const h of opts.unplayed || []) gross[h - 1] = null;
+  for (const h of opts.pickedUp || []) gross[h - 1] = "X";
+  return { name: "Test", courseHandicap: 0, gross, picks } as PlayerCard;
 }
 
-const score = (card: PlayerCard) =>
-  scorePlayer(card, ABERDEEN_TEE_IV, DEFAULT_CONTESTS).contests.watchTheBirdie;
+const score = (c: PlayerCard) =>
+  scorePlayer(c, ABERDEEN_TEE_IV, DEFAULT_CONTESTS).contests.watchTheBirdie;
 
-test("the legal picks are derived from par, not hardcoded", () => {
-  const { front, back } = birdiePickHoles(ABERDEEN_TEE_IV);
-  assert.deepEqual(front, [1, 2, 5, 6, 9], "front-nine par 4s");
-  assert.deepEqual(back, [10, 11, 12, 14, 15], "back-nine par 4s");
-  // Every listed hole really is a par 4 on the right nine.
-  for (const h of front) { assert.equal(PAR[h - 1], 4); assert.ok(h <= 9); }
-  for (const h of back) { assert.equal(PAR[h - 1], 4); assert.ok(h >= 10); }
+/* ---- the legal table ---- */
+
+test("the legal holes are derived from par and the bar list, not hardcoded", () => {
+  assert.deepEqual(LEGAL, {
+    f3: [3, 8], f4: [1, 2, 9], f5: [4, 7],
+    b3: [13, 17], b4: [10, 14, 15], b5: [16, 18],
+  });
 });
 
-test("both picks pay, for the full −2.0", () => {
-  const r = score(levelPar({ front: 5, back: 14 }));
-  assert.equal(r.strokes, -2.0);
-  assert.equal(r.detail, "2 of 2 picks");
+test("holes 5, 6, 11 and 12 are barred", () => {
+  const all = PICK_SLOTS.flatMap((s) => LEGAL[s.key]);
+  for (const h of [5, 6, 11, 12]) assert.ok(!all.includes(h), "hole " + h + " must not be offered");
+});
+
+// A slot offering one hole is a formality, not a choice — which is why hole 4
+// stays legal despite being an Agony Alley hole.
+test("every slot keeps at least two holes in it", () => {
+  for (const s of PICK_SLOTS) {
+    assert.ok(LEGAL[s.key].length >= 2, `${s.label} has only ${LEGAL[s.key].length}`);
+  }
+});
+
+test("no hole belongs to two slots", () => {
+  const all = PICK_SLOTS.flatMap((s) => LEGAL[s.key]);
+  assert.equal(new Set(all).size, all.length);
+});
+
+/* ---- what a pick pays ---- */
+
+test("six valid picks and one net birdie pays 0.5", () => {
+  // Hole 14 in one under; every other hole left at par.
+  const r = score(card(SIX, { edit: (g) => { g[13] = PAR[13] - 1; } }));
+  assert.equal(r.strokes, -0.5);
+  assert.equal(r.detail, "1 of 6 picks");
   assert.equal(r.live, true);
 });
 
-test("one nominated birdie pays −1.0", () => {
-  // Hole 5 bogeyed (gross par+2 nets par+1), hole 14 left at level par.
-  const card = levelPar({ front: 5, back: 14 });
-  card.gross[4] = PAR[4] + 2;
-  assert.equal(score(card).strokes, -1.0);
+test("six valid picks and one net eagle pays 1.0, not 1.5", () => {
+  const r = score(card(SIX, { edit: (g) => { g[3] = PAR[3] - 2; } }));
+  assert.equal(r.strokes, -1.0, "the eagle rate alone");
+  assert.equal(r.detail, "1 of 6 picks", "and it is one hole paying, not two");
 });
 
-test("an unplayed nominated hole scores 0", () => {
-  const one = score(levelPar({ front: 5, back: 14 }, [5]));
-  assert.equal(one.strokes, -1.0, "the played pick still pays");
-  const none = score(levelPar({ front: 5, back: 14 }, [5, 14]));
-  assert.equal(none.strokes, 0, "neither pick played, nothing paid");
-  assert.equal(none.live, true, "still a live contest, just unpaid");
+test("better than an eagle still pays the eagle rate", () => {
+  const r = score(card(SIX, { edit: (g) => { g[3] = PAR[3] - 3; } }));
+  assert.equal(r.strokes, -1.0);
 });
 
-test("a pick that is not a par 4 is rejected", () => {
-  // Hole 3 is a par 3; hole 4 is a par 5.
-  assert.throws(() => score(levelPar({ front: 3, back: 14 })), /front-nine pick must be a par 4/);
-  assert.throws(() => score(levelPar({ front: 4, back: 14 })), /front-nine pick must be a par 4/);
-  assert.throws(() => score(levelPar({ front: 5, back: 16 })), /back-nine pick must be a par 4/);
+test("a net par on a pick pays nothing", () => {
+  assert.equal(score(card(SIX)).strokes, 0);
+  assert.equal(score(card(SIX)).live, true, "still a live contest, just unpaid");
 });
 
-test("a pick on the wrong nine is rejected", () => {
-  // Hole 10 is a legal BACK pick, but not a legal front one, and vice versa.
-  assert.throws(() => score(levelPar({ front: 10, back: 14 })), /front-nine pick must be a par 4/);
-  assert.throws(() => score(levelPar({ front: 5, back: 2 })), /back-nine pick must be a par 4/);
+test("a birdie on a hole he did not nominate pays nothing", () => {
+  // Hole 7 is a legal front par 5, but 4 is the one he picked.
+  const r = score(card(SIX, { edit: (g) => { g[6] = PAR[6] - 2; } }));
+  assert.equal(r.strokes, 0);
 });
 
-test("a card with no picks simply doesn't score the contest", () => {
-  const r = score(levelPar(undefined));
+test("all six can pay at once", () => {
+  const r = score(card(SIX, { edit: (g) => {
+    for (const h of [3, 2, 4, 13, 14, 16]) g[h - 1] = PAR[h - 1] - 1;
+  } }));
+  assert.equal(r.strokes, -3.0, "six birdies");
+  assert.equal(r.detail, "6 of 6 picks");
+});
+
+test("six net eagles is 6.0 — the ceiling, and only arithmetic", () => {
+  const r = score(card(SIX, { edit: (g) => {
+    for (const h of [3, 2, 4, 13, 14, 16]) g[h - 1] = PAR[h - 1] - 2;
+  } }));
+  assert.equal(r.strokes, -6.0);
+});
+
+test("the total is always a clean tenth", () => {
+  for (let n = 0; n <= 6; n++) {
+    const holes = [3, 2, 4, 13, 14, 16].slice(0, n);
+    const r = score(card(SIX, { edit: (g) => { for (const h of holes) g[h - 1] = PAR[h - 1] - 1; } }));
+    assert.equal(Math.round(r.strokes * 10) / 10, r.strokes, `${n} birdies`);
+  }
+});
+
+/* ---- holes with no score on them ---- */
+
+test("a picked-up hole that was a pick scores double bogey plus his strokes", () => {
+  // The brief's own example: a par 5 with two handicap strokes on it is a 9.
+  // This man is off 36, so he has two strokes everywhere; the card is bogeyed
+  // throughout so that a played hole nets par and only the pick-up stands out.
+  const c = card(SIX, {
+    edit: (g) => { for (let i = 0; i < 18; i++) g[i] = (PAR[i] as number) + 2; },
+    pickedUp: [4],
+  });
+  c.courseHandicap = 36;
+  const full = scorePlayer(c, ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
+
+  const net = cappedNetByHole(c, ABERDEEN_TEE_IV);
+  assert.equal(net[3], PAR[3] + 2, "hole 4 nets par + 2 — double bogey after his strokes");
+  assert.equal(full.gross, 18 * 4 + 2 * 18 + 2,
+    "and it shows a gross of 9 there: par 5, double bogey, plus his two strokes");
+  assert.equal(full.contests.watchTheBirdie.strokes, 0, "a pick-up cannot be a birdie");
+  assert.equal(full.contests.watchTheBirdie.live, true, "the contest still runs");
+  assert.equal(full.holesPlayed, 18, "and the hole counts as played");
+});
+
+test("a pick he picked up on is worth the same as a pick he bogeyed", () => {
+  const up = card(SIX, { pickedUp: [14] });
+  const bogey = card(SIX, { edit: (g) => { g[13] = PAR[13] + 2; } });
+  assert.equal(score(up).strokes, score(bogey).strokes);
+});
+
+test("an unplayed nominated hole pays nothing and does not stop the rest", () => {
+  const r = score(card(SIX, {
+    unplayed: [4],
+    edit: (g) => { g[13] = PAR[13] - 1; },
+  }));
+  assert.equal(r.strokes, -0.5, "hole 14 still pays");
+  assert.equal(r.live, true);
+});
+
+test("no picks at all means the contest is not scored", () => {
+  const r = score(card(undefined));
   assert.equal(r.strokes, 0);
   assert.equal(r.live, false, "shown as not live, like any unscorable contest");
 });
 
-// The contest pays per pick, not by counting them — so the two nominated holes
-// can be worth different amounts. Nothing uses this yet; it is why the payout
-// is a value per hole rather than a ladder over "how many paid".
+test("some slots filled scores those slots", () => {
+  const r = score(card({ f3: 3, b4: 14 }, { edit: (g) => { g[13] = PAR[13] - 1; } }));
+  assert.equal(r.strokes, -0.5);
+  assert.equal(r.detail, "1 of 2 picks", "counted against what he actually nominated");
+});
+
+/* ---- picks that are not allowed ---- */
+
+test("a pick outside the legal table is rejected by name", () => {
+  assert.throws(() => score(card({ ...SIX, f4: 5 })),
+    /hole 5 is not a legal front par 4 — 1, 2, 9/);
+  assert.throws(() => score(card({ ...SIX, b4: 11 })),
+    /hole 11 is not a legal back par 4 — 10, 14, 15/);
+  assert.throws(() => score(card({ ...SIX, f3: 7 })),
+    /hole 7 is not a legal front par 3 — 3, 8/);
+  assert.throws(() => score(card({ ...SIX, b5: 10, b4: 15 })),
+    /hole 10 is not a legal back par 5 — 16, 18/);
+});
+
+test("a hole on the wrong nine is rejected", () => {
+  assert.throws(() => score(card({ ...SIX, f3: 17, b3: 3 })), /not a legal front par 3/);
+  assert.throws(() => score(card({ ...SIX, b5: 7 })), /hole 7 is not a legal back par 5/);
+});
+
+// The six lists never overlap, so a hole nominated twice is also illegal for one
+// of the two slots. The duplicate is reported FIRST because that is what the man
+// actually did — being told "8 is not a legal front par 4" about a line that
+// plainly says 8 twice is no help at all.
+test("the same hole in two slots is rejected as a duplicate", () => {
+  assert.throws(() => score(card({ ...SIX, f3: 8, f4: 8 })),
+    /hole 8 is nominated twice, as front par 3 and front par 4/);
+});
+
+test("the player's name is in the error, so a field of sixteen says who", () => {
+  const c = card({ ...SIX, f4: 5 });
+  c.name = "Ridgeway, Ken";
+  assert.throws(() => score(c), /^Error: Ridgeway, Ken: hole 5 is not a legal front par 4/);
+});
+
+/* ---- the two-pick form that came before ---- */
+
+test("a round stored with the old two picks still opens", () => {
+  // front/back were always par 4s, so they become the par 4 slots.
+  assert.deepEqual(migratePicks({ front: 2, back: 14 }),
+    { f4: 2, b4: 14, legacy: true });
+  const r = score(card({ front: 2, back: 14 } as BirdiePicks,
+    { edit: (g) => { g[13] = PAR[13] - 1; } }));
+  assert.equal(r.strokes, -0.5, "and it scores at the new rate");
+  assert.equal(r.detail, "1 of 2 picks");
+});
+
+// A pick made under the old rules on a hole since barred cannot be guessed at.
+// Dropping the slot loses one sixth of one contest; refusing would take a played
+// round off a man's phone.
+test("an old pick on a hole since barred is dropped, not refused", () => {
+  const r = score(card({ front: 5, back: 14 } as BirdiePicks,
+    { edit: (g) => { g[13] = PAR[13] - 1; } }));
+  assert.equal(r.strokes, -0.5, "hole 14 still pays");
+  assert.equal(r.detail, "1 of 1 pick", "hole 5 is simply gone");
+});
+
+test("the six named slots win over anything left in the old fields", () => {
+  assert.deepEqual(migratePicks({ f4: 9, front: 2, back: 14 } as BirdiePicks),
+    { f4: 9, front: 2, back: 14 });
+});
+
+test("no picks in either form is no picks", () => {
+  assert.equal(migratePicks(null), null);
+  assert.equal(migratePicks({}), null);
+  assert.equal(migratePicks({ front: null, back: null }), null);
+});
+
+/* ---- the payout is configuration ---- */
+
+test("the two rates are one config value each", () => {
+  assert.equal(DEFAULT_CONTESTS.watchTheBirdie.birdie, -0.5);
+  assert.equal(DEFAULT_CONTESTS.watchTheBirdie.eagle, -1.0);
+});
+
+// Nothing uses this yet; it is why the payout is a pair of values per hole
+// rather than one number in the scoring code.
 test("a hard hole can be made to pay more than an easy one", () => {
   const contests = {
     ...DEFAULT_CONTESTS,
-    watchTheBirdie: { perPick: -1.0, byHole: { 5: -2.5 } },
+    watchTheBirdie: { birdie: -0.5, eagle: -1.0, byHole: { 4: { birdie: -1.5, eagle: -3.0 } } },
   };
-  const both = scorePlayer(levelPar({ front: 5, back: 14 }), ABERDEEN_TEE_IV, contests);
-  assert.equal(both.contests.watchTheBirdie.strokes, -3.5, "−2.5 for hole 5 plus −1.0 for hole 14");
+  const one = (hole: number, under: number) => scorePlayer(
+    card(SIX, { edit: (g) => { g[hole - 1] = PAR[hole - 1] - under; } }),
+    ABERDEEN_TEE_IV, contests).contests.watchTheBirdie.strokes;
 
-  // A player who nominated an ordinary hole still gets the flat rate.
-  const flat = scorePlayer(levelPar({ front: 6, back: 14 }), ABERDEEN_TEE_IV, contests);
-  assert.equal(flat.contests.watchTheBirdie.strokes, -2.0);
-});
-
-test("the payout is one config value, applied per pick", () => {
-  assert.equal(DEFAULT_CONTESTS.watchTheBirdie.perPick, -1.0);
-  const r = score(levelPar({ front: 5, back: 14 }));
-  assert.equal(r.strokes, 2 * DEFAULT_CONTESTS.watchTheBirdie.perPick);
+  assert.equal(one(4, 1), -1.5, "hole 4's own birdie rate");
+  assert.equal(one(4, 2), -3.0, "and its own eagle rate");
+  assert.equal(one(14, 1), -0.5, "every other hole is unchanged");
 });
 
 test("Call Your Number is gone", () => {
-  const result = scorePlayer(levelPar({ front: 5, back: 14 }), ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
-  assert.ok(!("callYourNumber" in result.contests), "no Call Your Number in the results");
-  assert.ok(!("callYourNumber" in DEFAULT_CONTESTS), "no Call Your Number ladder in config");
+  assert.equal((DEFAULT_CONTESTS as Record<string, unknown>).callYourNumber, undefined);
 });

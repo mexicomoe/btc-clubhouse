@@ -50,8 +50,12 @@ export interface Step {
  * hole can be made worth more than an easy one.
  */
 export interface BirdiePayout {
-  perPick: number;
-  byHole?: Record<number, number>;
+  /** What a net birdie on a nominated hole pays. */
+  birdie: number;
+  /** What a net eagle or better pays. A hole pays this OR the birdie, never both. */
+  eagle: number;
+  /** Override the pair for a named hole, so a hard hole can be worth more. */
+  byHole?: Record<number, { birdie: number; eagle: number }>;
 }
 
 /**
@@ -76,7 +80,7 @@ export interface SkinsConfig {
 
 /** Contest thresholds. Agony/Damage/Long/Shorty grade `<=`; Bounce grades `>=`. */
 export interface ContestConfig {
-  /** Not a ladder — paid per pick. */
+  /** Not a ladder — each nominated hole pays its own best result. */
   watchTheBirdie: BirdiePayout;
   agonyAlley: Step[];
   damageControl: Step[];

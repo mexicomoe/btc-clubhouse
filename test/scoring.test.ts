@@ -20,7 +20,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { ABERDEEN_TEE_IV, DEFAULT_CONTESTS } from "../src/courseConfig.ts";
-import { scorePlayer, type PlayerCard, type BirdiePicks } from "../src/scoring.ts";
+import { scorePlayer, birdiePickHoles, PICK_SLOTS,
+         type PlayerCard, type BirdiePicks } from "../src/scoring.ts";
 
 interface Reference {
   card: PlayerCard;
@@ -33,16 +34,28 @@ interface Reference {
   final: number;
 }
 
+/**
+ * Watch the Birdie picks, assigned MECHANICALLY. The contest postdates this
+ * round, so the club recorded none: each of the six slots rotates through its
+ * own legal holes in finishing order. Nothing here was chosen to produce a
+ * result, and the same rule built the two-pick table this replaces.
+ */
+function picks(i: number): BirdiePicks {
+  const legal = birdiePickHoles(ABERDEEN_TEE_IV);
+  return Object.fromEntries(
+    PICK_SLOTS.map((s) => [s.key, legal[s.key][i % legal[s.key].length]])) as BirdiePicks;
+}
+
 // name | index | picks | 18 gross scores | expected: CH, gross, net, netUncapped, WTB, off, final
 const REFERENCE: Reference[] = [
-  ref("Abe Whitfield",   25.2, { front: 1, back: 10 }, [5,5,4,6,6,5,6,4,6,6,4,5,4,6,6,5,3,6], 19, 92, 73, 73,  0.0, 7.0, 66.0),
-  ref("Ben Castellan",   24.8, { front: 2, back: 11 }, [5,4,4,6,5,5,6,4,6,5,5,6,5,7,5,5,4,6], 19, 93, 74, 74, -1.0, 6.0, 68.0),
-  ref("Cy Ashford",      24.0, { front: 5, back: 12 }, [5,4,4,6,6,5,5,5,6,6,5,5,3,5,6,6,4,7], 18, 93, 75, 75,  0.0, 4.0, 71.0),
-  ref("Dan Pemberton",   26.4, { front: 6, back: 14 }, [6,5,3,9,5,6,6,2,4,7,5,3,5,4,7,7,4,7], 21, 95, 74, 74, -1.0, 3.5, 70.5),
-  ref("Eli Marsden",     23.6, { front: 9, back: 15 }, [6,6,4,8,5,5,6,3,6,6,5,5,4,4,3,6,4,6], 18, 92, 74, 74, -1.0, 3.0, 71.0),
-  ref("Gus Thornbury",   25.4, { front: 1, back: 10 }, [5,6,4,6,6,5,6,5,5,6,5,5,4,8,4,7,4,6], 20, 97, 76, 77,  0.0, 4.5, 71.5),
-  ref("Hal Brightwater", 25.1, { front: 2, back: 11 }, [5,6,4,8,6,6,6,3,5,5,6,6,4,5,5,6,3,6], 19, 95, 76, 76,  0.0, 3.0, 73.0),
-  ref("Ike Calloway",    20.8, { front: 5, back: 12 }, [6,5,4,7,4,7,6,4,5,6,5,5,5,4,5,6,4,6], 15, 94, 79, 79, -1.0, 3.0, 76.0),
+  ref("Abe Whitfield",   25.2, picks(0), [5,5,4,6,6,5,6,4,6,6,4,5,4,6,6,5,3,6], 19, 92, 73, 73, -1.0, 8.0, 65.0),
+  ref("Ben Castellan",   24.8, picks(1), [5,4,4,6,5,5,6,4,6,5,5,6,5,7,5,5,4,6], 19, 93, 74, 74, -0.5, 5.5, 68.5),
+  ref("Cy Ashford",      24.0, picks(2), [5,4,4,6,6,5,5,5,6,6,5,5,3,5,6,6,4,7], 18, 93, 75, 75, -0.5, 4.5, 70.5),
+  ref("Dan Pemberton",   26.4, picks(3), [6,5,3,9,5,6,6,2,4,7,5,3,5,4,7,7,4,7], 21, 95, 74, 74, -1.0, 3.5, 70.5),
+  ref("Eli Marsden",     23.6, picks(4), [6,6,4,8,5,5,6,3,6,6,5,5,4,4,3,6,4,6], 18, 92, 74, 74, -0.5, 2.5, 71.5),
+  ref("Gus Thornbury",   25.4, picks(5), [5,6,4,6,6,5,6,5,5,6,5,5,4,8,4,7,4,6], 20, 97, 76, 77, -1.0, 5.5, 70.5),
+  ref("Hal Brightwater", 25.1, picks(6), [5,6,4,8,6,6,6,3,5,5,6,6,4,5,5,6,3,6], 19, 95, 76, 76,  0.0, 3.0, 73.0),
+  ref("Ike Calloway",    20.8, picks(7), [6,5,4,7,4,7,6,4,5,6,5,5,5,4,5,6,4,6], 15, 94, 79, 79, -0.5, 2.5, 76.5),
 ];
 
 function ref(

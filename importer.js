@@ -445,8 +445,133 @@
     return { rows, ignored };
   }
 
+  /* ---- Watch the Birdie picks, sent in by text ----
+     The men message their picks in one line each:
+
+         Ridgeway, Ken — 8, 2, 4, 13, 14, 16
+
+     Six bare numbers, always in slot order: front par 3, front par 4, front
+     par 5, back par 3, back par 4, back par 5. There is nothing in the line to
+     say which is which, so the ORDER is the whole of the format and a line
+     with any other count of numbers is refused rather than guessed at.
+
+     A block of those lines is pasted in together. Nothing is applied until it
+     has been read back, the same as a paste of scores or of players. */
+
+  /* The dash between name and numbers. A phone will turn a typed hyphen into an
+     en or em dash on its own, so all three are read — but only when it stands
+     apart from the words, or "Jean-Paul" would split down the middle. A colon
+     and a tab are read too, because men type what they are used to. */
+  const PICK_SPLIT = /\s[—–-]\s|\s*:\s*|\t+/;
+
+  /** The first run of digits, for a line that came with no separator at all. */
+  const PICK_FIRST_NUMBER = /\d/;
+
+  /**
+   * Read a pasted block of picks, one player a line.
+   *
+   * `opts.names` is the setup roster to match against, in its own order;
+   * `opts.slots` is [{ key, label, legal }] in slot order, from the course.
+   *
+   * Every line comes back whether it worked or not, carrying `problems` and, if
+   * a name was recognised, the index of the player it belongs to. A name that
+   * matches nothing — or matches two men equally — is reported, never guessed.
+   */
+  function parseBirdiePicks(text, opts) {
+    const names = (opts && opts.names) || [];
+    const slots = (opts && opts.slots) || [];
+    const rows = [];
+    let ignored = 0;
+
+    String(text == null ? "" : text).split(/\r?\n/).forEach((raw) => {
+      const line = raw.trim();
+      if (line === "") { ignored++; return; }
+
+      // Split the name off the numbers. Where no separator was typed, the first
+      // digit is the boundary — "Ken Ridgeway 8 2 4 13 14 16" is a real message.
+      let namePart = line, numberPart = "";
+      const cut = line.split(PICK_SPLIT);
+      if (cut.length > 1) {
+        namePart = cut[0];
+        numberPart = cut.slice(1).join(" ");
+      } else {
+        const at = line.search(PICK_FIRST_NUMBER);
+        if (at > 0) { namePart = line.slice(0, at); numberPart = line.slice(at); }
+        else { namePart = line; numberPart = ""; }
+      }
+      namePart = namePart.trim();
+      // A heading row off a spreadsheet, or a line that is only a name.
+      if (namePart === "" || !PICK_FIRST_NUMBER.test(numberPart)) { ignored++; return; }
+
+      const row = { name: namePart, index: -1, how: null, picks: {}, holes: [], problems: [] };
+
+      // The name first, so a line that is wrong in both ways says so about both.
+      //
+      // The initial rule — first name plus last initial — is accepted only when
+      // the line was actually WRITTEN that way. It exists so "Abe W." finds Abe
+      // Whitfield; letting it also swallow "Abe Whitfeld" would turn a spelling
+      // mistake into a silent match against the wrong man's card, which is the
+      // one thing a paste of picks must never do.
+      const match = matchName(namePart, names);
+      const surname = namePart.replace(/,/g, " ").trim().split(/\s+/).pop() || "";
+      const writtenAsInitial = /^[A-Za-z]\.?$/.test(surname);
+      const ok = match.index !== -1 && (match.how !== "initial" || writtenAsInitial);
+      row.index = ok ? match.index : -1;
+      row.how = ok ? match.how : match.how;
+      if (!ok) {
+        row.problems.push(match.how === "ambiguous"
+          ? "more than one player could be meant — say which"
+          : "no player of that name on the list");
+      }
+
+      const numbers = numberPart.split(/[^0-9]+/).filter((s) => s !== "");
+      const holes = numbers.map(Number);
+      row.holes = holes;
+
+      if (holes.length !== slots.length) {
+        row.problems.push("expected " + slots.length + " numbers, found " + holes.length);
+        rows.push(row);
+        return;
+      }
+      if (holes.some((h) => !(h >= 1 && h <= 18))) {
+        row.problems.push("a hole number is outside 1–18");
+        rows.push(row);
+        return;
+      }
+
+      // Duplicates before legality: "hole 8 twice" is what a man will have
+      // typed, and reads far better than "8 is not a legal front par 4".
+      const seen = new Map();
+      let duplicated = false;
+      holes.forEach((h, i) => {
+        if (seen.has(h)) {
+          row.problems.push("hole " + h + " is nominated twice, as " +
+            seen.get(h) + " and " + slots[i].label);
+          duplicated = true;
+        } else {
+          seen.set(h, slots[i].label);
+        }
+      });
+      if (duplicated) { rows.push(row); return; }
+
+      slots.forEach((slot, i) => {
+        const h = holes[i];
+        if (slot.legal.indexOf(h) === -1) {
+          row.problems.push("hole " + h + " is not a legal " + slot.label +
+            " — " + slot.legal.join(", "));
+        } else {
+          row.picks[slot.key] = h;
+        }
+      });
+
+      rows.push(row);
+    });
+
+    return { rows, ignored };
+  }
+
   globalThis.ClubhouseImporter = {
-    parseRoster, splitCsvLine,
+    parseRoster, splitCsvLine, parseBirdiePicks,
     parseScores, splitName, grossCardToPlayer,
     normaliseName, unreverseName, stripHandicap, canonicalName, initialKey, matchName,
     PICKED_UP,
