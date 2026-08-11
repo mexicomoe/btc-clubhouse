@@ -120,15 +120,23 @@
     // The ceiling of six eagles — 6.0 — is theoretical and not what this is
     // tuned against. A realistic good round is nearer 3.0 and the field average
     // nearer 0.4.
-    watchTheBirdie: { birdie: -0.5, eagle: -1.0 },
+    watchTheBirdie: {
+      birdie: -0.3, eagle: -0.6,
+      // Holes 4 and 18 pay double. Measured over 111 rounds they were the two
+      // worst par 5s to nominate — hole 7 was worth 2.3× hole 4 — so nobody
+      // rational picked 4, and its slot was a formality. Doubling makes the
+      // choice a choice. Hole 18 was already the best of its pair; doubling it
+      // was asked for anyway and it makes 18 the pick of the back nine.
+      byHole: { 4: { birdie: -0.6, eagle: -1.2 }, 18: { birdie: -0.6, eagle: -1.2 } },
+    },
     agonyAlley: [
-      { threshold: 12, strokes: -2.5 }, { threshold: 13, strokes: -1.5 },
-      { threshold: 14, strokes: -0.5 }, { threshold: 15, strokes: 0 },
-      { threshold: 16, strokes: 1.0 }, { threshold: 99, strokes: 1.5 },
+      { threshold: 12, strokes: -1.5 }, { threshold: 13, strokes: -0.9 },
+      { threshold: 14, strokes: -0.3 }, { threshold: 15, strokes: 0 },
+      { threshold: 16, strokes: 0.6 }, { threshold: 99, strokes: 0.9 },
     ],
     damageControl: [
-      { threshold: 0, strokes: -2.0 }, { threshold: 1, strokes: -1.0 },
-      { threshold: 2, strokes: -0.5 }, { threshold: 99, strokes: 0 },
+      { threshold: 0, strokes: -1.2 }, { threshold: 1, strokes: -0.6 },
+      { threshold: 2, strokes: -0.3 }, { threshold: 99, strokes: 0 },
     ],
     /**
      * Easy Street — the three holes the card gives back, counted on GROSS.
@@ -144,8 +152,8 @@
      * That is the design as specified, not an accident of it.
      */
     easyStreet: [
-      { threshold: 0, strokes: 0.5 }, { threshold: 1, strokes: 0 },
-      { threshold: 99, strokes: -0.5 },
+      { threshold: 0, strokes: 0.3 }, { threshold: 1, strokes: 0 },
+      { threshold: 99, strokes: -0.3 },
     ],
     /**
      * Triple Threat — a gross triple bogey or worse costs, and answering it
@@ -156,7 +164,7 @@
      * mean a Stableford round punishing a man for the thing Stableford tells
      * him to do.
      */
-    tripleThreat: { perTriple: 0.3, perRecovery: -0.6 },
+    tripleThreat: { perTriple: 0.2, perRecovery: -0.4 },
     /**
      * Go Long and Get Shorty are SWITCHED OFF — Easy Street replaces both. Null
      * is the same signal Skins uses: not scored, not shown, not exported. The
@@ -169,28 +177,25 @@
     goLong: null,
     getShorty: null,
     bounceBack: [
-      { threshold: 3, strokes: -1.5 }, { threshold: 2, strokes: -1.0 },
-      { threshold: 1, strokes: -0.5 }, { threshold: 0, strokes: 0 },
+      { threshold: 3, strokes: -0.9 }, { threshold: 2, strokes: -0.6 },
+      { threshold: 1, strokes: -0.3 }, { threshold: 0, strokes: 0 },
     ],
     /**
-     * The most the six individual contests may take off one man's card, all
-     * told. Skins sits outside it.
+     * NO CEILING. `maxContestStrokes` was 11.0, then 6.0, and is now gone: with
+     * every value cut by 40% the contests cannot reach far enough for a ceiling
+     * to be the thing holding them back. Over 111 real rounds the highest total
+     * a card reached at the old rates was 9.2, and 40% of that is 5.5.
      *
-     * It was 11.0, set when the contest list was a different one, and it had
-     * stopped protecting anything: across 111 real rounds it never once bit,
-     * while the seven contests can in theory pay 17.7 between them.
+     * Null means no cap, the same signal Skins uses. The knob is left here
+     * rather than deleted so that putting a ceiling back is a one-line edit and
+     * so that its absence is a stated decision rather than a missing feature.
      *
-     * The reason a round can climb that high is that the four ladders were each
-     * calibrated on its own but are CORRELATED — a strong net round clears
-     * several top rungs at once. Agony Alley, Damage Control, Bounce Back and
-     * Easy Street at their best rungs come to 6.5 together, and Watch the
-     * Birdie can add three more on top. One round in 111 maxed all four.
-     *
-     * 6.0 bites the top few per cent and nothing else: real rounds run median
-     * 3.0, 90th 5.9, 99th 7.9. It is a ceiling, not a cure — the ladders
-     * stacking is the thing to fix, and that wants its own calibration pass.
+     * What a ceiling was covering up is still true: the four ladders were each
+     * calibrated on its own and they are CORRELATED, so a strong net round
+     * clears several top rungs at once. Cutting every value shrinks the symptom
+     * without touching the cause. That still wants its own calibration pass.
      */
-    maxContestStrokes: 6.0,
+    maxContestStrokes: null,
     // Skins scores into FINAL. It sits outside maxContestStrokes, which governs
     // the six individual contests. Set to null to switch it off.
     //
@@ -209,7 +214,7 @@
     // hot, and the two effects cancel. So the winner's PAY rises with the field
     // even though a fair share's does not, which is what maxSkinStrokes is for:
     // no one contest may outweigh Agony Alley's 2.5, however large the field.
-    skins: { fairShare: -0.8, maxSkinStrokes: -2.5 },
+    skins: { fairShare: -0.5, maxSkinStrokes: -1.5 },
   };
 
   /* ---- Reading a handicap index that someone typed in ----
@@ -646,7 +651,10 @@
     // were all halves used to add exactly, so nothing needed this until now.
     const earnedUncapped = toTenth(sum(Object.values(allContests).map((c) => c.strokes)));
     let earned = earnedUncapped;
-    if (-earned > contests.maxContestStrokes) earned = -contests.maxContestStrokes;
+    // Null or absent means no ceiling at all.
+    if (contests.maxContestStrokes != null && -earned > contests.maxContestStrokes) {
+      earned = -contests.maxContestStrokes;
+    }
 
     let final = null;
     if (netTotal != null) {

@@ -939,10 +939,16 @@ function showPlayer(name){
   }
 
   html += `<div class="section-label">The contests</div>`;
-  if(Math.abs(uncapped - off) > 0.05){
-    html += `<div class="note">These come to <b>${uncapped.toFixed(1)}</b>, over the
-      <b>${E.DEFAULT_CONTESTS.maxContestStrokes.toFixed(1)}</b> the six contests may take off
-      between them, so <b>${off.toFixed(1)}</b> is what counted. Skins is outside that limit.</div>`;
+  // The cap governs the SIX individual contests; Skins is added afterwards and
+  // sits outside it. So the comparison has to be six-against-cap — `off`
+  // includes Skins, and comparing it to the uncapped six made the note fire
+  // whenever Skins paid anything, saying something untrue when it did.
+  const cap = E.DEFAULT_CONTESTS.maxContestStrokes;
+  if(cap != null && uncapped - cap > 0.05){
+    html += `<div class="note">The six individual contests come to
+      <b>${uncapped.toFixed(1)}</b>, over the <b>${cap.toFixed(1)}</b> they may take off between
+      them, so <b>${cap.toFixed(1)}</b> is what counted from them. Skins is outside that
+      limit.</div>`;
   }
 
   for(const key of contestsInPlay()){

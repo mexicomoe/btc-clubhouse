@@ -69,8 +69,8 @@ test("December import feeds the engine and reproduces section 9", () => {
     Object.fromEntries(PICK_SLOTS.map((s) =>
       [s.key, legal[s.key][i % legal[s.key].length]])) as BirdiePicks]));
   const expectedFinal: Record<string, number> = {
-    "Abe Whitfield": 67.5, "Ben Castellan": 70.2, "Cy Ashford": 72.0, "Dan Pemberton": 71.7,
-    "Eli Marsden": 72.7, "Gus Thornbury": 72.2, "Hal Brightwater": 75.8, "Ike Calloway": 77.2,
+    "Abe Whitfield": 69.4, "Ben Castellan": 71.7, "Cy Ashford": 73.2, "Dan Pemberton": 72.6,
+    "Eli Marsden": 73.2, "Gus Thornbury": 73.4, "Hal Brightwater": 75.9, "Ike Calloway": 77.9,
   };
 
   const { cards } = parseScores(read("december_demo.tsv"));

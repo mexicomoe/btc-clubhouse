@@ -101,7 +101,7 @@ test("Damage Control does not read an empty card as a clean one", () => {
   // A card that really was clean over a partial round still earns it, though —
   // Damage Control is meant to work on a partial.
   const partial = scorePlayer(card("Partial", 12), ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
-  assert.equal(partial.contests.damageControl.strokes, -2.0, "a played card still counts");
+  assert.equal(partial.contests.damageControl.strokes, -1.2, "a played card still counts");
   assert.equal(partial.contests.damageControl.live, true);
 });
 

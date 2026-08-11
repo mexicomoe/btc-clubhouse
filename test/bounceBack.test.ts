@@ -10,7 +10,7 @@
  * set. On those sixty-three rounds the rule below shuts nobody out, 30% clear
  * two or more, and the handicap correlation falls to −0.09.
  *
- * The ladder is unchanged: 3 or more −1.5, 2 −1.0, 1 −0.5, none 0.
+ * The ladder is unchanged: 3 or more −0.9, 2 −0.6, 1 −0.3, none 0.
  */
 
 import { test } from "node:test";
@@ -35,7 +35,7 @@ const bounces = (c: PlayerCard) =>
 test("a bogey answered by a birdie counts", () => {
   const r = bounces(card((g) => { g[0] = PAR[0] + 1; g[1] = PAR[1] - 1; }));
   assert.equal(r.detail, "1 bounce-back");
-  assert.equal(r.strokes, -0.5);
+  assert.equal(r.strokes, -0.3);
 });
 
 test("worse than a bogey counts too — it is bogey OR WORSE", () => {
@@ -56,10 +56,10 @@ test("the ladder pays as it always did", () => {
     for (let k = 0; k < n; k++) { g[k * 4] = PAR[k * 4] + 1; g[k * 4 + 1] = PAR[k * 4 + 1] - 1; }
   });
   assert.equal(bounces(make(0)).strokes, 0);
-  assert.equal(bounces(make(1)).strokes, -0.5);
-  assert.equal(bounces(make(2)).strokes, -1.0);
-  assert.equal(bounces(make(3)).strokes, -1.5);
-  assert.equal(bounces(make(4)).strokes, -1.5, "and holds at three or more");
+  assert.equal(bounces(make(1)).strokes, -0.3);
+  assert.equal(bounces(make(2)).strokes, -0.6);
+  assert.equal(bounces(make(3)).strokes, -0.9);
+  assert.equal(bounces(make(4)).strokes, -0.9, "and holds at three or more");
 });
 
 /* ---- what does not ---- */
@@ -98,9 +98,9 @@ test("a round with no net doubles can score it", () => {
   });
   const r = scorePlayer(clean, ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
   assert.equal(r.contests.damageControl.detail, "0 net doubles", "not one all round");
-  assert.equal(r.contests.damageControl.strokes, -2.0, "and Damage Control pays its best");
+  assert.equal(r.contests.damageControl.strokes, -1.2, "and Damage Control pays its best");
   assert.equal(r.contests.bounceBack.detail, "2 bounce-backs", "Bounce Back pays too, now");
-  assert.equal(r.contests.bounceBack.strokes, -1.0);
+  assert.equal(r.contests.bounceBack.strokes, -0.6);
 });
 
 test("the two contests no longer pull against each other", () => {

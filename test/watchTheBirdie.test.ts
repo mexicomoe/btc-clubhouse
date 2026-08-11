@@ -2,10 +2,15 @@
  * Watch the Birdie — six nominated holes, a par 3, a par 4 and a par 5 on each
  * nine, each paying on its own.
  *
- *   net birdie  −0.5
- *   net eagle   −1.0
+ *   net birdie  −0.3
+ *   net eagle   −0.6
  *
- * A hole pays the BEST single result on it. A net eagle pays 1.0 and not 1.5:
+ * Holes 4 and 18 pay DOUBLE — 0.6 and 1.2. Hole 4 was measured as the worst par
+ * 5 to nominate by a distance, so its slot was a formality; 18 was already the
+ * best of its pair and doubling makes it the pick of the back nine.
+ *
+ * A hole pays the BEST single result on it. A net eagle pays the eagle rate and
+ * not the birdie rate as well:
  * it does not also collect the birdie underneath it.
  *
  * The legal holes come off the course's par and its barred list, never a
@@ -14,8 +19,8 @@
  * Hole 4 is an Agony Alley hole and stays legal anyway, because the front nine
  * has only two par 5s and a slot with one legal hole in it is not a choice.
  *
- * The ceiling of six net eagles — 6.0 — is arithmetic, not a target. Across the
- * two calibration rounds the best card takes 1.5 and the field averages 0.7.
+ * Six net eagles, with 4 and 18 doubled, comes to 4.8. That is arithmetic, not a
+ * target: across 111 real rounds the contest averages 0.4.
  */
 
 import { test } from "node:test";
@@ -79,23 +84,35 @@ test("no hole belongs to two slots", () => {
 
 /* ---- what a pick pays ---- */
 
-test("six valid picks and one net birdie pays 0.5", () => {
+test("six valid picks and one net birdie pays 0.3", () => {
   // Hole 14 in one under; every other hole left at par.
   const r = score(card(SIX, { edit: (g) => { g[13] = PAR[13] - 1; } }));
-  assert.equal(r.strokes, -0.5);
+  assert.equal(r.strokes, -0.3);
   assert.equal(r.detail, "1 of 6 picks");
   assert.equal(r.live, true);
 });
 
-test("six valid picks and one net eagle pays 1.0, not 1.5", () => {
-  const r = score(card(SIX, { edit: (g) => { g[3] = PAR[3] - 2; } }));
-  assert.equal(r.strokes, -1.0, "the eagle rate alone");
+test("six valid picks and one net eagle pays the eagle rate alone", () => {
+  // Hole 14, an ordinary hole: 0.6, not 0.6 + 0.3.
+  const r = score(card(SIX, { edit: (g) => { g[13] = PAR[13] - 2; } }));
+  assert.equal(r.strokes, -0.6, "the eagle rate alone");
   assert.equal(r.detail, "1 of 6 picks", "and it is one hole paying, not two");
 });
 
 test("better than an eagle still pays the eagle rate", () => {
-  const r = score(card(SIX, { edit: (g) => { g[3] = PAR[3] - 3; } }));
-  assert.equal(r.strokes, -1.0);
+  const r = score(card(SIX, { edit: (g) => { g[13] = PAR[13] - 3; } }));
+  assert.equal(r.strokes, -0.6);
+});
+
+// Holes 4 and 18 pay double, which is the whole reason hole 4 is worth picking.
+test("holes 4 and 18 pay double", () => {
+  assert.equal(score(card(SIX, { edit: (g) => { g[3] = PAR[3] - 1; } })).strokes, -0.6,
+    "a birdie on 4 pays what an eagle pays anywhere else");
+  assert.equal(score(card(SIX, { edit: (g) => { g[3] = PAR[3] - 2; } })).strokes, -1.2,
+    "and an eagle on 4 pays double the eagle rate");
+  const eighteen = { ...SIX, b5: 18 };
+  assert.equal(score(card(eighteen, { edit: (g) => { g[17] = PAR[17] - 1; } })).strokes, -0.6);
+  assert.equal(score(card(eighteen, { edit: (g) => { g[17] = PAR[17] - 2; } })).strokes, -1.2);
 });
 
 test("a net par on a pick pays nothing", () => {
@@ -113,15 +130,15 @@ test("all six can pay at once", () => {
   const r = score(card(SIX, { edit: (g) => {
     for (const h of [3, 2, 4, 13, 14, 16]) g[h - 1] = PAR[h - 1] - 1;
   } }));
-  assert.equal(r.strokes, -3.0, "six birdies");
+  assert.equal(r.strokes, -2.1, "five at 0.3 plus hole 4 at 0.6");
   assert.equal(r.detail, "6 of 6 picks");
 });
 
-test("six net eagles is 6.0 — the ceiling, and only arithmetic", () => {
+test("six net eagles is 4.2 here — the ceiling, and only arithmetic", () => {
   const r = score(card(SIX, { edit: (g) => {
     for (const h of [3, 2, 4, 13, 14, 16]) g[h - 1] = PAR[h - 1] - 2;
   } }));
-  assert.equal(r.strokes, -6.0);
+  assert.equal(r.strokes, -4.2, "five at 0.6 plus hole 4 at 1.2");
 });
 
 test("the total is always a clean tenth", () => {
@@ -165,7 +182,7 @@ test("an unplayed nominated hole pays nothing and does not stop the rest", () =>
     unplayed: [4],
     edit: (g) => { g[13] = PAR[13] - 1; },
   }));
-  assert.equal(r.strokes, -0.5, "hole 14 still pays");
+  assert.equal(r.strokes, -0.3, "hole 14 still pays");
   assert.equal(r.live, true);
 });
 
@@ -177,7 +194,7 @@ test("no picks at all means the contest is not scored", () => {
 
 test("some slots filled scores those slots", () => {
   const r = score(card({ f3: 3, b4: 14 }, { edit: (g) => { g[13] = PAR[13] - 1; } }));
-  assert.equal(r.strokes, -0.5);
+  assert.equal(r.strokes, -0.3);
   assert.equal(r.detail, "1 of 2 picks", "counted against what he actually nominated");
 });
 
@@ -222,7 +239,7 @@ test("a round stored with the old two picks still opens", () => {
     { f4: 2, b4: 14, legacy: true });
   const r = score(card({ front: 2, back: 14 } as BirdiePicks,
     { edit: (g) => { g[13] = PAR[13] - 1; } }));
-  assert.equal(r.strokes, -0.5, "and it scores at the new rate");
+  assert.equal(r.strokes, -0.3, "and it scores at the new rate");
   assert.equal(r.detail, "1 of 2 picks");
 });
 
@@ -232,7 +249,7 @@ test("a round stored with the old two picks still opens", () => {
 test("an old pick on a hole since barred is dropped, not refused", () => {
   const r = score(card({ front: 5, back: 14 } as BirdiePicks,
     { edit: (g) => { g[13] = PAR[13] - 1; } }));
-  assert.equal(r.strokes, -0.5, "hole 14 still pays");
+  assert.equal(r.strokes, -0.3, "hole 14 still pays");
   assert.equal(r.detail, "1 of 1 pick", "hole 5 is simply gone");
 });
 
@@ -250,8 +267,8 @@ test("no picks in either form is no picks", () => {
 /* ---- the payout is configuration ---- */
 
 test("the two rates are one config value each", () => {
-  assert.equal(DEFAULT_CONTESTS.watchTheBirdie.birdie, -0.5);
-  assert.equal(DEFAULT_CONTESTS.watchTheBirdie.eagle, -1.0);
+  assert.equal(DEFAULT_CONTESTS.watchTheBirdie.birdie, -0.3);
+  assert.equal(DEFAULT_CONTESTS.watchTheBirdie.eagle, -0.6);
 });
 
 // Nothing uses this yet; it is why the payout is a pair of values per hole
@@ -259,7 +276,7 @@ test("the two rates are one config value each", () => {
 test("a hard hole can be made to pay more than an easy one", () => {
   const contests = {
     ...DEFAULT_CONTESTS,
-    watchTheBirdie: { birdie: -0.5, eagle: -1.0, byHole: { 4: { birdie: -1.5, eagle: -3.0 } } },
+    watchTheBirdie: { birdie: -0.3, eagle: -0.6, byHole: { 4: { birdie: -1.5, eagle: -3.0 } } },
   };
   const one = (hole: number, under: number) => scorePlayer(
     card(SIX, { edit: (g) => { g[hole - 1] = PAR[hole - 1] - under; } }),
@@ -267,7 +284,7 @@ test("a hard hole can be made to pay more than an easy one", () => {
 
   assert.equal(one(4, 1), -1.5, "hole 4's own birdie rate");
   assert.equal(one(4, 2), -3.0, "and its own eagle rate");
-  assert.equal(one(14, 1), -0.5, "every other hole is unchanged");
+  assert.equal(one(14, 1), -0.3, "every other hole is unchanged");
 });
 
 test("Call Your Number is gone", () => {
