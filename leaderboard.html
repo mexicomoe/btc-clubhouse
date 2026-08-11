@@ -97,6 +97,7 @@
 <script src="importer.js"></script>
 <script src="exporter.js"></script>
 <script src="results.js"></script>
+<script src="boardimage.js"></script>
 <script src="version.js"></script>
 <script src="display.js"></script>
 <script>
@@ -108,6 +109,7 @@ const E = window.ClubhouseEngine;
 const IMP = window.ClubhouseImporter;
 const XP = window.ClubhouseExporter;
 const RS = window.ClubhouseResults;
+const IMG = window.ClubhouseBoardImage;
 const D  = window.ClubhouseDisplay;
 /* The display helpers live in display.js so results.html can use the same ones.
    Pulled onto locals here so every call site below reads exactly as it did. */
@@ -833,21 +835,87 @@ function drawShare(results){
   const link = RS.resultsLink(resultsBaseUrl(), shareRound(),
     results.map(r => ({ ...r, tieNote: tieNote(r) })), contestsInPlay());
 
-  if(!link.fits){
-    // Say so on the button rather than hand over an address that will arrive
-    // cut in half — a truncated link looks like it worked.
-    box.innerHTML =
-      `<div class="pad"><button class="big" id="shareBtn" disabled>Too many players to share</button>
-        <div class="note warn">This round makes a link of ${link.length} characters and
-        ${link.limit} is the most that survives a text message. Share a flight at a time,
-        or send the CSV from <b>Setup → Move this event</b>.</div></div>`;
-    return;
-  }
-
+  // TWO WAYS OUT, because neither one does the whole job.
+  //
+  // The picture goes first because it is the one that always arrives. A link of
+  // 250 characters or more is flaky through iOS Messages — measured on the
+  // club's own phone: 154, 159, 190 and 219 arrived first time, 250 and 299
+  // needed a second attempt, 350 failed twice — and a ten-man round cannot get
+  // under 250 while still carrying the contest breakdown. A picture has no
+  // length limit anywhere, so it is what a man texts.
+  //
+  // The link stays for e-mail, where it has always worked, because it carries
+  // the per-player breakdown that a picture cannot.
   box.innerHTML =
-    `<div class="pad"><button class="big solid" id="shareBtn">Share results</button>
+    `<div class="pad">
+       <button class="big solid" id="shareImgBtn">Send the board as a picture</button>
+       <button class="big" id="shareBtn">Copy the link, for e-mail</button>
        <div id="shareOut"></div></div>`;
-  document.getElementById("shareBtn").addEventListener("click", () => copyShareLink(link));
+  document.getElementById("shareImgBtn").addEventListener("click", () => shareBoardImage(results));
+  document.getElementById("shareBtn").addEventListener("click", () => {
+    if(!link.fits){
+      document.getElementById("shareOut").innerHTML =
+        `<div class="note warn">This round makes a link of ${link.length} characters and
+         ${link.limit} is the most a message will carry. Send the picture instead, or the
+         CSV from <b>Setup → Move this event</b>.</div>`;
+      return;
+    }
+    copyShareLink(link);
+  });
+}
+
+/* ---------- the board as a picture ----------
+   The one thing that always arrives. No length limit in any messenger, and
+   nothing to tap through — it is the board and nothing else. */
+
+/** The round in the shape the image builder wants. */
+function boardImageRound(results){
+  return {
+    course: "Aberdeen Golf & Country Club",
+    date: state.date,
+    dateText: niceDate(state.date),
+    note: shareRound().note,
+    players: results.map(r => ({
+      name: r.name, net: r.net, final: r.final,
+      rank: r.rank, tieNote: tieNote(r),
+      eligible: r.eligible !== false, holesPlayed: r.holesPlayed,
+    })),
+  };
+}
+
+function shareBoardImage(results){
+  const out = document.getElementById("shareOut");
+  const canvas = document.createElement("canvas");
+  IMG.render(canvas, boardImageRound(results));
+  const name = IMG.imageFilename(state.name, state.date);
+
+  canvas.toBlob((blob) => {
+    if(!blob){ out.innerHTML = `<div class="note warn">The picture could not be made on this phone.</div>`; return; }
+    const file = new File([blob], name, { type: "image/png" });
+
+    // The share sheet is what puts it into Messages. Where it is not offered —
+    // a desktop browser, an older phone — the picture is saved instead and can
+    // be attached by hand, which is slower but never fails.
+    if(navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share){
+      navigator.share({ files: [file] }).then(
+        () => { out.innerHTML = `<div class="note">Sent. The picture carries the board only —
+                 send the link by e-mail if anyone wants the contest breakdown.</div>`; },
+        (err) => { if(err && err.name === "AbortError") { out.innerHTML = ""; return; }
+                   saveBoardImage(blob, name, out); });
+    } else {
+      saveBoardImage(blob, name, out);
+    }
+  }, "image/png");
+}
+
+function saveBoardImage(blob, name, out){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
+  out.innerHTML = `<div class="note">Saved as <b>${esc(name)}</b>. Attach it to a message
+    the way you would any photograph.</div>`;
 }
 
 function copyShareLink(link){

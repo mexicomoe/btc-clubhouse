@@ -264,7 +264,21 @@ No server, no accounts, no sync. Those come later if the product proves out.
 
 ### Sharing a finished round
 
-Until this existed, the result of a round was the organiser reading numbers aloud in the bar. **One button — Share results — puts a link on the clipboard.** He texts it; every man opens the finished leaderboard on his own phone with nothing installed and nobody signed in.
+Until this existed, the result of a round was the organiser reading numbers aloud in the bar. **Share offers two things, because neither one does the whole job.**
+
+> ⚠️ **THE LINK DOES NOT SURVIVE iOS MESSAGES, AND CANNOT BE MADE TO.**
+>
+> Measured on the club's own phone with a ladder of valid links at known lengths: **154, 159, 190 and 219 characters arrived first time. 250 and 299 each failed once and arrived only on a second attempt. 350 failed twice.** The break sits between 299 and 350 and the band from 250 up is *flaky* — sometimes it goes, sometimes it doesn't.
+>
+> A ten-man round is about 750 characters. Deflate would take it to roughly 480; dropping the contest breakdown entirely takes it to about 380; both together, about 310. **Every one of those is still inside the unreliable band, and a link that works on the second try is not good enough for the men.**
+>
+> Three things were tried and none of it was the cause: the marker's colon (it looked like a URI scheme), percent-encoding of the fragment, and the `#` itself. Moving to a query string did not fix it either. It is length.
+
+**1 · Send the board as a picture.** The leaderboard drawn onto a canvas and handed to the share sheet as a PNG. **An image has no length limit in any messenger**, so this is the one that always arrives, and it is what a man texts. It carries the board and nothing else — there is nothing to tap into, so no per-player breakdown.
+
+**2 · Copy the link, for e-mail.** Unchanged, and it still carries everything: every contest value, every placing, tappable. E-mail has never had the problem.
+
+The picture is laid out in `boardimage.js` as a list of drawing operations that touch no canvas, so the whole arrangement is testable without a browser. Its palette and type sizes are lifted from `clubhouse.css` — a canvas has no cascade, so they are repeated, and a test holds the two copies together. Nothing in it is drawn below the **18-point floor**: a long name shrinks to the floor, then loses its surname to an initial, then is clipped rather than allowed to run into the final beside it.
 
 **There is no server. The round travels inside the link**, in a query string after `?r=`.
 
