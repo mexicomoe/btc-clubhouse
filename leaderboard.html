@@ -389,11 +389,26 @@ const XP = window.ClubhouseExporter;
 
 const CONTEST_NAMES = {
   watchTheBirdie: "Watch the Birdie", agonyAlley: "Agony Alley",
-  damageControl: "Damage Control", goLong: "Go Long",
+  damageControl: "Damage Control", easyStreet: "Easy Street",
+  tripleThreat: "Triple Threat", goLong: "Go Long",
   getShorty: "Get Shorty", bounceBack: "Bounce Back",
   skins: "Skins",
 };
-const CONTEST_ORDER = ["watchTheBirdie","agonyAlley","damageControl","goLong","getShorty","bounceBack","skins"];
+const CONTEST_ORDER = ["watchTheBirdie","agonyAlley","damageControl","easyStreet",
+                       "tripleThreat","goLong","getShorty","bounceBack","skins"];
+
+/**
+ * The contests this club actually plays. A contest switched off in the engine's
+ * config is not in the game at all and is left off the screen entirely — quite
+ * different from one that IS in the game and scored a man nothing, which still
+ * gets a line saying so.
+ *
+ * Skins is the exception and stays listed: it is switched off per ROUND from
+ * Setup, not in the code, so "not scored in this round" is exactly right for it.
+ */
+function contestsInPlay(){
+  return CONTEST_ORDER.filter(k => k === "skins" || E.DEFAULT_CONTESTS[k] != null);
+}
 const MAX_PLAYERS = 24;
 const HOLES = 18;
 
@@ -1149,7 +1164,7 @@ function showPlayer(name){
 
   html += `<div class="section-label">The contests</div>`;
 
-  for(const key of CONTEST_ORDER){
+  for(const key of contestsInPlay()){
     // All seven, always. A contest the result has nothing for says so rather
     // than vanishing: a missing line looks like a contest that doesn't exist,
     // and a man cannot tell that from one that scored him nothing.

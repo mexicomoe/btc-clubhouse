@@ -20,8 +20,8 @@ const html = readFileSync(new URL("../leaderboard.html", import.meta.url), "utf8
 
 // The section-11 finals, with Watch the Birdie in place of Call Your Number.
 const EXPECTED: Record<string, string> = {
-  Dex: "62.50", Alex: "66.00", Finn: "68.50", Boyd: "69.50",
-  Emmet: "76.00", Chip: "77.00", Grady: "77.50", Hoyt: "80.00",
+  Dex: "63.70", Finn: "68.10", Alex: "68.20", Boyd: "71.70",
+  Emmet: "77.30", Chip: "78.30", Grady: "79.00", Hoyt: "80.30",
 };
 
 test("engine.js reproduces the section 11 leaderboard", () => {

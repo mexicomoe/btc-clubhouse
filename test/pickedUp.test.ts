@@ -111,9 +111,24 @@ test("every contest still runs on a card with Xs on it", () => {
   // Agony Alley needs 4–6 and hole 4 was picked up — it was still played, so
   // the contest is live and simply scores the net double.
   assert.equal(r.contests.agonyAlley.live, true, "the stretch was played");
-  assert.equal(r.contests.goLong.live, true);
-  assert.equal(r.contests.getShorty.live, true);
+  assert.equal(r.contests.easyStreet.live, true, "11 was picked up, which is still played");
   assert.equal(r.contests.damageControl.live, true);
+  assert.equal(r.contests.tripleThreat.live, true);
+});
+
+// A pick-up shows a gross of par + 4, which clears the par + 3 bar — so without
+// an explicit exclusion Triple Threat would charge a man for picking up, which
+// is the one thing Stableford tells him to do.
+test("a picked-up hole is never a triple", () => {
+  const r = scorePlayer(card("Three Xs", [4, 11, 15]), ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
+  assert.equal(r.contests.tripleThreat.strokes, 0);
+  assert.match(r.contests.tripleThreat.detail, /no triples/);
+
+  // The same three holes actually played to par + 4 DO count.
+  const played = card("Played them", []);
+  for (const h of [4, 11, 15]) played.gross[h - 1] = (PAR[h - 1] as number) + 4;
+  const r2 = scorePlayer(played, ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
+  assert.equal(r2.contests.tripleThreat.detail.startsWith("3 triples"), true);
 });
 
 /* ---- reading it out of a paste ---- */

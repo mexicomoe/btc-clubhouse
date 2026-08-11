@@ -41,14 +41,14 @@ function picks(i: number): BirdiePicks {
 
 // name | course hcp | picks | 18 gross | expected: gross, net, off, final
 const REFERENCE: Reference[] = [
-  ref("Dex",   23, picks(0), [5,5,4,6,6,6,7,3,5,4,4,6,3,6,6,6,6,5], 93, 70, 7.50, 62.50),
-  ref("Alex",  18, picks(1), [5,5,3,6,5,5,6,3,5,7,5,5,4,4,6,6,3,7], 90, 72, 6.00, 66.00),
-  ref("Finn",  26, picks(2), [5,6,6,7,5,4,7,4,7,6,7,5,3,5,5,6,4,7], 99, 73, 4.50, 68.50),
-  ref("Boyd",  21, picks(3), [6,5,4,7,6,5,7,4,5,6,6,5,4,5,7,4,4,6], 96, 75, 5.50, 69.50),
-  ref("Emmet", 14, picks(4), [6,5,3,7,7,6,5,3,5,4,5,5,3,5,6,7,3,6], 91, 77, 1.00, 76.00),
-  ref("Chip",  15, picks(5), [6,5,4,8,6,5,5,4,5,5,6,3,5,6,6,5,4,6], 94, 79, 2.00, 77.00),
-  ref("Grady", 34, picks(6), [7,6,4,9,7,7,7,5,5,6,7,7,3,8,6,7,3,9], 113,79, 1.50, 77.50),
-  ref("Hoyt",  20, picks(7), [7,5,4,8,8,4,8,4,6,5,6,7,4,7,5,5,4,6], 103,82, 2.00, 80.00),
+  ref("Dex",   23, picks(0), [5,5,4,6,6,6,7,3,5,4,4,6,3,6,6,6,6,5], 93, 70, 6.30, 63.70),
+  ref("Alex",  18, picks(1), [5,5,3,6,5,5,6,3,5,7,5,5,4,4,6,6,3,7], 90, 72, 3.80, 68.20),
+  ref("Finn",  26, picks(2), [5,6,6,7,5,4,7,4,7,6,7,5,3,5,5,6,4,7], 99, 73, 4.90, 68.10),
+  ref("Boyd",  21, picks(3), [6,5,4,7,6,5,7,4,5,6,6,5,4,5,7,4,4,6], 96, 75, 3.30, 71.70),
+  ref("Emmet", 14, picks(4), [6,5,3,7,7,6,5,3,5,4,5,5,3,5,6,7,3,6], 91, 77, -0.30, 77.30),
+  ref("Chip",  15, picks(5), [6,5,4,8,6,5,5,4,5,5,6,3,5,6,6,5,4,6], 94, 79, 0.70, 78.30),
+  ref("Grady", 34, picks(6), [7,6,4,9,7,7,7,5,5,6,7,7,3,8,6,7,3,9], 113,79, 0.00, 79.00),
+  ref("Hoyt",  20, picks(7), [7,5,4,8,8,4,8,4,6,5,6,7,4,7,5,5,4,6], 103,82, 1.70, 80.30),
 ];
 
 function ref(
@@ -67,7 +67,10 @@ for (const r of REFERENCE) {
     assert.equal(result.courseHandicap, r.courseHandicap, "course handicap");
     assert.equal(result.gross, r.gross, "gross total");
     assert.equal(result.net, r.net, "capped net");
-    assert.equal(-result.strokesEarned, r.strokesOff, "strokes off");
+    // "+ 0" turns a negative zero back into zero: negating a strokesEarned of 0
+    // gives -0, and strict equality says -0 is not 0. Grady earns exactly
+    // nothing — eight triples and four answers cancel — so this is live.
+    assert.equal(-result.strokesEarned + 0, r.strokesOff, "strokes off");
     assert.equal(result.final, r.final, "FINAL");
   });
 }

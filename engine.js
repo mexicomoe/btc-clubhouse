@@ -72,6 +72,10 @@
       slope: tee[g].slope,
       courseRating: tee[g].courseRating,
       agonyHoles: [4, 5, 6],
+      // Easy Street's three holes — the stretch the card is supposed to give
+      // back. Beside the course for the same reason as Agony Alley: it is a
+      // property of these eighteen holes, not of the contest.
+      easyStreetHoles: [11, 12, 13],
       // Holes that may not be nominated for Watch the Birdie, whatever their
       // par. Kept beside the course rather than in the contest because it is
       // the COURSE that says which holes are already spoken for.
@@ -126,14 +130,44 @@
       { threshold: 0, strokes: -2.0 }, { threshold: 1, strokes: -1.0 },
       { threshold: 2, strokes: -0.5 }, { threshold: 99, strokes: 0 },
     ],
-    goLong: [
-      { threshold: -1, strokes: -1.5 }, { threshold: 0, strokes: -1.0 },
-      { threshold: 1, strokes: -0.5 }, { threshold: 99, strokes: 0 },
+    /**
+     * Easy Street — the three holes the card gives back, counted on GROSS.
+     *
+     * A hole at par or better counts ONE, however far under it went: a birdie
+     * is a par for this purpose, so a lone birdie is a count of one and pays
+     * nothing. Two is the most that can be reached in practice, and three pays
+     * the same as two.
+     *
+     * It is the only hole contest graded on gross. Every other one runs on net,
+     * where a high handicap gets strokes; here he does not, and the contest
+     * therefore runs mildly against him (r = +0.24 with index over 111 rounds).
+     * That is the design as specified, not an accident of it.
+     */
+    easyStreet: [
+      { threshold: 0, strokes: 0.5 }, { threshold: 1, strokes: 0 },
+      { threshold: 99, strokes: -0.5 },
     ],
-    getShorty: [
-      { threshold: -2, strokes: -1.5 }, { threshold: -1, strokes: -1.0 },
-      { threshold: 0, strokes: -0.5 }, { threshold: 99, strokes: 0 },
-    ],
+    /**
+     * Triple Threat — a gross triple bogey or worse costs, and answering it
+     * with a net par or better on the very next hole more than pays it back.
+     *
+     * One flat rate for everybody. A picked-up hole is NOT a triple: it shows a
+     * gross of par + 4 and would otherwise be caught by the bar, which would
+     * mean a Stableford round punishing a man for the thing Stableford tells
+     * him to do.
+     */
+    tripleThreat: { perTriple: 0.3, perRecovery: -0.6 },
+    /**
+     * Go Long and Get Shorty are SWITCHED OFF — Easy Street replaces both. Null
+     * is the same signal Skins uses: not scored, not shown, not exported. The
+     * ladders and `scorePar` are left in place below, because the contests were
+     * calibrated and may come back; nothing reads them while this is null.
+     *
+     *   goLong:    [ -1 → −1.5 · 0 → −1.0 · 1 → −0.5 · 99 → 0 ]
+     *   getShorty: [ -2 → −1.5 · -1 → −1.0 · 0 → −0.5 · 99 → 0 ]
+     */
+    goLong: null,
+    getShorty: null,
     bounceBack: [
       { threshold: 3, strokes: -1.5 }, { threshold: 2, strokes: -1.0 },
       { threshold: 1, strokes: -0.5 }, { threshold: 0, strokes: 0 },
@@ -493,10 +527,59 @@
     const netDoubles = range(HOLES).filter((i) => played(i) && over(i) >= 2).length;
     const damageControl = { strokes: gradeAtMost(netDoubles, contests.damageControl), detail: netDoubles + " net double" + (netDoubles === 1 ? "" : "s"), live: true };
 
-    // 4 · Go Long (par 5s) / 5 · Get Shorty (par 3s)
+    // 4 · Easy Street — pars or better on the three giving holes, on GROSS.
+    //
+    // All three must be played. The contest can PENALISE, and a man cannot be
+    // charged +0.5 for failing to par holes he never stood on — the same reason
+    // Agony Alley waits for its stretch.
+    const easyIdx = (course.easyStreetHoles || []).map((h) => h - 1);
+    let easyStreet;
+    if (contests.easyStreet == null) {
+      easyStreet = null;
+    } else if (easyIdx.length === 0 || !easyIdx.every(played)) {
+      easyStreet = { strokes: 0, live: false,
+        detail: "needs holes " + course.easyStreetHoles[0] + "–" + course.easyStreetHoles[course.easyStreetHoles.length - 1] };
+    } else {
+      // Gross, not net. A hole counts once whatever it was: par or better is a
+      // par here, so a birdie and a par together are two, not three.
+      const made = easyIdx.filter((i) => grossByHole[i] <= course.par[i]).length;
+      easyStreet = { strokes: gradeAtMost(made, contests.easyStreet),
+        detail: made === 0 ? "no pars on the three" : made + " of 3 at par or better",
+        live: true };
+    }
+
+    // 5 · Triple Threat — a gross triple or worse costs, answering it pays.
+    //
+    // A picked-up hole is excluded: it shows a gross of par + 4 and would sail
+    // over the bar, so a Stableford round would charge a man for picking up,
+    // which is what Stableford asks him to do. The recovery is read on NET —
+    // the man is being asked to steady the ship, not to match a scratch card.
+    let tripleThreat;
+    if (contests.tripleThreat == null) {
+      tripleThreat = null;
+    } else {
+      let triples = 0, answered = 0;
+      for (let i = 0; i < HOLES; i++) {
+        if (!played(i) || isPickedUp(card.gross[i])) continue;
+        if (grossByHole[i] - course.par[i] < 3) continue;
+        triples++;
+        // The 18th has no next hole, so a triple there can only cost.
+        if (i + 1 < HOLES && played(i + 1) && over(i + 1) <= 0) answered++;
+      }
+      const raw = triples * contests.tripleThreat.perTriple
+                + answered * contests.tripleThreat.perRecovery;
+      tripleThreat = { strokes: toTenth(raw),
+        detail: triples === 0 ? "no triples"
+          : triples + " triple" + (triples === 1 ? "" : "s") + ", " + answered + " answered",
+        live: true };
+    }
+
+    // Go Long and Get Shorty — switched off, Easy Street replaces them. The
+    // grader stays for the day they come back.
     const goLong = scorePar(range(HOLES).filter((i) => course.par[i] === 5), contests.goLong, "par 5s");
     const getShorty = scorePar(range(HOLES).filter((i) => course.par[i] === 3), contests.getShorty, "par 3s");
     function scorePar(idxs, ladder, label) {
+      if (ladder == null) return null;
       if (idxs.filter(played).length < 4) return { strokes: 0, detail: "needs the " + label, live: false };
       const total = sum(idxs.map(over));
       return { strokes: gradeAtMost(total, ladder), detail: signed(total) + " vs par on the " + label, live: true };
@@ -518,7 +601,16 @@
     }
     const bounceBack = { strokes: gradeAtLeast(bounces, contests.bounceBack), detail: bounces + " bounce-back" + (bounces === 1 ? "" : "s"), live: true };
 
-    const allContests = { watchTheBirdie, agonyAlley, damageControl, goLong, getShorty, bounceBack };
+    // A contest switched off in the config is not in the result at all — not a
+    // zero, which would read as "he scored nothing on it". The CSV writes a
+    // blank cell for a missing key and the detail screen leaves the line out.
+    const allContests = {};
+    for (const [key, value] of [["watchTheBirdie", watchTheBirdie], ["agonyAlley", agonyAlley],
+                                ["damageControl", damageControl], ["easyStreet", easyStreet],
+                                ["tripleThreat", tripleThreat], ["goLong", goLong],
+                                ["getShorty", getShorty], ["bounceBack", bounceBack]]) {
+      if (value != null) allContests[key] = value;
+    }
 
     // Nothing pays on an empty card. Every "count" contest reads zero holes as
     // zero of whatever it counts — no net doubles, no bounce-backs — which would
@@ -529,12 +621,17 @@
       }
     }
 
-    let earned = sum(Object.values(allContests).map((c) => c.strokes));
+    // Rounded to a tenth on the way out, and again after the net is added.
+    // Every contest pays a tenth, but tenths do not add exactly in binary: 0.3
+    // and −0.6 from Triple Threat sum to −0.30000000000000004, which reaches
+    // the CSV as that and reads as a broken number on a scoreboard. Values that
+    // were all halves used to add exactly, so nothing needed this until now.
+    let earned = toTenth(sum(Object.values(allContests).map((c) => c.strokes)));
     if (-earned > contests.maxContestStrokes) earned = -contests.maxContestStrokes;
 
     let final = null;
     if (netTotal != null) {
-      final = netTotal + earned;
+      final = toTenth(netTotal + earned);
       if (course.floor != null) final = Math.max(course.floor, final);
     }
 

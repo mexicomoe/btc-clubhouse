@@ -128,6 +128,10 @@ export interface PlayerResult {
   holesPlayed: number;
   contests: {
     watchTheBirdie: ContestResult;
+    /** Absent when the contest is switched off in the config. */
+    easyStreet?: ContestResult;
+    /** Absent when the contest is switched off in the config. */
+    tripleThreat?: ContestResult;
     agonyAlley: ContestResult;
     damageControl: ContestResult;
     goLong: ContestResult;

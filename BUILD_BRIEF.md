@@ -116,17 +116,40 @@ Reject a hole outside its slot's list, by name. Reject the same hole nominated t
 `0 → −2.0 · 1 → −1.0 · 2 → −0.5 · 3+ → 0`
 The fairest contest in the set — correlation with handicap is +0.05. Works on a partial round.
 
-**4 · Go Long** — net vs par across the par 5s.
-`≤−1 → −1.5 · 0 → −1.0 · +1 → −0.5 · +2 or worse → 0`
+**4 · Easy Street** — pars or better on holes **11, 12, 13**, counted on **GROSS**.
+`no par → +0.5 · one → 0 · two or more → −0.5`
 
-**5 · Get Shorty** — net vs par across the par 3s.
-`≤−2 → −1.5 · −1 → −1.0 · 0 → −0.5 · +1 or worse → 0`
+**Par or better counts as ONE.** A birdie is a par for this purpose, so a lone birdie is a count of one and pays nothing, and a birdie beside a par is two rather than three. Three pays the same as two.
+
+**The only hole contest graded on gross.** Every other one runs on net, where a high handicap receives strokes; here he does not, so the contest runs mildly against him — r = +0.24 with index over 111 rounds. That is the design, not an accident of it. It is also why dropping Go Long and Get Shorty (r = −0.29, and pure credit — neither could ever penalise) moved the six-contest bundle from r = −0.02 to r = +0.13, and every FINAL up by about **0.8 strokes**.
+
+**All three holes must be played.** The contest can penalise, and a man must not be charged +0.5 for failing to par holes he never stood on — the same reason Agony Alley waits for its stretch. A picked-up hole IS played, and is not a par.
+
+*Replaced Go Long and Get Shorty, which it succeeds outright.*
+
+**5 · Triple Threat** — a gross triple bogey or worse, and the answer to it.
+`gross triple or worse → +0.3 · net par or better on the very next hole → −0.6`
+
+**One flat rate for everybody**, no handicap bands. Over 111 rounds three of forty men would have qualified for a high-handicap tier, and they made *fewer* triples than the band below them — a tier catching three men on a reconstructed index is not a tier.
+
+The two halves are read differently on purpose: **the damage is gross, the recovery is net.** Steadying the ship is what is being asked for, and a 24-handicap should not have to match a scratch card to do it.
+
+**A picked-up hole is never a triple.** It shows a gross of par + 4 and would otherwise clear the bar, which would mean a Stableford round charging a man for the one thing Stableford tells him to do.
+
+A triple on the 18th can only cost — there is no next hole. Consecutive triples leave the first unanswered.
+
+*Overlaps Bounce Back by design: 31% of Triple Threat recoveries also score a bounce-back, the same two holes paying twice.*
 
 **6 · Bounce Back** — a net bogey or worse, answered by a **net birdie or better** on the very next hole.
 `3+ → −1.5 · 2 → −1.0 · 1 → −0.5 · 0 → 0`
 Consecutive holes only. Both must be played.
 
 *Retuned.* It used to need a net **double** to recover from, which made it punish good play: the fewer net doubles a man made the fewer chances he got, so a round without one could not score it at all. Ten of sixty-three real rounds were shut out and the correlation with making net doubles was **+0.69** — the opposite of what Damage Control rewards, in the same six-contest set. On the same sixty-three rounds the rule above shuts nobody out, **30% clear two or more**, and the handicap correlation falls to **−0.09**.
+
+**Go Long and Get Shorty are switched off.** Easy Street replaces both. The ladders and the grader stay in the code — they were calibrated and may come back — but null in the config means not scored, not shown, not exported. Their CSV columns stay too, writing blank: the archive workbook already holds rounds under them, and a column that disappears shifts every one to its right. The two new contests are appended after Skins, so only `Final` moves — column 64 to 66.
+
+  · *Go Long, retired* — net vs par across the par 5s. `≤−1 → −1.5 · 0 → −1.0 · +1 → −0.5 · +2 or worse → 0`
+  · *Get Shorty, retired* — net vs par across the par 3s. `≤−2 → −1.5 · −1 → −1.0 · 0 → −0.5 · +1 or worse → 0`
 
 **7 · Skins** — see the skins section. A skin is worth `0.8 × groups ÷ 18`, capped at **2.5**.
 
@@ -276,14 +299,14 @@ women    9 11 17  1  3  7  5 15 13   4 12 16 18  8  6 10 14  2
 
 | Player | Index | Course hcp | Gross | **Picks** | Net (capped) | Strokes off | FINAL |
 |---|---|---|---|---|---|---|---|
-| Abe Whitfield | 25.2 | 19 | 92 | 3,1,4,13,10,16 | 73 | 8.00 | **65.00** |
-| Ben Castellan | 24.8 | 19 | 93 | 8,2,7,17,14,18 | 74 | 5.50 | **68.50** |
-| Cy Ashford | 24.0 | 18 | 93 | 3,9,4,13,15,16 | 75 | 4.50 | **70.50** |
-| Dan Pemberton | 26.4 | 21 | 95 | 8,1,7,17,10,18 | 74 | 3.50 | **70.50** |
-| Gus Thornbury | 25.4 | 20 | 97 | 8,9,7,17,15,18 | 76 | 5.50 | **70.50** |
-| Eli Marsden | 23.6 | 18 | 92 | 3,2,4,13,14,16 | 74 | 2.50 | **71.50** |
-| Hal Brightwater | 25.1 | 19 | 95 | 3,1,4,13,10,16 | 76 | 3.00 | **73.00** |
-| Ike Calloway | 20.8 | 15 | 94 | 8,2,7,17,14,18 | 79 | 2.50 | **76.50** |
+| Abe Whitfield | 25.2 | 19 | 92 | 3,1,4,13,10,16 | 73 | 5.50 | **67.50** |
+| Ben Castellan | 24.8 | 19 | 93 | 8,2,7,17,14,18 | 74 | 3.80 | **70.20** |
+| Cy Ashford | 24.0 | 18 | 93 | 3,9,4,13,15,16 | 75 | 3.00 | **72.00** |
+| Dan Pemberton | 26.4 | 21 | 95 | 8,1,7,17,10,18 | 74 | 2.30 | **71.70** |
+| Gus Thornbury | 25.4 | 20 | 97 | 8,9,7,17,15,18 | 76 | 3.80 | **72.20** |
+| Eli Marsden | 23.6 | 18 | 92 | 3,2,4,13,14,16 | 74 | 1.30 | **72.70** |
+| Hal Brightwater | 25.1 | 19 | 95 | 3,1,4,13,10,16 | 76 | 0.20 | **75.80** |
+| Ike Calloway | 20.8 | 15 | 94 | 8,2,7,17,14,18 | 79 | 1.80 | **77.20** |
 
 **The picks are an input, not something you can compute** — and the ones above are invented. See the warning in section 11: the club recorded no Watch the Birdie picks for this round, so these are demo values and every FINAL in the table depends on them. Watch the Birdie paid: Abe −1.0 · Dan −1.0 · Gus −1.0 · Ben −0.5 · Cy −0.5 · Eli −0.5 · Ike −0.5, and nothing to Hal.
 
@@ -368,14 +391,14 @@ Hoyt      7  5  4  8  8  4  8  4  6  5  6  7  4  7  5  5  4  6
 
 | Player | Course hcp | Gross | Picks | Net (capped) | Strokes off | FINAL |
 |---|---|---|---|---|---|---|
-| Dex | 23 | 93 | 3,1,4,13,10,16 | 70 | 7.50 | **62.50** |
-| Alex | 18 | 90 | 8,2,7,17,14,18 | 72 | 6.00 | **66.00** |
-| Finn | 26 | 99 | 3,9,4,13,15,16 | 73 | 4.50 | **68.50** |
-| Boyd | 21 | 96 | 8,1,7,17,10,18 | 75 | 5.50 | **69.50** |
-| Emmet | 14 | 91 | 3,2,4,13,14,16 | 77 | 1.00 | **76.00** |
-| Chip | 15 | 94 | 8,9,7,17,15,18 | 79 | 2.00 | **77.00** |
-| Grady | 34 | 113 | 3,1,4,13,10,16 | 79 | 1.50 | **77.50** |
-| Hoyt | 20 | 103 | 8,2,7,17,14,18 | 82 | 2.00 | **80.00** |
+| Dex | 23 | 93 | 3,1,4,13,10,16 | 70 | 6.30 | **63.70** |
+| Alex | 18 | 90 | 8,2,7,17,14,18 | 72 | 3.80 | **68.20** |
+| Finn | 26 | 99 | 3,9,4,13,15,16 | 73 | 4.90 | **68.10** |
+| Boyd | 21 | 96 | 8,1,7,17,10,18 | 75 | 3.30 | **71.70** |
+| Emmet | 14 | 91 | 3,2,4,13,14,16 | 77 | -0.30 | **77.30** |
+| Chip | 15 | 94 | 8,9,7,17,15,18 | 79 | 0.70 | **78.30** |
+| Grady | 34 | 113 | 3,1,4,13,10,16 | 79 | 0.00 | **79.00** |
+| Hoyt | 20 | 103 | 8,2,7,17,14,18 | 82 | 1.70 | **80.30** |
 
 > ⚠️ **The Watch the Birdie picks above are invented, and every FINAL in this table depends on them.**
 >

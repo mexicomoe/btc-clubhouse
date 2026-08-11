@@ -78,14 +78,27 @@ export interface SkinsConfig {
   maxSkinStrokes: number | null;
 }
 
-/** Contest thresholds. Agony/Damage/Long/Shorty grade `<=`; Bounce grades `>=`. */
+/** Triple Threat is a tally, not a ladder: one flat rate for every player. */
+export interface TripleThreatConfig {
+  /** What a gross triple bogey or worse costs. Positive — it adds strokes. */
+  perTriple: number;
+  /** What answering one with a net par or better on the next hole pays back. */
+  perRecovery: number;
+}
+
+/** Contest thresholds. Agony/Damage/Easy grade `<=`; Bounce grades `>=`. */
 export interface ContestConfig {
   /** Not a ladder — each nominated hole pays its own best result. */
   watchTheBirdie: BirdiePayout;
   agonyAlley: Step[];
   damageControl: Step[];
-  goLong: Step[];
-  getShorty: Step[];
+  /** Graded on a COUNT of holes at gross par or better, not on a total. */
+  easyStreet: Step[];
+  tripleThreat: TripleThreatConfig;
+  /** Null switches the contest off — Easy Street replaced both. */
+  goLong: Step[] | null;
+  /** Null switches the contest off — Easy Street replaced both. */
+  getShorty: Step[] | null;
   bounceBack: Step[];
   maxContestStrokes: number;
   /** Null switches Skins off; it then scores nothing and no cart is read. */

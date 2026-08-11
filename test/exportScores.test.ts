@@ -90,12 +90,16 @@ test("the columns are the ones the brief asks for, in order", () => {
   assert.deepEqual(head.slice(18, 36), Array.from({ length: 18 }, (_, i) => "H" + (i + 1)));
   assert.deepEqual(head.slice(36, 54), Array.from({ length: 18 }, (_, i) => "N" + (i + 1)));
   assert.deepEqual(head.slice(54, 56), ["Net", "Gross"]);
-  assert.deepEqual(head.slice(56, 63), [
+  // Go Long and Get Shorty are switched off but their columns STAY — the
+  // archive workbook already holds rounds under them. The two new contests are
+  // appended after Skins, so only "Final" moves.
+  assert.deepEqual(head.slice(56, 65), [
     "Watch the Birdie", "Agony Alley", "Damage Control",
     "Go Long", "Get Shorty", "Bounce Back", "Skins",
+    "Easy Street", "Triple Threat",
   ]);
-  assert.equal(head[63], "Final");
-  assert.equal(head.length, 64);
+  assert.equal(head[65], "Final");
+  assert.equal(head.length, 66);
 });
 
 test("the event is stamped on every row", () => {
@@ -124,7 +128,7 @@ test("a row for every player, and a header", () => {
   assert.equal(r[0][0], "Event");
   assert.deepEqual(r.slice(1).map((x) => cell(x, "Name as entered")),
     ["Ridgeway, Ken", "Merrick, Sal"]);
-  for (const row of r) assert.equal(row.length, 64, "every row is the full width");
+  for (const row of r) assert.equal(row.length, 66, "every row is the full width");
 });
 
 /* ---- what is in it ---- */
@@ -188,7 +192,7 @@ test("a player with no index is still in the export", () => {
   assert.equal(cell(stray, "Handicap index"), "", "no index");
   assert.equal(cell(stray, "Course handicap"), "", "and so no course handicap");
   assert.equal(cell(stray, "Final"), "", "and no final");
-  assert.equal(stray.length, 64, "still the full width");
+  assert.equal(stray.length, 66, "still the full width");
 });
 
 /* ---- escaping ---- */
@@ -208,8 +212,8 @@ test("a name with a comma survives the round trip", () => {
   // rather than an edge case.
   const line = csv().trim().split("\r\n")[1];
   assert.ok(line.includes('"Ridgeway, Ken"'), "quoted, so the comma is not a column break");
-  assert.equal(line.split(",").length, 65, "split naively it comes apart...");
-  assert.equal(parseCsvLine(line).length, 64, "...but read properly it is one field");
+  assert.equal(line.split(",").length, 67, "split naively it comes apart...");
+  assert.equal(parseCsvLine(line).length, 66, "...but read properly it is one field");
   assert.equal(cell(parseCsvLine(line), "Name as entered"), "Ridgeway, Ken",
     "and the comma is still in the name");
 });

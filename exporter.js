@@ -20,10 +20,16 @@
     ["watchTheBirdie", "Watch the Birdie"],
     ["agonyAlley", "Agony Alley"],
     ["damageControl", "Damage Control"],
+    // Go Long and Get Shorty are switched off and now write a blank cell. The
+    // columns STAY: the archive workbook already holds rounds under them, and a
+    // column that disappears shifts every one to its right.
     ["goLong", "Go Long"],
     ["getShorty", "Get Shorty"],
     ["bounceBack", "Bounce Back"],
     ["skins", "Skins"],
+    // Appended after Skins, so nothing before them moves. Only "Final" shifts.
+    ["easyStreet", "Easy Street"],
+    ["tripleThreat", "Triple Threat"],
   ];
 
   function headerRow() {
