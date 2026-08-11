@@ -150,5 +150,5 @@ test("Triple Threat covers the same ground in one contest", () => {
   const c = card((g) => { g[0] = PAR[0] + 3; });      // triple, then a par
   const r = scorePlayer(c, ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
   assert.equal(r.contests.tripleThreat!.detail, "1 triple, 1 answered");
-  assert.equal(r.contests.tripleThreat!.strokes, -0.2);
+  assert.equal(r.contests.tripleThreat!.strokes, -0.6);
 });

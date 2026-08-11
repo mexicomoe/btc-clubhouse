@@ -72,7 +72,9 @@ No arbitrary base number. Their net score is the anchor and contests reduce it. 
 
 > **THERE IS NO CEILING. `maxContestStrokes` is null.**
 >
-> It was 11.0, then 6.0, and is now gone. With every contest value cut by 40% the contests cannot reach far enough for a ceiling to be what holds them back: across 111 real rounds the highest total any card reaches is **5.6**.
+> It was 11.0, then 6.0, and is now gone. Nothing bounds a round from below except what the contests can actually pay.
+>
+> **At the current values that is a great deal.** Across 111 real rounds the strokes off run median 2.8, 90th 8.2, best 10.9 — and worst **−5.3**, because Agony Alley and Easy Street can both charge. Within a single field the best Clubhouse round beats the worst by **13.4 strokes on average, 14.8 at most**, against a net spread of 16 to 26 in the same fields. The contests are therefore roughly two thirds as powerful as the net score itself, and they reorder the board: a man's placing moved in **5 of 5 rounds**, 9.5% of all pairs swapped, the furthest anyone travelled was **13 places**, and the winner changed in **1 round of 5**.
 >
 > Null means no cap, the same signal Skins uses. The knob is left in the config rather than deleted, so putting a ceiling back is a one-line edit and its absence is a stated decision rather than a missing feature.
 >
@@ -87,7 +89,7 @@ All thresholds must live in a config object, not in code. They are calibrated fr
 **Every value in the game is a multiple of 0.1.** No hundredths — they look wrong on a golf scoreboard. If a proposed threshold produces 0.75, round it to a tenth rather than allowing the third decimal in.
 
 **1 · Watch the Birdie** — **six** holes nominated before the round: a par 3, a par 4 and a par 5 on each nine.
-`net birdie −0.3 · net eagle −0.6`, per nominated hole. **Holes 4 and 18 pay double** — 0.6 and 1.2.
+`net birdie −1.0 · net eagle −2.0`, per nominated hole. **Holes 4 and 18 pay double** — 2.0 and 4.0.
 
 Hole 4 was measured over 111 rounds as the worst par 5 to nominate by a distance: hole 7 was worth 2.3× it, so nobody rational picked 4 and its slot was a formality. Doubling makes the choice a choice. Hole 18 was already the best of its pair; doubling it makes 18 the pick of the back nine.
 
@@ -119,7 +121,7 @@ Reject a hole outside its slot's list, by name. Reject the same hole nominated t
 *Replaced Call Your Number, which rewarded hitting a predicted number rather than playing well — a man could profit from a bad score.*
 
 **2 · Agony Alley** — net total across the course's hardest stretch (holes 4-5-6 at Aberdeen, par 13).
-`≤12 → −1.5 · 13 → −0.9 · 14 → −0.3 · 15 → 0 · 16 → +0.6 · 17+ → +0.9`
+`≤12 → −5.0 · 13 → −3.0 · 14 → −1.0 · 15 → 0 · 16 → +2.0 · 17+ → +3.0`
 **The only contest that can add strokes.** Stretch holes are per-course config. Requires all stretch holes played.
 
 **3 · Damage Control — SWITCHED OFF.** Triple Threat replaced it, together with Bounce Back. Count of net doubles or worse.
@@ -127,7 +129,7 @@ Reject a hole outside its slot's list, by name. Reject the same hole nominated t
 The fairest contest in the set — correlation with handicap is +0.05. Works on a partial round.
 
 **4 · Easy Street** — pars or better on holes **11, 12, 13**, counted on **GROSS**.
-`no par → +0.3 · one → 0 · two or more → −0.3`
+`no par → +1.0 · one → 0 · two or more → −1.0`
 
 **Par or better counts as ONE.** A birdie is a par for this purpose, so a lone birdie is a count of one and pays nothing, and a birdie beside a par is two rather than three. Three pays the same as two.
 
@@ -138,7 +140,7 @@ The fairest contest in the set — correlation with handicap is +0.05. Works on 
 *Replaced Go Long and Get Shorty, which it succeeds outright.*
 
 **5 · Triple Threat** — a gross triple bogey or worse, and the answer to it.
-`gross triple or worse → +0.2 · net par or better on the very next hole → −0.4`
+`gross triple or worse → +0.6 · net par or better on the very next hole → −1.2`
 
 **It replaced Damage Control and Bounce Back**, which are now null. It is the same idea as both in one contest: the gross triple is the damage and the net par on the next hole is the bounce back, scored as one event rather than two that overlapped — 31% of Triple Threat's recoveries were already paying Bounce Back for the same two holes. Their ladders and graders stay in the code; null means not scored, not shown, not exported, and their CSV columns stay writing blank.
 
@@ -165,7 +167,7 @@ Consecutive holes only. Both must be played.
   · *Go Long, retired* — net vs par across the par 5s. `≤−1 → −1.5 · 0 → −1.0 · +1 → −0.5 · +2 or worse → 0`
   · *Get Shorty, retired* — net vs par across the par 3s. `≤−2 → −1.5 · −1 → −1.0 · 0 → −0.5 · +1 or worse → 0`
 
-**7 · Skins** — see the skins section. A skin is worth `0.5 × groups ÷ 18`, capped at **1.5**.
+**7 · Skins** — see the skins section. A skin is worth `1.6 × groups ÷ 18`, capped at **5.0**.
 
 ### Skins — by cart or by team
 
@@ -192,11 +194,11 @@ Lowest cart average wins the hole. **Tied holes carry over** — the next hole i
 
 **Skins now scores into FINAL.** Previously it sat outside the total, which made it a sideshow.
 
-> **a skin is worth `0.5 × groups ÷ 18`, to the hundredth**
+> **a skin is worth `1.6 × groups ÷ 18`, to the hundredth**
 
-So −0.06 a skin over two groups, −0.11 over four, −0.17 over six, −0.33 over twelve: worth *less* in a small field and more in a large one.
+So −0.18 a skin over two groups, −0.36 over four, −0.53 over six, −1.07 over twelve: worth *less* in a small field and more in a large one.
 
-That is the value at which an **even share of the eighteen on offer is worth 0.5 whatever the size of the field**. Over two groups an even share is nine skins; over twelve it is one and a half. It is the flatness that makes the figure defensible: a group that does its fair share is worth the same to the day whether four are out or twelve.
+That is the value at which an **even share of the eighteen on offer is worth 1.6 whatever the size of the field**. Over two groups an even share is nine skins; over twelve it is one and a half. It is the flatness that makes the figure defensible: a group that does its fair share is worth the same to the day whether four are out or twelve.
 
 The per-skin figure is rounded to a hundredth *before* it multiplies up, because it is printed on the Skins tab and a man checking five skins against it must reach the number the board paid him. Totals are then in tenths like everything else.
 
@@ -359,18 +361,18 @@ women    9 11 17  1  3  7  5 15 13   4 12 16 18  8  6 10 14  2
 
 | Player | Index | Course hcp | Gross | **Picks** | Net (capped) | Strokes off | FINAL |
 |---|---|---|---|---|---|---|---|
-| Abe Whitfield | 25.2 | 19 | 92 | 3,1,4,13,10,16 | 73 | 1.80 | **71.20** |
-| Ben Castellan | 24.8 | 19 | 93 | 8,2,7,17,14,18 | 74 | 1.70 | **72.30** |
-| Cy Ashford | 24.0 | 18 | 93 | 3,9,4,13,15,16 | 75 | 0.60 | **74.40** |
-| Dan Pemberton | 26.4 | 21 | 95 | 8,1,7,17,10,18 | 74 | 0.80 | **73.20** |
-| Gus Thornbury | 25.4 | 20 | 97 | 8,9,7,17,15,18 | 76 | 1.70 | **74.30** |
-| Eli Marsden | 23.6 | 18 | 92 | 3,2,4,13,14,16 | 74 | 0.20 | **73.80** |
-| Hal Brightwater | 25.1 | 19 | 95 | 3,1,4,13,10,16 | 76 | -1.10 | **77.10** |
-| Ike Calloway | 20.8 | 15 | 94 | 8,2,7,17,14,18 | 79 | 0.20 | **78.80** |
+| Abe Whitfield | 25.2 | 19 | 92 | 3,1,4,13,10,16 | 73 | 6.00 | **67.00** |
+| Ben Castellan | 24.8 | 19 | 93 | 8,2,7,17,14,18 | 74 | 5.60 | **68.40** |
+| Cy Ashford | 24.0 | 18 | 93 | 3,9,4,13,15,16 | 75 | 2.00 | **73.00** |
+| Dan Pemberton | 26.4 | 21 | 95 | 8,1,7,17,10,18 | 74 | 2.60 | **71.40** |
+| Gus Thornbury | 25.4 | 20 | 97 | 8,9,7,17,15,18 | 76 | 5.60 | **70.40** |
+| Eli Marsden | 23.6 | 18 | 92 | 3,2,4,13,14,16 | 74 | 0.60 | **73.40** |
+| Hal Brightwater | 25.1 | 19 | 95 | 3,1,4,13,10,16 | 76 | -3.60 | **79.60** |
+| Ike Calloway | 20.8 | 15 | 94 | 8,2,7,17,14,18 | 79 | 0.60 | **78.40** |
 
 **The picks are an input, not something you can compute** — and the ones above are invented. See the warning in section 11: the club recorded no Watch the Birdie picks for this round, so these are demo values and every FINAL in the table depends on them. Watch the Birdie paid: Abe −0.9 · Gus −0.9 · Dan −0.6 · Ben −0.3 · Cy −0.3 · Eli −0.3 · Ike −0.3, and nothing to Hal. **Hal finishes 1.10 strokes WORSE than his net** — the contests can now cost a man more than they pay him.
 
-**Eli and Ike finish level on 0.20 strokes off**, and Alex and Finn tie on 79.30 in section 11 — ties settled by the card match of section 8.
+**Emmet and Chip finish level on 80.60 in section 11** — a tie settled by the card match of section 8.
 
 **Cart assignments for the skins check:** 1, 1, 2, 2, 3, 3, 4, 4 in the order Ike, Eli, Cy, Ben, Hal, Abe, Gus, Dan.
 
@@ -451,14 +453,14 @@ Hoyt      7  5  4  8  8  4  8  4  6  5  6  7  4  7  5  5  4  6
 
 | Player | Course hcp | Gross | Picks | Net (capped) | Strokes off | FINAL |
 |---|---|---|---|---|---|---|
-| Dex | 23 | 93 | 3,1,4,13,10,16 | 70 | 2.60 | **67.40** |
-| Alex | 18 | 90 | 8,2,7,17,14,18 | 72 | 1.70 | **70.30** |
-| Finn | 26 | 99 | 3,9,4,13,15,16 | 73 | 2.70 | **70.30** |
-| Boyd | 21 | 96 | 8,1,7,17,10,18 | 75 | 1.40 | **73.60** |
-| Emmet | 14 | 91 | 3,2,4,13,14,16 | 77 | -1.10 | **78.10** |
-| Chip | 15 | 94 | 8,9,7,17,15,18 | 79 | -0.50 | **79.50** |
-| Grady | 34 | 113 | 3,1,4,13,10,16 | 79 | -0.30 | **79.30** |
-| Hoyt | 20 | 103 | 8,2,7,17,14,18 | 82 | 1.10 | **80.90** |
+| Dex | 23 | 93 | 3,1,4,13,10,16 | 70 | 8.60 | **61.40** |
+| Alex | 18 | 90 | 8,2,7,17,14,18 | 72 | 5.60 | **66.40** |
+| Finn | 26 | 99 | 3,9,4,13,15,16 | 73 | 8.80 | **64.20** |
+| Boyd | 21 | 96 | 8,1,7,17,10,18 | 75 | 4.60 | **70.40** |
+| Emmet | 14 | 91 | 3,2,4,13,14,16 | 77 | -3.60 | **80.60** |
+| Chip | 15 | 94 | 8,9,7,17,15,18 | 79 | -1.60 | **80.60** |
+| Grady | 34 | 113 | 3,1,4,13,10,16 | 79 | -1.00 | **80.00** |
+| Hoyt | 20 | 103 | 8,2,7,17,14,18 | 82 | 3.40 | **78.60** |
 
 > ⚠️ **The Watch the Birdie picks above are invented, and every FINAL in this table depends on them.**
 >

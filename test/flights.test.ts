@@ -145,7 +145,7 @@ test("carts only face carts in their own flight", () => {
 test("a skin is worth what the FLIGHT's size says, not the whole field's", () => {
   const config = DEFAULT_CONTESTS.skins!;
   // Six groups in the field, but only two in flight A. A skin in A is worth the
-  // two-group figure (−0.06), not the six-group one (−0.17).
+  // two-group figure (−0.18), not the six-group one (−0.53).
   const field = [
     card("A1", { flight: "A", cart: 1 }, (g) => { for (let i = 0; i < 18; i++) g[i] = (g[i] as number) - 1; }),
     card("A2", { flight: "A", cart: 2 }),
@@ -157,7 +157,7 @@ test("a skin is worth what the FLIGHT's size says, not the whole field's", () =>
   // A1's group won all eighteen inside flight A.
   assert.equal(a1.contests.skins!.strokes, skinStrokes(18, config, 2),
     "two groups in this flight");
-  assert.equal(skinStrokes(18, config, 2), -1.1, "and a small flight pays a small figure");
+  assert.equal(skinStrokes(18, config, 2), -3.2, "and a small flight pays a small figure");
   // Read against the whole field it would have been worth the ceiling instead.
   assert.notEqual(skinStrokes(18, config, 6), skinStrokes(18, config, 2));
 });

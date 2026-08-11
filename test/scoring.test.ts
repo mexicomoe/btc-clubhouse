@@ -48,14 +48,14 @@ function picks(i: number): BirdiePicks {
 
 // name | index | picks | 18 gross scores | expected: CH, gross, net, netUncapped, WTB, off, final
 const REFERENCE: Reference[] = [
-  ref("Abe Whitfield",   25.2, picks(0), [5,5,4,6,6,5,6,4,6,6,4,5,4,6,6,5,3,6], 19, 92, 73, 73, -0.9, 1.8, 71.2),
-  ref("Ben Castellan",   24.8, picks(1), [5,4,4,6,5,5,6,4,6,5,5,6,5,7,5,5,4,6], 19, 93, 74, 74, -0.3, 1.7, 72.3),
-  ref("Cy Ashford",      24.0, picks(2), [5,4,4,6,6,5,5,5,6,6,5,5,3,5,6,6,4,7], 18, 93, 75, 75, -0.3, 0.6, 74.4),
-  ref("Dan Pemberton",   26.4, picks(3), [6,5,3,9,5,6,6,2,4,7,5,3,5,4,7,7,4,7], 21, 95, 74, 74, -0.6, 0.8, 73.2),
-  ref("Eli Marsden",     23.6, picks(4), [6,6,4,8,5,5,6,3,6,6,5,5,4,4,3,6,4,6], 18, 92, 74, 74, -0.3, 0.2, 73.8),
-  ref("Gus Thornbury",   25.4, picks(5), [5,6,4,6,6,5,6,5,5,6,5,5,4,8,4,7,4,6], 20, 97, 76, 77, -0.9, 1.7, 74.3),
-  ref("Hal Brightwater", 25.1, picks(6), [5,6,4,8,6,6,6,3,5,5,6,6,4,5,5,6,3,6], 19, 95, 76, 76,  0.0, -1.1, 77.1),
-  ref("Ike Calloway",    20.8, picks(7), [6,5,4,7,4,7,6,4,5,6,5,5,5,4,5,6,4,6], 15, 94, 79, 79, -0.3, 0.2, 78.8),
+  ref("Abe Whitfield",   25.2, picks(0), [5,5,4,6,6,5,6,4,6,6,4,5,4,6,6,5,3,6], 19, 92, 73, 73, -3.0, 6.0, 67.0),
+  ref("Ben Castellan",   24.8, picks(1), [5,4,4,6,5,5,6,4,6,5,5,6,5,7,5,5,4,6], 19, 93, 74, 74, -1.0, 5.6, 68.4),
+  ref("Cy Ashford",      24.0, picks(2), [5,4,4,6,6,5,5,5,6,6,5,5,3,5,6,6,4,7], 18, 93, 75, 75, -1.0, 2.0, 73.0),
+  ref("Dan Pemberton",   26.4, picks(3), [6,5,3,9,5,6,6,2,4,7,5,3,5,4,7,7,4,7], 21, 95, 74, 74, -2.0, 2.6, 71.4),
+  ref("Eli Marsden",     23.6, picks(4), [6,6,4,8,5,5,6,3,6,6,5,5,4,4,3,6,4,6], 18, 92, 74, 74, -1.0, 0.6, 73.4),
+  ref("Gus Thornbury",   25.4, picks(5), [5,6,4,6,6,5,6,5,5,6,5,5,4,8,4,7,4,6], 20, 97, 76, 77, -3.0, 5.6, 70.4),
+  ref("Hal Brightwater", 25.1, picks(6), [5,6,4,8,6,6,6,3,5,5,6,6,4,5,5,6,3,6], 19, 95, 76, 76,  0.0, -3.6, 79.6),
+  ref("Ike Calloway",    20.8, picks(7), [6,5,4,7,4,7,6,4,5,6,5,5,5,4,5,6,4,6], 15, 94, 79, 79, -1.0, 0.6, 78.4),
 ];
 
 function ref(
@@ -92,8 +92,8 @@ test("Gus Thornbury's net is capped from 77 to 76", () => {
   assert.equal(result.net, 76);
 });
 
-test("Hal Brightwater takes a +0.6 penalty on Agony Alley", () => {
+test("Hal Brightwater takes a +2.0 penalty on Agony Alley", () => {
   const hal = REFERENCE.find((r) => r.card.name === "Hal Brightwater")!;
   const result = scorePlayer(hal.card, ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
-  assert.equal(result.contests.agonyAlley.strokes, 0.6);
+  assert.equal(result.contests.agonyAlley.strokes, 2.0);
 });

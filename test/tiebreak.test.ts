@@ -43,7 +43,7 @@ test("all three finish on the same final", () => {
   for (const c of [EVEN, BACK_NINE, LAST_SIX]) {
     const r = scorePlayer(c, ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
     assert.equal(r.net, 72, `${c.name} net`);
-    assert.equal(r.final, 70.8, `${c.name} final — the tie these tests exist to break`);
+    assert.equal(r.final, 68, `${c.name} final — the tie these tests exist to break`);
   }
 });
 
