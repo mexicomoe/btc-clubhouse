@@ -11,6 +11,13 @@
  * two or more, and the handicap correlation falls to −0.09.
  *
  * The ladder is unchanged: 3 or more −0.9, 2 −0.6, 1 −0.3, none 0.
+ *
+ * IT IS SWITCHED OFF. Triple Threat replaced it and Damage Control together —
+ * the gross triple is the damage and the net par on the next hole is the bounce
+ * back, scored as one event rather than two that overlapped. The code stays,
+ * because the calibration above was earned on real rounds and the contest may
+ * come back, so these tests run it against an explicit config rather than the
+ * default. The last test here is the one that checks it is off by default.
  */
 
 import { test } from "node:test";
@@ -27,8 +34,16 @@ function card(edit: (g: number[]) => void = () => {}): PlayerCard {
   edit(gross);
   return { name: "x", courseHandicap: 0, gross, picks: { front: 5, back: 14 } };
 }
+/** The ladder as it was calibrated, switched back on for these tests only. */
+const WITH_BOUNCE = {
+  ...DEFAULT_CONTESTS,
+  bounceBack: [
+    { threshold: 3, strokes: -0.9 }, { threshold: 2, strokes: -0.6 },
+    { threshold: 1, strokes: -0.3 }, { threshold: 0, strokes: 0 },
+  ],
+};
 const bounces = (c: PlayerCard) =>
-  scorePlayer(c, ABERDEEN_TEE_IV, DEFAULT_CONTESTS).contests.bounceBack;
+  scorePlayer(c, ABERDEEN_TEE_IV, WITH_BOUNCE).contests.bounceBack!;
 
 /* ---- what counts ---- */
 
@@ -96,18 +111,44 @@ test("a round with no net doubles can score it", () => {
     g[0] = PAR[0] + 1; g[1] = PAR[1] - 1;
     g[6] = PAR[6] + 1; g[7] = PAR[7] - 1;
   });
-  const r = scorePlayer(clean, ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
-  assert.equal(r.contests.damageControl.detail, "0 net doubles", "not one all round");
-  assert.equal(r.contests.damageControl.strokes, -1.2, "and Damage Control pays its best");
-  assert.equal(r.contests.bounceBack.detail, "2 bounce-backs", "Bounce Back pays too, now");
-  assert.equal(r.contests.bounceBack.strokes, -0.6);
+  const r = scorePlayer(clean, ABERDEEN_TEE_IV,
+    { ...WITH_BOUNCE, damageControl: [
+      { threshold: 0, strokes: -1.2 }, { threshold: 1, strokes: -0.6 },
+      { threshold: 2, strokes: -0.3 }, { threshold: 99, strokes: 0 }] });
+  assert.equal(r.contests.damageControl!.detail, "0 net doubles", "not one all round");
+  assert.equal(r.contests.damageControl!.strokes, -1.2, "and Damage Control pays its best");
+  assert.equal(r.contests.bounceBack!.detail, "2 bounce-backs", "Bounce Back pays too, now");
+  assert.equal(r.contests.bounceBack!.strokes, -0.6);
 });
 
 test("the two contests no longer pull against each other", () => {
   // The old rule needed a net double, so the man who avoided them — exactly the
   // man Damage Control rewards — was the man Bounce Back could not pay.
   const spotless = card((g) => { g[0] = PAR[0] + 1; g[1] = PAR[1] - 1; });
-  const r = scorePlayer(spotless, ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
-  assert.ok(r.contests.damageControl.strokes < 0, "Damage Control pays");
-  assert.ok(r.contests.bounceBack.strokes < 0, "and so can Bounce Back");
+  const r = scorePlayer(spotless, ABERDEEN_TEE_IV,
+    { ...WITH_BOUNCE, damageControl: [
+      { threshold: 0, strokes: -1.2 }, { threshold: 1, strokes: -0.6 },
+      { threshold: 2, strokes: -0.3 }, { threshold: 99, strokes: 0 }] });
+  assert.ok(r.contests.damageControl!.strokes < 0, "Damage Control pays");
+  assert.ok(r.contests.bounceBack!.strokes < 0, "and so can Bounce Back");
+});
+
+/* ---- but it is not in the game ---- */
+
+test("Bounce Back and Damage Control are switched off, not merely zero", () => {
+  assert.equal(DEFAULT_CONTESTS.bounceBack, null);
+  assert.equal(DEFAULT_CONTESTS.damageControl, null);
+  const r = scorePlayer(card((g) => { g[0] = PAR[0] + 1; g[1] = PAR[1] - 1; }),
+    ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
+  assert.equal(r.contests.bounceBack, undefined, "absent from the card entirely");
+  assert.equal(r.contests.damageControl, undefined);
+});
+
+// Triple Threat is what replaced them, and it is one contest rather than two:
+// the gross triple is the damage, the net par after it is the bounce back.
+test("Triple Threat covers the same ground in one contest", () => {
+  const c = card((g) => { g[0] = PAR[0] + 3; });      // triple, then a par
+  const r = scorePlayer(c, ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
+  assert.equal(r.contests.tripleThreat!.detail, "1 triple, 1 answered");
+  assert.equal(r.contests.tripleThreat!.strokes, -0.2);
 });

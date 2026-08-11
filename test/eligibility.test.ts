@@ -92,17 +92,31 @@ test("no contest pays out on a card with no scores", () => {
   }
 });
 
-test("Damage Control does not read an empty card as a clean one", () => {
-  // This is the specific trap: zero holes means zero net doubles, which grades
-  // as the best possible round and would have paid −2.0.
-  const empty = scorePlayer(card("Empty", 0), ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
-  assert.equal(empty.contests.damageControl.strokes, 0);
+// Damage Control is switched off now — Triple Threat replaced it. The rule it
+// stands for still matters and now belongs to whatever counts holes: an empty
+// card must never grade as a perfect one.
+test("no contest reads an empty card as a clean one", () => {
+  // The trap, shown against Damage Control because that is where it was found:
+  // zero holes means zero net doubles, which grades as the best possible round
+  // and would pay its best rung to a man who never teed off. Switched on for
+  // this test alone — the trap belongs to any contest that counts something.
+  const withDamage = {
+    ...DEFAULT_CONTESTS,
+    damageControl: [
+      { threshold: 0, strokes: -1.2 }, { threshold: 1, strokes: -0.6 },
+      { threshold: 2, strokes: -0.3 }, { threshold: 99, strokes: 0 },
+    ],
+  };
+  const empty = scorePlayer(card("Empty", 0), ABERDEEN_TEE_IV, withDamage);
+  assert.equal(empty.contests.damageControl!.strokes, 0);
+  assert.equal(empty.contests.damageControl!.live, false, "and it says it is not scored");
 
-  // A card that really was clean over a partial round still earns it, though —
-  // Damage Control is meant to work on a partial.
-  const partial = scorePlayer(card("Partial", 12), ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
-  assert.equal(partial.contests.damageControl.strokes, -1.2, "a played card still counts");
-  assert.equal(partial.contests.damageControl.live, true);
+  const partial = scorePlayer(card("Partial", 12), ABERDEEN_TEE_IV, withDamage);
+  assert.equal(partial.contests.damageControl!.strokes, -1.2, "a played card still counts");
+  assert.equal(partial.contests.damageControl!.live, true);
+
+  // On the contests actually in the game, an empty card pays nothing at all.
+  assert.equal(scorePlayer(card("Empty", 0), ABERDEEN_TEE_IV, DEFAULT_CONTESTS).strokesEarned, 0);
 });
 
 test("a contest never pays for holes that were not played", () => {

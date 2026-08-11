@@ -122,7 +122,7 @@ Reject a hole outside its slot's list, by name. Reject the same hole nominated t
 `≤12 → −1.5 · 13 → −0.9 · 14 → −0.3 · 15 → 0 · 16 → +0.6 · 17+ → +0.9`
 **The only contest that can add strokes.** Stretch holes are per-course config. Requires all stretch holes played.
 
-**3 · Damage Control** — count of net doubles or worse.
+**3 · Damage Control — SWITCHED OFF.** Triple Threat replaced it, together with Bounce Back. Count of net doubles or worse.
 `0 → −2.0 · 1 → −1.0 · 2 → −0.5 · 3+ → 0`
 The fairest contest in the set — correlation with handicap is +0.05. Works on a partial round.
 
@@ -140,6 +140,10 @@ The fairest contest in the set — correlation with handicap is +0.05. Works on 
 **5 · Triple Threat** — a gross triple bogey or worse, and the answer to it.
 `gross triple or worse → +0.2 · net par or better on the very next hole → −0.4`
 
+**It replaced Damage Control and Bounce Back**, which are now null. It is the same idea as both in one contest: the gross triple is the damage and the net par on the next hole is the bounce back, scored as one event rather than two that overlapped — 31% of Triple Threat's recoveries were already paying Bounce Back for the same two holes. Their ladders and graders stay in the code; null means not scored, not shown, not exported, and their CSV columns stay writing blank.
+
+> **It does not carry their weight, and that is measured, not guessed.** Over 111 real rounds Damage Control paid −0.58 a round and Bounce Back −0.31, together **−0.89**. Triple Threat pays **+0.02** — it penalises 29 rounds, rewards 34 and leaves 48 alone. Switching the two off therefore takes about nine tenths of a stroke of credit off every card and puts nothing back.
+
 **One flat rate for everybody**, no handicap bands. Over 111 rounds three of forty men would have qualified for a high-handicap tier, and they made *fewer* triples than the band below them — a tier catching three men on a reconstructed index is not a tier.
 
 The two halves are read differently on purpose: **the damage is gross, the recovery is net.** Steadying the ship is what is being asked for, and a 24-handicap should not have to match a scratch card to do it.
@@ -150,7 +154,7 @@ A triple on the 18th can only cost — there is no next hole. Consecutive triple
 
 *Overlaps Bounce Back by design: 31% of Triple Threat recoveries also score a bounce-back, the same two holes paying twice.*
 
-**6 · Bounce Back** — a net bogey or worse, answered by a **net birdie or better** on the very next hole.
+**6 · Bounce Back — SWITCHED OFF.** Triple Threat replaced it, together with Damage Control. A net bogey or worse, answered by a **net birdie or better** on the very next hole.
 `3+ → −1.5 · 2 → −1.0 · 1 → −0.5 · 0 → 0`
 Consecutive holes only. Both must be played.
 
@@ -355,18 +359,18 @@ women    9 11 17  1  3  7  5 15 13   4 12 16 18  8  6 10 14  2
 
 | Player | Index | Course hcp | Gross | **Picks** | Net (capped) | Strokes off | FINAL |
 |---|---|---|---|---|---|---|---|
-| Abe Whitfield | 25.2 | 19 | 92 | 3,1,4,13,10,16 | 73 | 3.60 | **69.40** |
-| Ben Castellan | 24.8 | 19 | 93 | 8,2,7,17,14,18 | 74 | 2.30 | **71.70** |
-| Cy Ashford | 24.0 | 18 | 93 | 3,9,4,13,15,16 | 75 | 1.80 | **73.20** |
-| Dan Pemberton | 26.4 | 21 | 95 | 8,1,7,17,10,18 | 74 | 1.40 | **72.60** |
-| Gus Thornbury | 25.4 | 20 | 97 | 8,9,7,17,15,18 | 76 | 2.60 | **73.40** |
-| Eli Marsden | 23.6 | 18 | 92 | 3,2,4,13,14,16 | 74 | 0.80 | **73.20** |
-| Hal Brightwater | 25.1 | 19 | 95 | 3,1,4,13,10,16 | 76 | 0.10 | **75.90** |
-| Ike Calloway | 20.8 | 15 | 94 | 8,2,7,17,14,18 | 79 | 1.10 | **77.90** |
+| Abe Whitfield | 25.2 | 19 | 92 | 3,1,4,13,10,16 | 73 | 1.80 | **71.20** |
+| Ben Castellan | 24.8 | 19 | 93 | 8,2,7,17,14,18 | 74 | 1.70 | **72.30** |
+| Cy Ashford | 24.0 | 18 | 93 | 3,9,4,13,15,16 | 75 | 0.60 | **74.40** |
+| Dan Pemberton | 26.4 | 21 | 95 | 8,1,7,17,10,18 | 74 | 0.80 | **73.20** |
+| Gus Thornbury | 25.4 | 20 | 97 | 8,9,7,17,15,18 | 76 | 1.70 | **74.30** |
+| Eli Marsden | 23.6 | 18 | 92 | 3,2,4,13,14,16 | 74 | 0.20 | **73.80** |
+| Hal Brightwater | 25.1 | 19 | 95 | 3,1,4,13,10,16 | 76 | -1.10 | **77.10** |
+| Ike Calloway | 20.8 | 15 | 94 | 8,2,7,17,14,18 | 79 | 0.20 | **78.80** |
 
-**The picks are an input, not something you can compute** — and the ones above are invented. See the warning in section 11: the club recorded no Watch the Birdie picks for this round, so these are demo values and every FINAL in the table depends on them. Watch the Birdie paid: Abe −0.9 · Gus −0.9 · Dan −0.6 · Ben −0.3 · Cy −0.3 · Eli −0.3 · Ike −0.3, and nothing to Hal.
+**The picks are an input, not something you can compute** — and the ones above are invented. See the warning in section 11: the club recorded no Watch the Birdie picks for this round, so these are demo values and every FINAL in the table depends on them. Watch the Birdie paid: Abe −0.9 · Gus −0.9 · Dan −0.6 · Ben −0.3 · Cy −0.3 · Eli −0.3 · Ike −0.3, and nothing to Hal. **Hal finishes 1.10 strokes WORSE than his net** — the contests can now cost a man more than they pay him.
 
-**Cy and Eli finish level on 73.20** — a tie settled by the card match of section 8.
+**Eli and Ike finish level on 0.20 strokes off**, and Alex and Finn tie on 79.30 in section 11 — ties settled by the card match of section 8.
 
 **Cart assignments for the skins check:** 1, 1, 2, 2, 3, 3, 4, 4 in the order Ike, Eli, Cy, Ben, Hal, Abe, Gus, Dan.
 
@@ -447,14 +451,14 @@ Hoyt      7  5  4  8  8  4  8  4  6  5  6  7  4  7  5  5  4  6
 
 | Player | Course hcp | Gross | Picks | Net (capped) | Strokes off | FINAL |
 |---|---|---|---|---|---|---|
-| Dex | 23 | 93 | 3,1,4,13,10,16 | 70 | 4.10 | **65.90** |
-| Alex | 18 | 90 | 8,2,7,17,14,18 | 72 | 2.30 | **69.70** |
-| Finn | 26 | 99 | 3,9,4,13,15,16 | 73 | 3.00 | **70.00** |
-| Boyd | 21 | 96 | 8,1,7,17,10,18 | 75 | 2.30 | **72.70** |
-| Emmet | 14 | 91 | 3,2,4,13,14,16 | 77 | -0.20 | **77.20** |
-| Chip | 15 | 94 | 8,9,7,17,15,18 | 79 | 0.40 | **78.60** |
-| Grady | 34 | 113 | 3,1,4,13,10,16 | 79 | 0.00 | **79.00** |
-| Hoyt | 20 | 103 | 8,2,7,17,14,18 | 82 | 1.40 | **80.60** |
+| Dex | 23 | 93 | 3,1,4,13,10,16 | 70 | 2.60 | **67.40** |
+| Alex | 18 | 90 | 8,2,7,17,14,18 | 72 | 1.70 | **70.30** |
+| Finn | 26 | 99 | 3,9,4,13,15,16 | 73 | 2.70 | **70.30** |
+| Boyd | 21 | 96 | 8,1,7,17,10,18 | 75 | 1.40 | **73.60** |
+| Emmet | 14 | 91 | 3,2,4,13,14,16 | 77 | -1.10 | **78.10** |
+| Chip | 15 | 94 | 8,9,7,17,15,18 | 79 | -0.50 | **79.50** |
+| Grady | 34 | 113 | 3,1,4,13,10,16 | 79 | -0.30 | **79.30** |
+| Hoyt | 20 | 103 | 8,2,7,17,14,18 | 82 | 1.10 | **80.90** |
 
 > ⚠️ **The Watch the Birdie picks above are invented, and every FINAL in this table depends on them.**
 >

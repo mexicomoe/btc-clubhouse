@@ -134,10 +134,20 @@
       { threshold: 14, strokes: -0.3 }, { threshold: 15, strokes: 0 },
       { threshold: 16, strokes: 0.6 }, { threshold: 99, strokes: 0.9 },
     ],
-    damageControl: [
-      { threshold: 0, strokes: -1.2 }, { threshold: 1, strokes: -0.6 },
-      { threshold: 2, strokes: -0.3 }, { threshold: 99, strokes: 0 },
-    ],
+    /**
+     * Damage Control and Bounce Back are SWITCHED OFF — Triple Threat replaced
+     * both. It is the same contest in one: the gross triple is the damage and
+     * the net par on the next hole is the bounce back, scored as one event
+     * rather than two that overlapped. Thirty-one per cent of Triple Threat's
+     * recoveries were already paying Bounce Back for the same two holes.
+     *
+     * Null is the signal Skins uses. The ladders and their graders stay below,
+     * because they were calibrated on real rounds and may come back.
+     *
+     *   damageControl: [ 0 → −1.2 · 1 → −0.6 · 2 → −0.3 · 99 → 0 ]
+     *   bounceBack:    [ 3 → −0.9 · 2 → −0.6 · 1 → −0.3 · 0 → 0 ]
+     */
+    damageControl: null,
     /**
      * Easy Street — the three holes the card gives back, counted on GROSS.
      *
@@ -176,10 +186,7 @@
      */
     goLong: null,
     getShorty: null,
-    bounceBack: [
-      { threshold: 3, strokes: -0.9 }, { threshold: 2, strokes: -0.6 },
-      { threshold: 1, strokes: -0.3 }, { threshold: 0, strokes: 0 },
-    ],
+    bounceBack: null,
     /**
      * NO CEILING. `maxContestStrokes` was 11.0, then 6.0, and is now gone: with
      * every value cut by 40% the contests cannot reach far enough for a ceiling
@@ -546,9 +553,14 @@
       agonyAlley = { strokes: gradeAtMost(total, contests.agonyAlley), detail: "net " + total + " across the stretch", live: true };
     }
 
-    // 3 · Damage Control (partial ok)
-    const netDoubles = range(HOLES).filter((i) => played(i) && over(i) >= 2).length;
-    const damageControl = { strokes: gradeAtMost(netDoubles, contests.damageControl), detail: netDoubles + " net double" + (netDoubles === 1 ? "" : "s"), live: true };
+    // 3 · Damage Control — switched off, Triple Threat replaced it. The counter
+    // stays for the day it comes back.
+    let damageControl = null;
+    if (contests.damageControl != null) {
+      const netDoubles = range(HOLES).filter((i) => played(i) && over(i) >= 2).length;
+      damageControl = { strokes: gradeAtMost(netDoubles, contests.damageControl),
+        detail: netDoubles + " net double" + (netDoubles === 1 ? "" : "s"), live: true };
+    }
 
     // 4 · Easy Street — pars or better on the three giving holes, on GROSS.
     //
@@ -618,11 +630,15 @@
     // given, which is the opposite of what Damage Control rewards. On the same
     // sixty-three rounds the rule below shuts nobody out, 30% clear two or
     // more, and the handicap correlation falls to −0.09.
-    let bounces = 0;
-    for (let i = 0; i < HOLES - 1; i++) {
-      if (played(i) && played(i + 1) && over(i) >= 1 && over(i + 1) <= -1) bounces++;
+    let bounceBack = null;
+    if (contests.bounceBack != null) {
+      let bounces = 0;
+      for (let i = 0; i < HOLES - 1; i++) {
+        if (played(i) && played(i + 1) && over(i) >= 1 && over(i + 1) <= -1) bounces++;
+      }
+      bounceBack = { strokes: gradeAtLeast(bounces, contests.bounceBack),
+        detail: bounces + " bounce-back" + (bounces === 1 ? "" : "s"), live: true };
     }
-    const bounceBack = { strokes: gradeAtLeast(bounces, contests.bounceBack), detail: bounces + " bounce-back" + (bounces === 1 ? "" : "s"), live: true };
 
     // A contest switched off in the config is not in the result at all — not a
     // zero, which would read as "he scored nothing on it". The CSV writes a

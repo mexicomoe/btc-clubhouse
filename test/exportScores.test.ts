@@ -159,8 +159,11 @@ test("the scoring columns come from the leaderboard, not recomputed", () => {
   assert.equal(cell(ken, "Net"), String(r.net));
   assert.equal(cell(ken, "Gross"), String(r.gross));
   assert.equal(cell(ken, "Final"), String(r.final), "the final is the one that was placed");
-  assert.equal(cell(ken, "Watch the Birdie"), String(r.contests.watchTheBirdie.strokes));
-  assert.equal(cell(ken, "Bounce Back"), String(r.contests.bounceBack.strokes));
+  assert.equal(cell(ken, "Watch the Birdie"), String(r.contests.watchTheBirdie!.strokes));
+  assert.equal(cell(ken, "Agony Alley"), String(r.contests.agonyAlley!.strokes));
+  // Switched-off contests keep their columns and write a blank cell.
+  assert.equal(cell(ken, "Bounce Back"), "", "Bounce Back is not in the game");
+  assert.equal(cell(ken, "Damage Control"), "", "nor is Damage Control");
 });
 
 test("the hole columns carry the card, not the scoring device", () => {

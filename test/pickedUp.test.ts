@@ -112,7 +112,6 @@ test("every contest still runs on a card with Xs on it", () => {
   // the contest is live and simply scores the net double.
   assert.equal(r.contests.agonyAlley.live, true, "the stretch was played");
   assert.equal(r.contests.easyStreet.live, true, "11 was picked up, which is still played");
-  assert.equal(r.contests.damageControl.live, true);
   assert.equal(r.contests.tripleThreat.live, true);
 });
 
