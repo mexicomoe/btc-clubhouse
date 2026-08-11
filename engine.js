@@ -172,7 +172,25 @@
       { threshold: 3, strokes: -1.5 }, { threshold: 2, strokes: -1.0 },
       { threshold: 1, strokes: -0.5 }, { threshold: 0, strokes: 0 },
     ],
-    maxContestStrokes: 11.0,
+    /**
+     * The most the six individual contests may take off one man's card, all
+     * told. Skins sits outside it.
+     *
+     * It was 11.0, set when the contest list was a different one, and it had
+     * stopped protecting anything: across 111 real rounds it never once bit,
+     * while the seven contests can in theory pay 17.7 between them.
+     *
+     * The reason a round can climb that high is that the four ladders were each
+     * calibrated on its own but are CORRELATED — a strong net round clears
+     * several top rungs at once. Agony Alley, Damage Control, Bounce Back and
+     * Easy Street at their best rungs come to 6.5 together, and Watch the
+     * Birdie can add three more on top. One round in 111 maxed all four.
+     *
+     * 6.0 bites the top few per cent and nothing else: real rounds run median
+     * 3.0, 90th 5.9, 99th 7.9. It is a ceiling, not a cure — the ladders
+     * stacking is the thing to fix, and that wants its own calibration pass.
+     */
+    maxContestStrokes: 6.0,
     // Skins scores into FINAL. It sits outside maxContestStrokes, which governs
     // the six individual contests. Set to null to switch it off.
     //
@@ -626,7 +644,8 @@
     // and −0.6 from Triple Threat sum to −0.30000000000000004, which reaches
     // the CSV as that and reads as a broken number on a scoreboard. Values that
     // were all halves used to add exactly, so nothing needed this until now.
-    let earned = toTenth(sum(Object.values(allContests).map((c) => c.strokes)));
+    const earnedUncapped = toTenth(sum(Object.values(allContests).map((c) => c.strokes)));
+    let earned = earnedUncapped;
     if (-earned > contests.maxContestStrokes) earned = -contests.maxContestStrokes;
 
     let final = null;
@@ -637,6 +656,11 @@
 
     return {
       name: card.name, courseHandicap: ch,
+      // What the contests came to before maxContestStrokes was applied. Equal to
+      // strokesEarned unless the cap bit — and when it did, the contest lines on
+      // screen add up to more than the total, which needs saying rather than
+      // leaving for a man to spot and mistrust.
+      strokesEarnedUncapped: earnedUncapped,
       // The figure before the allowance, when there was one to cut. Null when the
       // handicap came off a Golf Genius card, which already has it applied.
       courseHandicapFull: card.courseHandicap != null || card.handicapIndex == null

@@ -68,7 +68,15 @@ Two roundings, and the order is not interchangeable. It is not a small adjustmen
 
 No arbitrary base number. Their net score is the anchor and contests reduce it. **Lowest wins.**
 
-**No floor by default.** The Tournament product protects a hard floor of 59; Clubhouse does not, because net scoring already keeps everyone near par. Make it a console setting — blank means no floor — so it can be switched on if a freak round ever prints something absurd. Maximum contest strokes is 11.0, so a net 65 could in theory print a 54.
+**No floor by default.** The Tournament product protects a hard floor of 59; Clubhouse does not, because net scoring already keeps everyone near par. Make it a console setting — blank means no floor — so it can be switched on if a freak round ever prints something absurd. Maximum contest strokes is **6.0**, so a net 65 could in theory print a 59.
+
+> **`maxContestStrokes` was 11.0 and had stopped protecting anything.** Across 111 real rounds it never once bit, while the seven contests can in theory pay **17.7** between them.
+>
+> The reason a round climbs that high is that the four ladders were each calibrated on its own but are **correlated** — a strong net round clears several top rungs at once. Agony Alley, Damage Control, Bounce Back and Easy Street at their best rungs come to **6.5 together**, and Watch the Birdie can add three more on top, because at a 19 course handicap a gross par on a nominated hole is a net birdie. One round in 111 maxed all four ladders; 45% maxed none.
+>
+> **6.0 bites the top few per cent and nothing else** — real rounds run median 3.0, 90th 5.9, 99th 7.9, highest ever seen 9.2. In both reference rounds it touches exactly one card: Dex, from 6.30 to 6.00.
+>
+> It is a ceiling, not a cure. **The ladders stacking is the thing to fix, and it wants its own calibration pass.**
 
 **Every contest is scored on ONE player's card.** Team size, team format and blinds are irrelevant to Clubhouse — the group can be playing best-two-net, best-three-on-easy-holes or nothing at all and it makes no difference. Cart Skins is the only team element in the product. Do not build team aggregation.
 
@@ -248,7 +256,7 @@ No server, no accounts, no sync. Those come later if the product proves out.
 
 Until this existed, the result of a round was the organiser reading numbers aloud in the bar. **One button — Share results — puts a link on the clipboard.** He texts it; every man opens the finished leaderboard on his own phone with nothing installed and nobody signed in.
 
-**There is no server. The round travels inside the link**, in the fragment after `#`, which is never sent anywhere — not even to GitHub Pages' logs.
+**There is no server. The round travels inside the link**, in a query string after `?r=`.
 
 **Results, not a round.** The event code of section 5 carries SETUP and the far end scores it again. That is wrong here three times over: it needs the engine present on a page that must never reach it; it would rescore against the *reader's* settings, so a link would change its numbers whenever a threshold moved; and it costs the eighteen holes nobody reads on a phone. So the finished figures travel — name, course handicap, gross, net, what each contest paid, final — **already settled, including the placing and the phrase that broke any tie**, because the far end has no cards to run a card match on and must not guess at one.
 
@@ -264,18 +272,19 @@ Until this existed, the result of a round was the organiser reading numbers alou
 
 The ceiling is **2,000 characters for the whole URL**. That is not a browser limit — Safari and Chrome take fragments of 64 KB — but the point at which a messaging app stops agreeing where a link ends. The payload is base64**url** (`A–Z a–z 0–9 - _`) because a `+` or `/` is exactly where that goes wrong.
 
-> ⚠️ **The fragment must be one unbroken run of `[A-Za-z0-9_-]`, and nothing else.**
+> ⚠️ **THE ROUND RIDES IN A QUERY STRING, NOT A FRAGMENT — and that was forced.**
 >
-> The marker was `BTCR1:` and a link sent by e-mail worked while the same link sent by text arrived with **nothing after the `#`**. The colon was the only character in the whole fragment that is not base64url, and it can do two separate kinds of damage:
+> It began in the fragment, where nothing is sent to a server. A link sent by e-mail worked; the same link sent by text did not.
 >
-> · `BTCR1:` has the exact shape of a **URI scheme** — a letter, then letters and digits, then a colon. A link detector scanning a message can end the `https` URL at the `#` and read the rest as a second URI with an unknown scheme, which it drops. What gets tapped is the page with no round on it.
-> · A sender that **percent-encodes** the fragment writes `BTCR1%3A`, and a marker matched by its literal characters no longer matches.
+> The first suspect was the marker's colon. `BTCR1:` has the exact shape of a **URI scheme**, which lets a link detector end the `https` URL at the `#` and drop the rest as a second unknown-scheme URI; and a sender that percent-encodes writes `BTCR1%3A`, which a literal marker match no longer finds. The marker became `BTCR1_` — an underscore is in the base64url alphabet, is not a scheme separator, and nothing percent-encodes it.
 >
-> The marker is now `BTCR1_`. An underscore is in the base64url alphabet, is not a scheme separator and is not percent-encoded by anything. **Do not put a colon, a slash, a dot or an ampersand in a fragment that has to survive a messenger.**
+> **It was not enough.** The message arrives in two pieces — the address on one line, everything from the `#` on the next — and only the address is tappable. **iOS Messages ends the link at the hash, whatever follows it.** So there is no hash in the link any more.
+>
+> **The cost was accepted deliberately.** A query string IS sent to the server, so every shared round — every member's name and every score — now appears in GitHub Pages' request logs. That is the price of the link working at all, and it is the second reason to treat a shared link as public. Length did not decide it: a query string is two characters longer than a fragment and 24 players still comes to about 1,750.
 
-The reader is defensive about the rest of the trip: it percent-decodes first, accepts the old `BTCR1:` and `BTCR1%3A` markers so links already sent still open, and reads the payload from a **query string** as well as a fragment — so if a messenger ever forces the move, no change to `results.html` is needed and no link has to be reissued.
+The payload must stay one unbroken run of `[A-Za-z0-9_-]`. **Do not put a colon, a slash, a dot, a hash or an ampersand in a link that has to survive a messenger.**
 
-**The payload stays in the fragment while it possibly can**, because a fragment is never sent to a server and a query string is: moving it would put every member's name and score into GitHub Pages' request logs. Length is not the obstacle — a query string is two characters longer than a fragment and 24 players still comes to 1,749 — the logging is.
+The reader stays defensive about the rest of the trip: it percent-decodes first, accepts the old `BTCR1:` and `BTCR1%3A` markers, and still reads a **fragment** — links made before the move are already in people's messages, and on a phone that does not mangle them they work perfectly.
 
 | Field | Real names, real scores |
 |---|---|
@@ -436,7 +445,7 @@ Hoyt      7  5  4  8  8  4  8  4  6  5  6  7  4  7  5  5  4  6
 
 | Player | Course hcp | Gross | Picks | Net (capped) | Strokes off | FINAL |
 |---|---|---|---|---|---|---|
-| Dex | 23 | 93 | 3,1,4,13,10,16 | 70 | 6.30 | **63.70** |
+| Dex | 23 | 93 | 3,1,4,13,10,16 | 70 | 6.00 | **64.00** |
 | Alex | 18 | 90 | 8,2,7,17,14,18 | 72 | 3.80 | **68.20** |
 | Finn | 26 | 99 | 3,9,4,13,15,16 | 73 | 4.90 | **68.10** |
 | Boyd | 21 | 96 | 8,1,7,17,10,18 | 75 | 3.30 | **71.70** |

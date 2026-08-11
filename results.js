@@ -173,6 +173,30 @@
   }
 
   /**
+   * Where the round rides in the address.
+   *
+   * IT WAS THE FRAGMENT, AND THE FRAGMENT DOES NOT SURVIVE A TEXT MESSAGE.
+   * First the marker's colon was suspected and removed; it was not enough. The
+   * message arrives in two pieces — the address on one line and everything from
+   * the "#" onwards on the next — and only the address is tappable. iOS Messages
+   * is ending the link AT THE HASH, whatever follows it.
+   *
+   * So the round now travels in a QUERY STRING, which every link detector
+   * treats as part of the address because half the web's addresses have one.
+   *
+   * THE COST IS REAL AND WAS ACCEPTED DELIBERATELY. A fragment is never sent to
+   * a server; a query string is. Every shared round — every member's name and
+   * every score — now appears in GitHub Pages' request logs. That is the price
+   * of the link working at all, and it is a small one for a leaderboard whose
+   * names and scores are already on the club's Golf Genius portal. It is also
+   * the second reason the link is worth treating as public.
+   *
+   * Length is not what decided it: a query string is two characters longer than
+   * a fragment, and a 24-man field still comes to about 1,750.
+   */
+  const RESULT_QUERY = "?r=";
+
+  /**
    * The whole link for a round, and whether it will survive being sent.
    *
    * Returns { code, url, length, fits, players }. `fits` false means the button
@@ -181,7 +205,7 @@
    */
   function resultsLink(baseUrl, round, results, live) {
     const code = encodeResults(round, results, live);
-    const url = String(baseUrl || "") + "#" + code;
+    const url = String(baseUrl || "") + RESULT_QUERY + code;
     return { code, url, length: url.length, fits: url.length <= MAX_URL_LENGTH,
              players: (results || []).length, limit: MAX_URL_LENGTH };
   }
@@ -205,10 +229,9 @@
       try { raw = decodeURIComponent(raw); } catch (err) { /* leave it as it came */ }
     }
 
-    // The round may ride in the fragment (where it is never sent to a server) or
-    // in a query string. Only the fragment is written today; the query string is
-    // read as well so that moving to it, if a messenger ever forces the issue,
-    // needs no change to this page — and a link already out there keeps working.
+    // The round rides in a query string now. The fragment is still read, because
+    // links made before the move are already in people's messages — and on a
+    // phone that does not mangle them those still work perfectly.
     const upper = raw.toUpperCase();
     let at = -1, markerLength = 0;
     for (const prefix of READ_PREFIXES) {
@@ -221,10 +244,9 @@
       // address with nothing after the "#" and one that was never a round at all
       // is the difference between "your messenger ate it" and "wrong link".
       const hasPage = /results\.html/i.test(raw);
-      const hasNothingAfterHash = /#\s*$/.test(raw) || (hasPage && raw.indexOf("#") === -1);
-      return refuse(hasNothingAfterHash
-        ? "The round is missing from this link — everything after the “#” was lost on the way. " +
-          "Ask for it again, and send it as an e-mail if a text keeps doing this."
+      return refuse(hasPage
+        ? "The round is missing from this link — only the address arrived, not the round on the " +
+          "end of it. Ask for it to be sent again."
         : "This link does not carry a round. Ask for it to be sent again.");
     }
     const body = raw.slice(at + markerLength).replace(/\s+/g, "");
@@ -330,7 +352,7 @@
   }
 
   globalThis.ClubhouseResults = {
-    RESULT_PREFIX, READ_PREFIXES, RESULT_CONTESTS, MAX_URL_LENGTH,
+    RESULT_PREFIX, READ_PREFIXES, RESULT_QUERY, RESULT_CONTESTS, MAX_URL_LENGTH,
     encodeResults, decodeResults, resultsLink, maxPlayersThatFit,
     toBase64Url, fromBase64Url,
   };

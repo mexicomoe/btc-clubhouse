@@ -121,6 +121,9 @@ export interface PlayerResult {
   netUncapped: number | null;
   /** Capped net per hole — what a match of cards is settled on. */
   netByHole: (number | null)[];
+  /** What the contests came to before `maxContestStrokes`. Equal to
+   *  `strokesEarned` unless the cap bit. */
+  strokesEarnedUncapped: number;
   /** Gross per hole, with picked-up holes filled in at par + 4. */
   grossByHole: (number | null)[];
   /** Hole numbers he picked up on. Show these as X, never as the filled figure. */

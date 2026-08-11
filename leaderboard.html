@@ -886,6 +886,9 @@ function showPlayer(name){
   const r = boardResults.find(x => x.name === name) || E.scorePlayer(card, undefined, E.DEFAULT_CONTESTS);
   const course = E.courseFor(card);
   const off = -r.strokesEarned;                    // positive = strokes taken off the net
+  // When maxContestStrokes bites, the contest lines below add up to more than
+  // this. Say so, or a man who checks the arithmetic finds it wrong.
+  const uncapped = -r.strokesEarnedUncapped;
   // "as played" marks a handicap that came off the card rather than from the
   // index, so a figure that disagrees with the setup screen explains itself.
   const asPlayed = card.courseHandicap != null ? " as played" : "";
@@ -936,6 +939,11 @@ function showPlayer(name){
   }
 
   html += `<div class="section-label">The contests</div>`;
+  if(Math.abs(uncapped - off) > 0.05){
+    html += `<div class="note">These come to <b>${uncapped.toFixed(1)}</b>, over the
+      <b>${E.DEFAULT_CONTESTS.maxContestStrokes.toFixed(1)}</b> the six contests may take off
+      between them, so <b>${off.toFixed(1)}</b> is what counted. Skins is outside that limit.</div>`;
+  }
 
   for(const key of contestsInPlay()){
     // All seven, always. A contest the result has nothing for says so rather

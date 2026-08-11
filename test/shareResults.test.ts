@@ -169,7 +169,9 @@ test("only the contests that were live travel", () => {
 
 test("a truncated link says so rather than showing an empty board", () => {
   const url = link(15).url;
-  for (const cut of [0.3, 0.5, 0.7, 0.9, 0.99]) {
+  // 0.4 upward: below that the cut lands inside the address itself, which no
+  // longer looks like a results link at all and gets the other sentence.
+  for (const cut of [0.4, 0.5, 0.7, 0.9, 0.99]) {
     const read = decodeResults(url.slice(0, Math.floor(url.length * cut)));
     assert.equal(read.ok, false, `cut at ${cut}`);
     assert.equal(read.round, null, "and nothing half-read comes through");
@@ -180,9 +182,9 @@ test("a truncated link says so rather than showing an empty board", () => {
 test("every refusal is a sentence a man can act on", () => {
   const cases: [string, RegExp][] = [
     ["", /does not carry a round/],
-    // A results.html address with no fragment is the messenger-ate-it case, and
-    // gets its own sentence — see "surviving the trip" below.
-    ["https://example.com/results.html", /everything after the “#” was lost/],
+    // A results.html address with no round on the end of it is the
+    // messenger-ate-it case, and gets its own sentence — see below.
+    ["https://example.com/results.html", /only the address arrived/],
     [RESULT_PREFIX, /arrived empty/],
     [RESULT_PREFIX + "not base64 !!", /not part of one/],
   ];
@@ -295,12 +297,23 @@ test("both pages share one stylesheet and one set of display helpers", () => {
  * "BTCR1%3A", which a literal marker match no longer finds.
  */
 
-test("the fragment is one unbroken run of characters no parser will touch", () => {
+// iOS Messages ends the link AT THE HASH — the message arrives in two pieces,
+// the address on one line and everything from the "#" on the next, and only the
+// address is tappable. Taking the colon out of the marker did not help, because
+// the hash itself was the boundary. So there is no hash in the link any more.
+test("there is no hash in the link at all", () => {
   const url = link(8).url;
-  const fragment = url.slice(url.indexOf("#") + 1);
-  assert.match(fragment, /^[A-Za-z0-9_-]+$/,
+  assert.ok(!url.includes("#"),
+    "iOS Messages breaks the link at the hash, whatever follows it");
+  assert.ok(url.includes("?r="), "the round rides in a query string now");
+});
+
+test("the payload is one unbroken run of characters no parser will touch", () => {
+  const url = link(8).url;
+  const payload = url.slice(url.indexOf("?r=") + 3);
+  assert.match(payload, /^[A-Za-z0-9_-]+$/,
     "anything else is something a link detector can take an interest in");
-  assert.ok(!fragment.includes(":"),
+  assert.ok(!payload.includes(":"),
     "a colon here reads as a URI scheme and the round gets dropped in transit");
 });
 
@@ -309,10 +322,10 @@ test("the marker cannot be mistaken for a URI scheme", () => {
   assert.ok(!/^[A-Za-z][A-Za-z0-9+.-]*:/.test(RESULT_PREFIX), RESULT_PREFIX);
 });
 
-test("a percent-encoded fragment still opens", () => {
+test("a percent-encoded payload still opens", () => {
   const url = link(8).url;
-  const [page, fragment] = url.split("#");
-  const encoded = page + "#" + encodeURIComponent(fragment);
+  const [page, payload] = url.split("?r=");
+  const encoded = page + "?r=" + encodeURIComponent(payload);
   const read = decodeResults(encoded);
   assert.equal(read.ok, true, read.error || "");
   assert.equal(read.round!.players.length, 8);
@@ -328,22 +341,21 @@ test("a link sent with the old colon marker still opens", () => {
   }
 });
 
-// Not written today. Read anyway, so that moving the payload out of the
-// fragment — if a messenger ever forces it — needs no change to results.html
-// and no reissuing of links already sent.
-test("a payload in a query string is read as well as one in a fragment", () => {
-  const read = decodeResults(link(8).url.replace("#", "?r="));
+// Links made before the move are already in people's messages, and on a phone
+// that does not mangle a fragment they work perfectly. They must keep working.
+test("a link made when the round rode in the fragment still opens", () => {
+  const read = decodeResults(link(8).url.replace("?r=", "#"));
   assert.equal(read.ok, true, read.error || "");
   assert.equal(read.round!.players.length, 8);
 });
 
-test("a link that lost its fragment says so, and says it is the messenger", () => {
+test("a link that lost its round says so, rather than showing an empty board", () => {
   for (const url of ["https://x.github.io/btc-clubhouse/results.html",
+                     "https://x.github.io/btc-clubhouse/results.html?r=",
                      "https://x.github.io/btc-clubhouse/results.html#"]) {
     const read = decodeResults(url);
-    assert.equal(read.ok, false);
-    assert.match(read.error!, /everything after the “#” was lost/);
-    assert.match(read.error!, /e-mail/, "and offers the way round it");
+    assert.equal(read.ok, false, url);
+    assert.match(read.error!, /only the address arrived/, url);
   }
 });
 
