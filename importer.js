@@ -75,9 +75,11 @@
     const errors = [];
     if (lines.length === 0) return { cards, errors };
 
-    // Locate the columns. If a header row is present (it carries "Total"), read
-    // the hole/Total/Net positions from it — that survives Out/In being dropped
-    // from a selection. Otherwise fall back to the fixed section-10 layout.
+    // Locate the columns. A header row is recognised by its run of hole numbers
+    // — Total, if there is one, is a bonus — and the hole/Total/Net positions
+    // are read from it, which survives Out/In being dropped from a selection
+    // and handles a plain table that has neither. Only a paste with no header
+    // at all falls back to the fixed section-10 layout.
     const layout = detectLayout(lines);
     const dataLines = lines.slice(layout.firstDataRow);
 
@@ -115,7 +117,8 @@
         continue;
       }
 
-      const verdict = classify(name, holes, holesPlayed, pickedUp, grossTotal, netTotal);
+      const verdict = classify(name, holes, holesPlayed, pickedUp, grossTotal, netTotal,
+                               layout.totalCol != null);
       if (verdict.error) errors.push(verdict.error);
 
       cards.push({ name, handicap, holes, holesPlayed, pickedUp,
@@ -126,9 +129,19 @@
   }
 
   /** Decide gross vs net for one card by which total the 18 holes sum to. */
-  function classify(name, holes, holesPlayed, pickedUp, grossTotal, netTotal) {
+  function classify(name, holes, holesPlayed, pickedUp, grossTotal, netTotal, hasTotalColumn) {
+    if (!hasTotalColumn) {
+      // A plain table — hole numbers and scores, no Out/In/Total. Nothing to
+      // reconcile the eighteen against, so gross cannot be told from net here.
+      // That is the SHAPE, not a fault: the card read perfectly and the import
+      // screen asks which the columns are. Calling it broken would send a man
+      // looking for a mistake in a paste that has none.
+      return { mode: "unknown" };
+    }
     if (grossTotal == null) {
-      return { mode: "unknown", error: name + ": no Total column — cannot read the card." };
+      // There IS a Total column and this row's cell is empty or unreadable,
+      // which is a real fault in the row rather than a different shape.
+      return { mode: "unknown", error: name + ": the Total column is empty — cannot read the card." };
     }
     if (pickedUp > 0) {
       // A picked-up hole has no number to add, so the eighteen cannot be summed
@@ -154,9 +167,42 @@
     };
   }
 
+  /**
+   * Which line is the header, if there is one.
+   *
+   * It used to be "the line with Total in it", which is true of a Golf Genius
+   * export and false of a plain table — hole numbers across the top, a name and
+   * eighteen scores beneath, nothing else. That shape has no Total, so no
+   * header was found, the fixed section-10 layout was used instead, and column
+   * 10 was read as the Out total: hole 10 was dropped, holes 11–18 slid one
+   * place left, seventeen came through and the eighteenth was blank. The header
+   * row itself then parsed as a player called "1".
+   *
+   * So the header is recognised by what it actually is — a row of consecutive
+   * hole numbers — and Total, if there is one, is a bonus rather than the test.
+   */
+  function headerRowIndex(lines) {
+    for (let i = 0; i < lines.length; i++) {
+      const cells = lines[i].split("\t").map((c) => c.trim());
+      if (/(^|\t)\s*total\s*(\t|$)/i.test(lines[i])) return i;
+      // A run of at least four hole numbers ascending from 1, and no cell that
+      // looks like a player's name. Four is enough to be deliberate and short
+      // enough to survive a selection that clipped the right-hand end.
+      const numbers = cells.map((c) => (/^\d{1,2}$/.test(c) ? Number(c) : null));
+      const run = [];
+      for (const n of numbers) {
+        if (n == null) continue;
+        if (run.length === 0 ? n === 1 : n === run[run.length - 1] + 1) run.push(n);
+      }
+      const named = cells.some((c) => c !== "" && /[A-Za-z]/.test(c) && !/^(out|in|total|net|tot)$/i.test(c));
+      if (run.length >= 4 && !named) return i;
+    }
+    return -1;
+  }
+
   /** Find the column layout, reading a header row if the paste includes one. */
   function detectLayout(lines) {
-    const headerRow = lines.findIndex((l) => /(^|\t)\s*total\s*(\t|$)/i.test(l));
+    const headerRow = headerRowIndex(lines);
     if (headerRow === -1) return FIXED_LAYOUT;
 
     const cells = lines[headerRow].split("\t");
