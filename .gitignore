@@ -11,3 +11,6 @@ test/fixtures/december_gross.tsv
 test/fixtures/tgif_low_net.tsv
 Stats collection, BtC-C, Jay.md
 jay_rounds_*.csv
+
+# A diagnostic ladder of test links — regenerated, never shipped.
+linktest.txt
