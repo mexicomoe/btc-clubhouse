@@ -180,7 +180,9 @@ test("a truncated link says so rather than showing an empty board", () => {
 test("every refusal is a sentence a man can act on", () => {
   const cases: [string, RegExp][] = [
     ["", /does not carry a round/],
-    ["https://example.com/results.html", /does not carry a round/],
+    // A results.html address with no fragment is the messenger-ate-it case, and
+    // gets its own sentence — see "surviving the trip" below.
+    ["https://example.com/results.html", /everything after the “#” was lost/],
     [RESULT_PREFIX, /arrived empty/],
     [RESULT_PREFIX + "not base64 !!", /not part of one/],
   ];
@@ -237,7 +239,9 @@ test("the link is made only of characters a message will not break", () => {
 
 test("the code carries its own marker and version", () => {
   assert.ok(link(8).code.startsWith(RESULT_PREFIX));
-  assert.match(RESULT_PREFIX, /^BTCR\d+:$/);
+  // Ends in an underscore, not a colon: a colon here reads as a URI scheme and
+  // a link detector drops everything after it. See "surviving the trip" below.
+  assert.match(RESULT_PREFIX, /^BTCR\d+_$/);
 });
 
 /* ---- the read-only page is read-only by construction ---- */
@@ -278,4 +282,73 @@ test("both pages share one stylesheet and one set of display helpers", () => {
     assert.ok(RESULTS_HTML.includes(shared), "the shared view must load " + shared);
   }
   assert.ok(!app.includes("<style>"), "the app must not keep a second copy of the styles");
+});
+
+/* ---- surviving the trip ----
+ *
+ * A link sent by e-mail worked and the same link sent by text arrived with
+ * nothing after the "#". The colon in the old "BTCR1:" marker was the only
+ * character in the whole fragment that is not base64url, and it could do two
+ * separate kinds of damage: it has the exact shape of a URI scheme, which lets
+ * a link detector end the https URL at the "#" and drop the rest as a second
+ * unknown-scheme URI; and a sender that percent-encodes the fragment writes
+ * "BTCR1%3A", which a literal marker match no longer finds.
+ */
+
+test("the fragment is one unbroken run of characters no parser will touch", () => {
+  const url = link(8).url;
+  const fragment = url.slice(url.indexOf("#") + 1);
+  assert.match(fragment, /^[A-Za-z0-9_-]+$/,
+    "anything else is something a link detector can take an interest in");
+  assert.ok(!fragment.includes(":"),
+    "a colon here reads as a URI scheme and the round gets dropped in transit");
+});
+
+test("the marker cannot be mistaken for a URI scheme", () => {
+  // scheme = ALPHA *( ALPHA / DIGIT / "+" / "-" / "." ) ":"  — RFC 3986.
+  assert.ok(!/^[A-Za-z][A-Za-z0-9+.-]*:/.test(RESULT_PREFIX), RESULT_PREFIX);
+});
+
+test("a percent-encoded fragment still opens", () => {
+  const url = link(8).url;
+  const [page, fragment] = url.split("#");
+  const encoded = page + "#" + encodeURIComponent(fragment);
+  const read = decodeResults(encoded);
+  assert.equal(read.ok, true, read.error || "");
+  assert.equal(read.round!.players.length, 8);
+});
+
+// Links made before the marker changed are already in people's messages.
+test("a link sent with the old colon marker still opens", () => {
+  for (const old of ["BTCR1:", "BTCR1%3A", "BTCR1-"]) {
+    const url = link(8).url.replace(RESULT_PREFIX, old);
+    const read = decodeResults(url);
+    assert.equal(read.ok, true, old + ": " + (read.error || ""));
+    assert.equal(read.round!.players.length, 8, old);
+  }
+});
+
+// Not written today. Read anyway, so that moving the payload out of the
+// fragment — if a messenger ever forces it — needs no change to results.html
+// and no reissuing of links already sent.
+test("a payload in a query string is read as well as one in a fragment", () => {
+  const read = decodeResults(link(8).url.replace("#", "?r="));
+  assert.equal(read.ok, true, read.error || "");
+  assert.equal(read.round!.players.length, 8);
+});
+
+test("a link that lost its fragment says so, and says it is the messenger", () => {
+  for (const url of ["https://x.github.io/btc-clubhouse/results.html",
+                     "https://x.github.io/btc-clubhouse/results.html#"]) {
+    const read = decodeResults(url);
+    assert.equal(read.ok, false);
+    assert.match(read.error!, /everything after the “#” was lost/);
+    assert.match(read.error!, /e-mail/, "and offers the way round it");
+  }
+});
+
+test("something that was never a round says that instead", () => {
+  const read = decodeResults("https://example.com/some/other/page");
+  assert.equal(read.ok, false);
+  assert.match(read.error!, /does not carry a round/);
 });

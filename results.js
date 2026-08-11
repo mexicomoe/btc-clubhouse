@@ -36,8 +36,34 @@
  */
 (function () {
 
-  /** The marker. A version number in it, so a later format can be told apart. */
-  const RESULT_PREFIX = "BTCR1:";
+  /**
+   * The marker, with a version number in it so a later format can be told apart.
+   *
+   * IT ENDS IN AN UNDERSCORE, AND THAT MATTERS. It used to end in a colon, like
+   * the event code's marker, and a link sent by e-mail worked while the same
+   * link sent by text arrived with nothing after the "#". The colon was the only
+   * character in the whole fragment that is not base64url, and it can do two
+   * separate kinds of damage:
+   *
+   *   · "BTCR1:" has the exact shape of a URI SCHEME — a letter followed by
+   *     letters and digits, then a colon. A link detector scanning a message can
+   *     end the https URL at the "#" and read the rest as a second URI with an
+   *     unknown scheme, which it then drops. The address that gets tapped is the
+   *     page with no round on it.
+   *   · A sender that percent-encodes the fragment writes "BTCR1%3A", and a
+   *     marker matched by its literal characters no longer matches at all.
+   *
+   * An underscore is in the base64url alphabet, is not a scheme separator and is
+   * not percent-encoded by anything. The fragment is now a single unbroken run
+   * of [A-Za-z0-9_-] with nothing in it for a parser to take an interest in.
+   */
+  const RESULT_PREFIX = "BTCR1_";
+
+  /**
+   * Every marker a link may arrive with. Only the first is ever written; the
+   * others are read so that a link already sent still opens.
+   */
+  const READ_PREFIXES = ["BTCR1_", "BTCR1:", "BTCR1%3A", "BTCR1-"];
 
   /**
    * The most characters a whole URL may run to. The figure is not a browser
@@ -170,12 +196,38 @@
    * which he would read as "nobody scored" and repeat in the bar.
    */
   function decodeResults(text) {
-    const raw = String(text == null ? "" : text);
-    const at = raw.toUpperCase().indexOf(RESULT_PREFIX);
-    if (at === -1) {
-      return refuse("This link does not carry a round. Ask for it to be sent again.");
+    let raw = String(text == null ? "" : text);
+
+    // Percent-escapes first, in case something on the way encoded the fragment.
+    // A payload of base64url has nothing in it that needs encoding, so anything
+    // escaped here was added by a messenger rather than by us.
+    if (raw.indexOf("%") !== -1) {
+      try { raw = decodeURIComponent(raw); } catch (err) { /* leave it as it came */ }
     }
-    const body = raw.slice(at + RESULT_PREFIX.length).replace(/\s+/g, "");
+
+    // The round may ride in the fragment (where it is never sent to a server) or
+    // in a query string. Only the fragment is written today; the query string is
+    // read as well so that moving to it, if a messenger ever forces the issue,
+    // needs no change to this page — and a link already out there keeps working.
+    const upper = raw.toUpperCase();
+    let at = -1, markerLength = 0;
+    for (const prefix of READ_PREFIXES) {
+      const found = upper.indexOf(prefix.toUpperCase());
+      if (found !== -1 && (at === -1 || found < at)) { at = found; markerLength = prefix.length; }
+    }
+    if (at === -1) {
+      // Say which of the two it was. "The link opened but the board is empty" is
+      // the hardest kind of fault to report on, and the difference between an
+      // address with nothing after the "#" and one that was never a round at all
+      // is the difference between "your messenger ate it" and "wrong link".
+      const hasPage = /results\.html/i.test(raw);
+      const hasNothingAfterHash = /#\s*$/.test(raw) || (hasPage && raw.indexOf("#") === -1);
+      return refuse(hasNothingAfterHash
+        ? "The round is missing from this link — everything after the “#” was lost on the way. " +
+          "Ask for it again, and send it as an e-mail if a text keeps doing this."
+        : "This link does not carry a round. Ask for it to be sent again.");
+    }
+    const body = raw.slice(at + markerLength).replace(/\s+/g, "");
     if (body === "") {
       return refuse("The link arrived empty — everything after the marker was lost. Ask for it again.");
     }
@@ -278,7 +330,7 @@
   }
 
   globalThis.ClubhouseResults = {
-    RESULT_PREFIX, RESULT_CONTESTS, MAX_URL_LENGTH,
+    RESULT_PREFIX, READ_PREFIXES, RESULT_CONTESTS, MAX_URL_LENGTH,
     encodeResults, decodeResults, resultsLink, maxPlayersThatFit,
     toBase64Url, fromBase64Url,
   };

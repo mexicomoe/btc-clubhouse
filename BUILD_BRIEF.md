@@ -264,6 +264,19 @@ Until this existed, the result of a round was the organiser reading numbers alou
 
 The ceiling is **2,000 characters for the whole URL**. That is not a browser limit — Safari and Chrome take fragments of 64 KB — but the point at which a messaging app stops agreeing where a link ends. The payload is base64**url** (`A–Z a–z 0–9 - _`) because a `+` or `/` is exactly where that goes wrong.
 
+> ⚠️ **The fragment must be one unbroken run of `[A-Za-z0-9_-]`, and nothing else.**
+>
+> The marker was `BTCR1:` and a link sent by e-mail worked while the same link sent by text arrived with **nothing after the `#`**. The colon was the only character in the whole fragment that is not base64url, and it can do two separate kinds of damage:
+>
+> · `BTCR1:` has the exact shape of a **URI scheme** — a letter, then letters and digits, then a colon. A link detector scanning a message can end the `https` URL at the `#` and read the rest as a second URI with an unknown scheme, which it drops. What gets tapped is the page with no round on it.
+> · A sender that **percent-encodes** the fragment writes `BTCR1%3A`, and a marker matched by its literal characters no longer matches.
+>
+> The marker is now `BTCR1_`. An underscore is in the base64url alphabet, is not a scheme separator and is not percent-encoded by anything. **Do not put a colon, a slash, a dot or an ampersand in a fragment that has to survive a messenger.**
+
+The reader is defensive about the rest of the trip: it percent-decodes first, accepts the old `BTCR1:` and `BTCR1%3A` markers so links already sent still open, and reads the payload from a **query string** as well as a fragment — so if a messenger ever forces the move, no change to `results.html` is needed and no link has to be reissued.
+
+**The payload stays in the fragment while it possibly can**, because a fragment is never sent to a server and a query string is: moving it would put every member's name and score into GitHub Pages' request logs. Length is not the obstacle — a query string is two characters longer than a fragment and 24 players still comes to 1,749 — the logging is.
+
 | Field | Real names, real scores |
 |---|---|
 | 8 players | **680** characters — 34% of the limit |
