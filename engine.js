@@ -166,15 +166,21 @@
       { threshold: 99, strokes: -0.8 },
     ],
     /**
-     * Triple Threat — a gross triple bogey or worse costs, and answering it
-     * with a net par or better on the very next hole more than pays it back.
+     * Triple Threat — a gross triple bogey or worse costs, and a BOUNCE BACK
+     * off it, a net par or better on the very next hole, more than pays it back.
+     *
+     * The second half carries the name of the contest it absorbed. Bounce Back
+     * used to stand on its own and 31% of its scores were already being paid
+     * twice, once here and once there, because a gross triple is usually a net
+     * bogey and a net par usually satisfies both. It is one contest now, and
+     * the half that answers the damage is still called what it always was.
      *
      * One flat rate for everybody. A picked-up hole is NOT a triple: it shows a
      * gross of par + 4 and would otherwise be caught by the bar, which would
      * mean a Stableford round punishing a man for the thing Stableford tells
      * him to do.
      */
-    tripleThreat: { perTriple: 0.5, perRecovery: -0.9 },
+    tripleThreat: { perTriple: 0.5, perBounceBack: -0.9 },
     /**
      * Go Long and Get Shorty are SWITCHED OFF — Easy Street replaces both. Null
      * is the same signal Skins uses: not scored, not shown, not exported. The
@@ -587,25 +593,26 @@
     //
     // A picked-up hole is excluded: it shows a gross of par + 4 and would sail
     // over the bar, so a Stableford round would charge a man for picking up,
-    // which is what Stableford asks him to do. The recovery is read on NET —
+    // which is what Stableford asks him to do. The bounce back is read on NET —
     // the man is being asked to steady the ship, not to match a scratch card.
     let tripleThreat;
     if (contests.tripleThreat == null) {
       tripleThreat = null;
     } else {
-      let triples = 0, answered = 0;
+      let triples = 0, bounces = 0;
       for (let i = 0; i < HOLES; i++) {
         if (!played(i) || isPickedUp(card.gross[i])) continue;
         if (grossByHole[i] - course.par[i] < 3) continue;
         triples++;
         // The 18th has no next hole, so a triple there can only cost.
-        if (i + 1 < HOLES && played(i + 1) && over(i + 1) <= 0) answered++;
+        if (i + 1 < HOLES && played(i + 1) && over(i + 1) <= 0) bounces++;
       }
       const raw = triples * contests.tripleThreat.perTriple
-                + answered * contests.tripleThreat.perRecovery;
+                + bounces * contests.tripleThreat.perBounceBack;
       tripleThreat = { strokes: toTenth(raw),
         detail: triples === 0 ? "no triples"
-          : triples + " triple" + (triples === 1 ? "" : "s") + ", " + answered + " answered",
+          : triples + " triple" + (triples === 1 ? "" : "s") + ", " +
+            bounces + " bounce-back" + (bounces === 1 ? "" : "s"),
         live: true };
     }
 

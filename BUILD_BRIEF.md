@@ -140,9 +140,11 @@ The fairest contest in the set — correlation with handicap is +0.05. Works on 
 *Replaced Go Long and Get Shorty, which it succeeds outright.*
 
 **5 · Triple Threat** — a gross triple bogey or worse, and the answer to it.
-`gross triple or worse → +0.5 · net par or better on the very next hole → −0.9`
+`gross triple or worse → +0.5 · a **bounce back** off it, a net par or better on the very next hole → −0.9`
 
-*The recovery used to be exactly twice the penalty. Scaling by 1.5 took 0.45 to 0.5 and left 0.9 alone, so it is now 1.8× — two triples with one answered comes to a tenth against the man rather than nothing.*
+**The second half keeps the name of the contest it absorbed.** Bounce Back used to stand on its own and 31% of its scores were already being paid twice — a gross triple is usually a net bogey and a net par usually satisfies both. It is one contest now, and the half that answers the damage is still called what it always was. A card reads *"2 triples, 1 bounce-back"*.
+
+*The bounce back used to be exactly twice the penalty. Scaling by 1.5 took 0.45 to 0.5 and left 0.9 alone, so it is now 1.8× — two triples with one bounce back comes to a tenth against the man rather than nothing.*
 
 **It replaced Damage Control and Bounce Back**, which are now null. It is the same idea as both in one contest: the gross triple is the damage and the net par on the next hole is the bounce back, scored as one event rather than two that overlapped — 31% of Triple Threat's recoveries were already paying Bounce Back for the same two holes. Their ladders and graders stay in the code; null means not scored, not shown, not exported, and their CSV columns stay writing blank.
 
@@ -154,7 +156,7 @@ The two halves are read differently on purpose: **the damage is gross, the recov
 
 **A picked-up hole is never a triple.** It shows a gross of par + 4 and would otherwise clear the bar, which would mean a Stableford round charging a man for the one thing Stableford tells him to do.
 
-A triple on the 18th can only cost — there is no next hole. Consecutive triples leave the first unanswered.
+A triple on the 18th can only cost — there is no next hole. Consecutive triples leave the first without a bounce back.
 
 *Overlaps Bounce Back by design: 31% of Triple Threat recoveries also score a bounce-back, the same two holes paying twice.*
 

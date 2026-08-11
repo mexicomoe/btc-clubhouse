@@ -82,8 +82,12 @@ export interface SkinsConfig {
 export interface TripleThreatConfig {
   /** What a gross triple bogey or worse costs. Positive — it adds strokes. */
   perTriple: number;
-  /** What answering one with a net par or better on the next hole pays back. */
-  perRecovery: number;
+  /**
+   * What a BOUNCE BACK pays — a net par or better on the very next hole. Named
+   * for the contest it absorbed: Bounce Back used to stand on its own, and the
+   * half of Triple Threat that answers the damage is still called that.
+   */
+  perBounceBack: number;
 }
 
 /** Contest thresholds. Agony/Damage/Easy grade `<=`; Bounce grades `>=`. */
