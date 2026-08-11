@@ -9,10 +9,10 @@
  * A "group" is whatever the round is played in — carts of two some weeks, teams
  * of four others. The engine does not care which; only the membership changes.
  *
- * A skin is worth `fairShare × groups / 18`: −0.18 over two groups, −0.36 over
- * four, −0.53 over six, −1.07 over twelve. That is the value at which an even
- * share of the eighteen comes to 1.6 whatever the size of the field. The total
- * is capped at 5.0, because the winning group's haul does
+ * A skin is worth `fairShare × groups / 18`: −0.13 over two groups, −0.27 over
+ * four, −0.40 over six, −0.80 over twelve. That is the value at which an even
+ * share of the eighteen comes to 1.2 whatever the size of the field. The total
+ * is capped at 3.8, because the winning group's haul does
  * NOT shrink as the field grows — six or seven skins over four groups, six or
  * seven over twelve — so without a ceiling Skins would outgrow every other
  * contest in a large field.
@@ -44,31 +44,31 @@ function card(name: string, cart: number | null, edit: (g: (number | null)[]) =>
 // and more in a big one.
 test("a skin is worth what makes an even share come to the fair share", () => {
   const config = DEFAULT_CONTESTS.skins!;
-  assert.equal(config.fairShare, -1.6);
+  assert.equal(config.fairShare, -1.2);
 
   const per = (g: number) => Number(skinValue(config, g).toFixed(2));
-  assert.equal(per(2), -0.18, "two groups");
-  assert.equal(per(4), -0.36, "four groups");
-  assert.equal(per(6), -0.53, "six groups");
-  assert.equal(per(12), -1.07, "twelve groups");
+  assert.equal(per(2), -0.13, "two groups");
+  assert.equal(per(4), -0.27, "four groups");
+  assert.equal(per(6), -0.4, "six groups");
+  assert.equal(per(12), -0.8, "twelve groups");
 });
 
 // This is the property the value exists to have, and the reason it is not
-// `fairShare / groups`: that made a fair share worth 7.2 over two groups and
-// 0.13 over twelve, which is the opposite of flat.
+// `fairShare / groups`: that made a fair share worth 5.4 over two groups and
+// 0.10 over twelve, which is the opposite of flat.
 test("an even share of the eighteen is worth the same in any field", () => {
   const config = DEFAULT_CONTESTS.skins!;
   for (const groups of [2, 3, 6, 9, 18]) {
     const share = 18 / groups;              // a whole number for each of these
     const paid = Math.abs(share * skinValue(config, groups));
-    assert.ok(Math.abs(paid - 1.6) < 0.05,
-      `${groups} groups: an even share of ${share} paid ${paid.toFixed(2)}, not 1.6`);
+    assert.ok(Math.abs(paid - 1.2) < 0.05,
+      `${groups} groups: an even share of ${share} paid ${paid.toFixed(2)}, not 1.2`);
   }
 });
 
 test("a skin is worth to the hundredth exactly what the tab prints", () => {
   // The figure on the Skins tab is the one that must multiply up. An unrounded
-  // 0.1778 would print as 0.18 and pay as though it were not.
+  // 0.1333 would print as 0.13 and pay as though it were not.
   const config = DEFAULT_CONTESTS.skins!;
   for (let groups = 1; groups <= 18; groups++) {
     const v = skinValue(config, groups);
@@ -94,14 +94,14 @@ test("winning more pays more, right up to the ceiling", () => {
 // sits past a rout of every hole, so nothing a group can actually do is held
 // back. It exists for the large field, where the winner's haul does not shrink
 // but the value of each skin keeps climbing.
-test("the ceiling is 5.0", () => {
+test("the ceiling is 3.8", () => {
   const config = DEFAULT_CONTESTS.skins!;
-  assert.equal(config.maxSkinStrokes, -5.0);
+  assert.equal(config.maxSkinStrokes, -3.8);
 
-  assert.equal(skinStrokes(18, config, 4), -5.0, "a four-group rout reaches it");
-  assert.ok(skinStrokes(13, config, 4) > -5.0, "but thirteen skins does not");
-  assert.equal(skinStrokes(18, config, 12), -5.0, "and a big field cannot pass it");
-  assert.equal(skinStrokes(5, config, 12), -5.0, "which at twelve groups is soon reached");
+  assert.equal(skinStrokes(18, config, 4), -3.8, "a four-group rout reaches it");
+  assert.ok(skinStrokes(13, config, 4) > -3.8, "but thirteen skins does not");
+  assert.equal(skinStrokes(18, config, 12), -3.8, "and a big field cannot pass it");
+  assert.equal(skinStrokes(5, config, 12), -3.8, "which at twelve groups is soon reached");
 });
 
 test("the same haul is worth more in a bigger field, until the ceiling", () => {
@@ -135,9 +135,9 @@ test("skins are added to the final and shown as a contest", () => {
   const by = Object.fromEntries(board.map((r) => [r.name, r]));
 
   assert.equal(by["Strong"].skins, 18, "all eighteen");
-  // Two groups, so a skin is worth −0.18 and eighteen of them −3.2 — inside the
+  // Two groups, so a skin is worth −0.13 and eighteen of them −2.3 — inside the
   // ceiling, because in a small field each skin is worth little.
-  assert.equal(by["Strong"].contests.skins!.strokes, -3.2);
+  assert.equal(by["Strong"].contests.skins!.strokes, -2.3);
   assert.equal(by["Strong"].contests.skins!.live, true);
   assert.match(by["Strong"].contests.skins!.detail, /18 skins for group 1/);
 
@@ -188,7 +188,7 @@ function field(carts: number): PlayerCard[] {
 // Two groups is inside the ceiling; four and six are held at it. A rout of every
 // hole is the only thing that reaches it over four groups.
 for (const [carts, eighteen, capped] of
-     [[2, -3.2, false], [4, -5.0, true], [6, -5.0, true]] as const) {
+     [[2, -2.3, false], [4, -3.8, true], [6, -3.8, true]] as const) {
   test(`a ${carts}-group rout pays ${eighteen}${capped ? ", held at the ceiling" : ""}`, () => {
     const board = computeLeaderboard(field(carts), ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
     const winners = board.filter((r) => r.skins === 18);
@@ -218,8 +218,8 @@ test("a two-group field is decided rather than levelled", () => {
   const level = computeLeaderboard(even, ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
   assert.deepEqual(level.map((r) => r.skins).sort(), [9, 9], "nine skins each");
   // Nine of eighteen over two groups is an even share, so each is paid the
-  // 1.6 the fair share is worth — the property the value is built to have.
-  assert.ok(level.every((r) => r.contests.skins!.strokes === -1.6), "and both paid the same");
+  // 1.2 the fair share is worth — the property the value is built to have.
+  assert.ok(level.every((r) => r.contests.skins!.strokes === -1.2), "and both paid the same");
 
   // ...but tilt it and the contest separates them, which a fixed −1.5 could not.
   const tilted = [

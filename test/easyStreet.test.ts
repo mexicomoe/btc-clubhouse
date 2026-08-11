@@ -2,9 +2,9 @@
  * Easy Street — the three holes the card is supposed to give back, counted on
  * GROSS scores.
  *
- *   no par     +1.0
+ *   no par     +0.8
  *   one par     0
- *   two or more −1.0
+ *   two or more −0.8
  *
  * Par or better counts as ONE. A birdie is a par for this purpose, so a lone
  * birdie is a count of one and pays nothing, and a birdie beside a par is two
@@ -45,9 +45,9 @@ test("the three holes come off the course, not out of the contest", () => {
 
 /* ---- the ladder ---- */
 
-test("no par on the three costs 1.0", () => {
+test("no par on the three costs 0.8", () => {
   const r = score(street(1, 1, 1));
-  assert.equal(r.strokes, 1.0);
+  assert.equal(r.strokes, 0.8);
   assert.equal(r.detail, "no pars on the three");
   assert.equal(r.live, true);
 });
@@ -59,13 +59,13 @@ test("one par pays nothing", () => {
   assert.equal(score(street(0, 1, 1)).detail, "1 of 3 at par or better");
 });
 
-test("two pars pay 1.0", () => {
-  assert.equal(score(street(0, 0, 1)).strokes, -1.0);
+test("two pars pay 0.8", () => {
+  assert.equal(score(street(0, 0, 1)).strokes, -0.8);
   assert.equal(score(street(0, 0, 1)).detail, "2 of 3 at par or better");
 });
 
 test("all three pay the same as two — the ladder tops out", () => {
-  assert.equal(score(street(0, 0, 0)).strokes, -1.0);
+  assert.equal(score(street(0, 0, 0)).strokes, -0.8);
   assert.equal(score(street(0, 0, 0)).detail, "3 of 3 at par or better");
 });
 
@@ -80,13 +80,13 @@ test("a lone birdie is a count of one, and pays nothing", () => {
 
 test("a birdie beside a par is two, not three", () => {
   const r = score(street(-1, 0, 1));
-  assert.equal(r.strokes, -1.0);
+  assert.equal(r.strokes, -0.8);
   assert.equal(r.detail, "2 of 3 at par or better");
 });
 
 test("an eagle is still one hole", () => {
   assert.equal(score(street(-2, 1, 1)).strokes, 0);
-  assert.equal(score(street(-2, -2, 1)).strokes, -1.0, "two eagles are two, not four");
+  assert.equal(score(street(-2, -2, 1)).strokes, -0.8, "two eagles are two, not four");
 });
 
 /* ---- gross, not net ---- */
@@ -95,13 +95,13 @@ test("an eagle is still one hole", () => {
 // two strokes on every hole — gets no help at all.
 test("it reads gross, so handicap strokes do not create pars", () => {
   // Off 18 he has exactly one stroke on every hole, so a gross bogey on all
-  // three IS a net par on all three — and Easy Street still charges him 1.0.
+  // three IS a net par on all three — and Easy Street still charges him 0.8.
   const bogeys = street(1, 1, 1);
   bogeys.courseHandicap = 18;
   const r = scorePlayer(bogeys, ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
   assert.deepEqual([10, 11, 12].map((i) => r.netByHole![i]),
     [10, 11, 12].map((i) => PAR[i]), "all three net par");
-  assert.equal(r.contests.easyStreet!.strokes, 1.0, "and gross bogey pays the penalty anyway");
+  assert.equal(r.contests.easyStreet!.strokes, 0.8, "and gross bogey pays the penalty anyway");
 });
 
 test("the same card scores the same off every tee", () => {
@@ -111,7 +111,7 @@ test("the same card scores the same off every tee", () => {
     const c = street(0, 0, 1);
     c.tee = tee; c.courseHandicap = 18;
     assert.equal(scorePlayer(c, undefined, DEFAULT_CONTESTS).contests.easyStreet!.strokes,
-      -1.0, "Tee " + tee);
+      -0.8, "Tee " + tee);
   }
 });
 
@@ -143,7 +143,7 @@ test("a picked-up hole is played, and is not a par", () => {
   c.gross[10] = "X";
   const r = score(c);
   assert.equal(r.live, true, "the hole was played");
-  assert.equal(r.strokes, -1.0, "12 and 13 still carry it");
+  assert.equal(r.strokes, -0.8, "12 and 13 still carry it");
   assert.equal(r.detail, "2 of 3 at par or better");
 });
 

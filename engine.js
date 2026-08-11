@@ -121,18 +121,18 @@
     // tuned against. A realistic good round is nearer 3.0 and the field average
     // nearer 0.4.
     watchTheBirdie: {
-      birdie: -1.0, eagle: -2.0,
+      birdie: -0.8, eagle: -1.5,
       // Holes 4 and 18 pay double. Measured over 111 rounds they were the two
       // worst par 5s to nominate — hole 7 was worth 2.3× hole 4 — so nobody
       // rational picked 4, and its slot was a formality. Doubling makes the
       // choice a choice. Hole 18 was already the best of its pair; doubling it
       // was asked for anyway and it makes 18 the pick of the back nine.
-      byHole: { 4: { birdie: -2.0, eagle: -4.0 }, 18: { birdie: -2.0, eagle: -4.0 } },
+      byHole: { 4: { birdie: -1.6, eagle: -3.0 }, 18: { birdie: -1.6, eagle: -3.0 } },
     },
     agonyAlley: [
-      { threshold: 12, strokes: -5.0 }, { threshold: 13, strokes: -3.0 },
-      { threshold: 14, strokes: -1.0 }, { threshold: 15, strokes: 0 },
-      { threshold: 16, strokes: 2.0 }, { threshold: 99, strokes: 3.0 },
+      { threshold: 12, strokes: -3.8 }, { threshold: 13, strokes: -2.3 },
+      { threshold: 14, strokes: -0.8 }, { threshold: 15, strokes: 0 },
+      { threshold: 16, strokes: 1.5 }, { threshold: 99, strokes: 2.3 },
     ],
     /**
      * Damage Control and Bounce Back are SWITCHED OFF — Triple Threat replaced
@@ -162,8 +162,8 @@
      * That is the design as specified, not an accident of it.
      */
     easyStreet: [
-      { threshold: 0, strokes: 1.0 }, { threshold: 1, strokes: 0 },
-      { threshold: 99, strokes: -1.0 },
+      { threshold: 0, strokes: 0.8 }, { threshold: 1, strokes: 0 },
+      { threshold: 99, strokes: -0.8 },
     ],
     /**
      * Triple Threat — a gross triple bogey or worse costs, and answering it
@@ -174,7 +174,7 @@
      * mean a Stableford round punishing a man for the thing Stableford tells
      * him to do.
      */
-    tripleThreat: { perTriple: 0.6, perRecovery: -1.2 },
+    tripleThreat: { perTriple: 0.5, perRecovery: -0.9 },
     /**
      * Go Long and Get Shorty are SWITCHED OFF — Easy Street replaces both. Null
      * is the same signal Skins uses: not scored, not shown, not exported. The
@@ -221,7 +221,7 @@
     // hot, and the two effects cancel. So the winner's PAY rises with the field
     // even though a fair share's does not, which is what maxSkinStrokes is for:
     // no one contest may outweigh Agony Alley's 2.5, however large the field.
-    skins: { fairShare: -1.6, maxSkinStrokes: -5.0 },
+    skins: { fairShare: -1.2, maxSkinStrokes: -3.8 },
   };
 
   /* ---- Reading a handicap index that someone typed in ----
