@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0b2e13">
+<meta name="robots" content="noindex, nofollow">
+<title>Beat the Crowd · Results</title>
+<link rel="stylesheet" href="clubhouse.css">
+</head>
+<body>
+
+<!--
+  The read-only leaderboard a shared link opens.
+
+  THERE IS NO SCORING CODE ON THIS PAGE and no setup. engine.js, importer.js and
+  exporter.js are not loaded, and nothing here writes to storage. The round
+  arrives already settled — every final, every contest value and every placing
+  was decided on the organiser's phone — so there is nothing here to score with
+  and no way to reach the app's setup, whatever anyone does to the address.
+  That is not a flag that could be flipped; the code simply is not present.
+
+  The look comes from clubhouse.css and the name-fitting from display.js, both
+  shared with the app, so this reads as the same product rather than a copy of
+  it that has drifted.
+-->
+
+<section id="board" class="screen on">
+  <header class="band">
+    <div class="title">Leaderboard</div>
+    <div class="sub" id="boardSub">Loading…</div>
+  </header>
+  <div id="rows"></div>
+  <div id="boardNote"></div>
+</section>
+
+<section id="player" class="screen">
+  <div class="backbar"><button class="back" id="backBtn">‹ Leaderboard</button></div>
+  <div id="playerBody"></div>
+</section>
+
+<script src="display.js"></script>
+<script src="results.js"></script>
+<script>
+"use strict";
+const D = window.ClubhouseDisplay;
+const RS = window.ClubhouseResults;
+const { esc, fmtFinal, fmtStrokes, fitName, niceDate, CONTEST_NAMES } = D;
+
+let round = null;
+
+function show(which){
+  for(const id of ["board","player"]){
+    document.getElementById(id).classList.toggle("on", id === which);
+  }
+  window.scrollTo(0, 0);
+}
+
+/**
+ * Something is wrong with the link. Say so in a sentence a man can act on —
+ * an empty leaderboard would be read as "nobody scored" and repeated in the bar,
+ * which is worse than no page at all.
+ */
+function fail(message){
+  document.getElementById("boardSub").textContent = "This link did not open";
+  document.getElementById("rows").innerHTML = "";
+  document.getElementById("boardNote").innerHTML =
+    `<div class="note warn">${esc(message)}</div>`;
+  show("board");
+}
+
+function renderBoard(){
+  const rowsEl = document.getElementById("rows");
+  const players = round.players;
+
+  const when = niceDate(round.date);
+  const n = players.length;
+  document.getElementById("boardSub").textContent =
+    [round.course || "Aberdeen G&CC", when, n + " player" + (n === 1 ? "" : "s")]
+      .filter(Boolean).join(" · ");
+
+  rowsEl.innerHTML = "";
+  let markedIneligible = false;
+  players.forEach((r) => {
+    // Everyone who finished, then a line, then everyone who didn't — exactly as
+    // the app orders them. The order arrived settled; nothing is sorted here.
+    if(!r.eligible && !markedIneligible){
+      markedIneligible = true;
+      const head = document.createElement("div");
+      head.className = "section-label";
+      head.textContent = "Not eligible — no full round";
+      rowsEl.appendChild(head);
+    }
+    const b = document.createElement("button");
+    b.className = "row" + (r.rank === 1 && r.eligible ? " leader" : "");
+    const partial = r.holesPlayed > 0 && r.holesPlayed < 18 ? " · " + r.holesPlayed + " holes" : "";
+    const meta = r.net == null ? "no card" : "Net " + r.net + partial;
+    const tie = r.eligible ? r.tieNote : "not eligible";
+    b.innerHTML =
+      `<span class="rank">${r.eligible ? r.rank : "–"}</span>` +
+      `<span class="who"><span class="name">${esc(r.name)}</span>` +
+      `<span class="meta">${esc(meta)}</span>` +
+      (tie ? `<span class="tie">${esc(tie)}</span>` : ``) + `</span>` +
+      `<span class="final">${fmtFinal(r.final)}</span><span class="chev">›</span>`;
+    b.addEventListener("click", () => showPlayer(r.name));
+    rowsEl.appendChild(b);
+  });
+
+  // Anything about the round that was not the usual settings, said once rather
+  // than left for someone to work out from the numbers.
+  document.getElementById("boardNote").innerHTML =
+    `<div class="note">${round.note ? esc(round.note) + "<br>" : ""}` +
+    `Final = net score minus the strokes earned in the contests. ` +
+    `Tap a name for the breakdown.<br>` +
+    `<b>This is a finished round.</b> It keeps these numbers for good — ` +
+    `later rounds and later settings do not change it.</div>`;
+
+  document.querySelectorAll("#rows .name").forEach((el) => fitName(el, 26, 18));
+  show("board");
+}
+
+function showPlayer(name){
+  const r = round.players.find((p) => p.name === name);
+  if(!r) return;
+  const earned = Object.values(r.contests).reduce((a, b) => a + b, 0);
+  const off = Math.round(-earned * 10) / 10;
+
+  let html =
+    `<header class="band"><div class="title">${esc(r.name)}</div>` +
+    `<div class="sub">${esc([round.course || "Aberdeen G&CC", niceDate(round.date)]
+      .filter(Boolean).join(" · "))}</div></header>`;
+
+  if(r.courseHandicap != null){
+    html += `<div class="chread">Course handicap <b>${r.courseHandicap}</b>` +
+      (round.tee ? `<span style="font-size:18px"> · Tee ${esc(round.tee)}</span>` : ``) +
+      `</div>`;
+  }
+
+  // The same equation the app shows: net, less what the contests took off.
+  html += `<div class="equation">` +
+    `<div><div class="lab">NET</div><div class="num">${r.net == null ? "–" : r.net}</div></div>` +
+    `<div class="op">−</div>` +
+    `<div><div class="lab">CONTESTS</div><div class="num">${off.toFixed(1)}</div></div>` +
+    `<div class="op">=</div>` +
+    `<div><div class="lab">FINAL</div><div class="fin">${fmtFinal(r.final)}</div></div>` +
+    `</div>`;
+
+  if(r.gross != null){
+    html += `<div class="note">Gross ${r.gross}` +
+      (r.holesPlayed != null && r.holesPlayed < 18 ? ` · ${r.holesPlayed} holes played` : ``) +
+      `</div>`;
+  }
+
+  html += `<div class="section-label">The contests</div>`;
+  // Only the contests this round actually played, in the round's own order —
+  // which contests were live travelled with it, so a round scored before a
+  // contest existed does not sprout an empty line for it.
+  html += round.contests.map((key) => {
+    const v = r.contests[key];
+    if(v == null) return "";
+    const cls = v < 0 ? "good" : v > 0 ? "penalty" : "none";
+    return `<div class="contest"><div class="cname">` +
+      `<div class="cn">${esc(CONTEST_NAMES[key] || key)}</div></div>` +
+      `<div class="cs ${cls}">${fmtStrokes(v)}</div></div>`;
+  }).join("");
+
+  document.getElementById("playerBody").innerHTML = html;
+  document.querySelectorAll("#playerBody .name").forEach((el) => fitName(el, 30, 18));
+  show("player");
+}
+
+document.getElementById("backBtn").addEventListener("click", () => { renderBoard(); });
+window.addEventListener("resize", () => {
+  document.querySelectorAll("#rows .name").forEach((el) => fitName(el, 26, 18));
+});
+
+/* The round rides in the fragment. A fragment is never sent to the server, so
+   the club's rounds never reach a web log — and this page is static anyway. */
+(function start(){
+  const read = RS.decodeResults(location.hash || "");
+  if(!read.ok){ fail(read.error); return; }
+  round = read.round;
+  renderBoard();
+})();
+</script>
+</body>
+</html>

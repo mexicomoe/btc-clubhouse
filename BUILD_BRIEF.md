@@ -244,6 +244,38 @@ Local storage on the device. One event at a time in v1. An export button (JSON o
 
 No server, no accounts, no sync. Those come later if the product proves out.
 
+### Sharing a finished round
+
+Until this existed, the result of a round was the organiser reading numbers aloud in the bar. **One button — Share results — puts a link on the clipboard.** He texts it; every man opens the finished leaderboard on his own phone with nothing installed and nobody signed in.
+
+**There is no server. The round travels inside the link**, in the fragment after `#`, which is never sent anywhere — not even to GitHub Pages' logs.
+
+**Results, not a round.** The event code of section 5 carries SETUP and the far end scores it again. That is wrong here three times over: it needs the engine present on a page that must never reach it; it would rescore against the *reader's* settings, so a link would change its numbers whenever a threshold moved; and it costs the eighteen holes nobody reads on a phone. So the finished figures travel — name, course handicap, gross, net, what each contest paid, final — **already settled, including the placing and the phrase that broke any tie**, because the far end has no cards to run a card match on and must not guess at one.
+
+**`results.html` is read-only by construction, not by a flag.** It loads `display.js` and `results.js` and nothing else — no engine, no importer, no exporter, no storage. There is nothing on the page to score with and no route into setup, whatever anyone does to the address. It shares `clubhouse.css` and `display.js` with the app so the two cannot drift apart and look like different products.
+
+> ⚠️ **A shared link is OBFUSCATED, NOT ENCRYPTED.**
+>
+> Nothing is legible in the address bar — the payload is base64, so a forwarded text gives away no member names at a glance. But anyone who pastes it into a decoder has the names and scores back in seconds. **Treat a shared link as public.**
+>
+> That is the right trade here: it is a golf leaderboard, the same names and scores are already on the club's Golf Genius portal, and a password to type would defeat the one thing the link is for.
+
+**Size.** The payload is delimited text rather than JSON — JSON spends a quote on every name and cost four players off the top of the field. Strokes travel as tenths, as whole numbers. The last three fields of a row are written as nothing when they say the ordinary thing and then cut off the end.
+
+The ceiling is **2,000 characters for the whole URL**. That is not a browser limit — Safari and Chrome take fragments of 64 KB — but the point at which a messaging app stops agreeing where a link ends. The payload is base64**url** (`A–Z a–z 0–9 - _`) because a `+` or `/` is exactly where that goes wrong.
+
+| Field | Real names, real scores |
+|---|---|
+| 8 players | **680** characters — 34% of the limit |
+| 15 players | **1,160** — 58% |
+| 24 players (the app's maximum) | **1,788** — 89% |
+
+Worst case — every contest paying, so no value is a short "0" — the ceiling is **23 players at a 14-character average name**, 24 at 12 characters, 21 at 19. **Above it the button says so and refuses**, naming the length and the limit, rather than handing over an address that will arrive cut in half. A truncated link is worse than no link, because it looks like it worked.
+
+**No compression, deliberately.** Deflate would roughly halve these figures, but `CompressionStream` is needed at *both* ends and a man on an older phone would tap the link and get nothing. Plain base64 works on anything with a browser.
+
+**A wrong or truncated link fails with a sentence**, never an empty leaderboard — which a man would read as "nobody scored" and repeat in the bar.
+
 ---
 
 ## 6. What already exists

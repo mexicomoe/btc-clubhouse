@@ -7,289 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="theme-color" content="#0b2e13">
 <title>Beat the Crowd · Clubhouse</title>
-<style>
-  /* Built for men in their 70s–80s reading a dim phone in Florida sun.
-     Everything is big, black-on-white or white-on-black, bold, no thin greys.
-     Nothing is smaller than 18px and nothing tappable is under 48px. */
-  :root {
-    --ink: #000;
-    --paper: #fff;
-    --good: #0a6b2e;      /* strokes earned — dark green, high contrast on white */
-    --penalty: #b0140a;   /* the one contest that can add strokes */
-    --band: #0b2e13;      /* header band, deep green */
-    --wash: #f0efe9;      /* the only fill that isn't white — still near-black text */
-    /* Colour is here to help the eye FIND things, never to carry meaning on its
-       own: every tinted thing also says in words what it is. These are all pale
-       enough to keep black text at full contrast in Florida sun. */
-    --amber: #8a5000;     /* something is missing — always beside the word */
-    --amberwash: #ffeec8;
-    --tint-event: #dfeee1;   /* Event settings */
-    --tint-move: #dee8f3;    /* Move this event */
-    --tint-about: #eae7f2;   /* About */
-    font-size: 20px;
-  }
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { margin: 0; background: var(--paper); color: var(--ink); }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-    font-size: 20px; line-height: 1.3; -webkit-text-size-adjust: 100%;
-  }
-  .screen { display: none; max-width: 720px; margin: 0 auto; min-height: 100vh; }
-  .screen.on { display: block; }
-
-  header.band {
-    background: var(--band); color: #fff;
-    padding: 18px 20px; position: sticky; top: 0; z-index: 5;
-  }
-  header.band .title { font-size: 30px; font-weight: 800; letter-spacing: .2px; }
-  header.band .sub { font-size: 18px; font-weight: 700; margin-top: 2px; color: #fff; }
-
-  /* Tabs — the three places you can be */
-  nav.tabs { display: flex; border-bottom: 3px solid var(--ink); }
-  nav.tabs button {
-    flex: 1 1 0; min-height: 56px; padding: 12px 6px;
-    font: inherit; font-size: 18px; font-weight: 800;
-    background: var(--paper); color: var(--ink);
-    border: 0; border-right: 3px solid var(--ink); cursor: pointer;
-  }
-  nav.tabs button:last-child { border-right: 0; }
-  nav.tabs button[aria-current="true"] { background: var(--ink); color: var(--paper); }
-
-  /* Flight picker — only drawn when the field is actually divided */
-  nav.flights { display: flex; flex-wrap: wrap; border-bottom: 3px solid var(--ink); }
-  nav.flights button {
-    flex: 1 1 auto; min-width: 33%; min-height: 52px; padding: 10px 8px;
-    font: inherit; font-size: 18px; font-weight: 800;
-    background: var(--paper); color: var(--ink);
-    border: 0; border-right: 3px solid var(--ink); border-top: 0; cursor: pointer;
-  }
-  nav.flights button:last-child { border-right: 0; }
-  nav.flights button[aria-current="true"] { background: var(--ink); color: var(--paper); }
-
-  /* Leaderboard rows */
-  .row {
-    display: flex; align-items: center; gap: 8px; width: 100%;
-    padding: 18px 12px; min-height: 76px;
-    background: var(--paper); color: var(--ink);
-    border: 0; border-bottom: 3px solid var(--ink);
-    text-align: left; font: inherit; cursor: pointer;
-  }
-  .row:active { background: var(--ink); color: var(--paper); }
-  .row:active .final, .row:active .rank { color: var(--paper); }
-  .row .rank {
-    flex: 0 0 auto; min-width: 32px; text-align: center;
-    font-size: 28px; font-weight: 800;
-  }
-  .row .who { flex: 1 1 auto; min-width: 0; overflow: hidden; }
-  /* name and meta are stacked blocks so the gap below is real spacing, not just line-wrap.
-     nowrap + hidden lets JS auto-fit the name to one line without ever pushing the layout. */
-  .row .name {
-    display: block; font-size: 26px; font-weight: 800; line-height: 1.15;
-    white-space: nowrap; overflow: hidden;
-  }
-  /* Net only, fixed at the 18px floor — never auto-shrunk. Gross lives on the
-     detail screen: it isn't what anyone reads on a scoreboard, and dropping it
-     is what buys this line the room to stay legible. */
-  .row .meta {
-    display: block; font-size: 18px; font-weight: 700; margin-top: 7px;
-    white-space: nowrap; overflow: hidden;
-  }
-  /* Only appears when a tie had to be settled, so most rows never grow. */
-  .row .tie {
-    display: block; font-size: 18px; font-weight: 700; margin-top: 5px;
-    white-space: nowrap; overflow: hidden;
-  }
-  .row .final { flex: 0 0 auto; font-size: 44px; font-weight: 800; font-variant-numeric: tabular-nums; }
-  .row.leader { background: #fff7d6; }             /* faint gold, still black text */
-  .row.leader:active { background: var(--ink); }
-
-  .chev { flex: 0 0 auto; font-size: 26px; font-weight: 800; }
-
-  /* Detail screen */
-  .backbar { padding: 12px 14px; position: sticky; top: 0; background: var(--paper); z-index: 5; border-bottom: 3px solid var(--ink); }
-  .back {
-    display: inline-flex; align-items: center; gap: 8px;
-    min-height: 56px; padding: 10px 20px 10px 12px;
-    font-size: 22px; font-weight: 800;
-    background: var(--paper); color: var(--ink); border: 3px solid var(--ink); border-radius: 10px;
-    cursor: pointer;
-  }
-  .back:active { background: var(--ink); color: var(--paper); }
-
-  .detail-head { padding: 20px; }
-  .detail-head .name { font-size: 36px; font-weight: 800; white-space: nowrap; overflow: hidden; line-height: 1.1; }
-  .detail-head .hcp { font-size: 19px; font-weight: 700; margin-top: 4px; }
-
-  .equation {
-    display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px 16px;
-    padding: 8px 20px 20px; font-variant-numeric: tabular-nums;
-  }
-  .equation .lab { font-size: 18px; font-weight: 700; }
-  .equation .num { font-size: 30px; font-weight: 800; }
-  .equation .op { font-size: 26px; font-weight: 800; }
-  .equation .fin { font-size: 44px; font-weight: 800; }
-
-  .section-label {
-    padding: 14px 20px 6px; font-size: 20px; font-weight: 800;
-    border-top: 3px solid var(--ink); text-transform: uppercase; letter-spacing: .4px;
-  }
-  .contest { display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-bottom: 2px solid var(--ink); min-height: 60px; }
-  .contest .cname { flex: 1 1 auto; }
-  .contest .cn { font-size: 21px; font-weight: 800; }
-  .contest .cd { font-size: 18px; font-weight: 700; margin-top: 2px; }
-  .contest .cs { flex: 0 0 auto; font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; }
-  .cs.good { color: var(--good); }
-  .cs.penalty { color: var(--penalty); }
-  .cs.none { color: var(--ink); }
-  .cd.dim { font-weight: 800; }   /* "needs 18 holes" — kept bold black, not grey */
-
-  /* Shared blocks */
-  .pad { padding: 18px 14px; }
-  .note { font-size: 18px; font-weight: 700; padding: 16px 14px; }
-  .note.warn { background: var(--wash); border-bottom: 3px solid var(--ink); }
-  .big {
-    display: block; width: 100%; min-height: 60px; padding: 14px;
-    font: inherit; font-size: 22px; font-weight: 800;
-    background: var(--paper); color: var(--ink);
-    border: 3px solid var(--ink); border-radius: 10px; cursor: pointer;
-  }
-  .big:active { background: var(--ink); color: var(--paper); }
-  .big.solid { background: var(--ink); color: var(--paper); }
-  .big.solid:active { background: var(--paper); color: var(--ink); }
-  .big.danger { color: var(--penalty); border-color: var(--penalty); }
-  .big.danger:active { background: var(--penalty); color: var(--paper); }
-  .big[disabled] { opacity: .45; cursor: default; }
-  .big + .big { margin-top: 12px; }
-
-  /* Setup: the two things checked first, before anything is opened — how many
-     men are in, and whether their cards have arrived. */
-  .status { display: flex; border-bottom: 3px solid var(--ink); }
-  .status .stat {
-    flex: 1 1 0; min-width: 0; padding: 12px 14px;
-    border-right: 3px solid var(--ink);
-  }
-  .status .stat:last-child { border-right: 0; }
-  .status .statn { font-size: 30px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.1; }
-  .status .statl { font-size: 18px; font-weight: 800; text-transform: uppercase; letter-spacing: .4px; margin-top: 2px; }
-  /* Amber says "not yet"; the words say it too, so the tint is never the signal. */
-  .status .stat.wait { background: var(--amberwash); box-shadow: inset 0 -6px 0 var(--amber); }
-
-  /* Collapsed sections — the settings, the transfers and the build line, each
-     out of the way until wanted. Native <details>, so it needs no script, works
-     offline and reads correctly to VoiceOver. */
-  details.fold { border-bottom: 3px solid var(--ink); }
-  details.fold > summary {
-    display: flex; align-items: center; gap: 10px;
-    min-height: 60px; padding: 14px 18px;
-    font-size: 22px; font-weight: 800; cursor: pointer;
-    border-top: 3px solid var(--ink);
-    list-style: none;
-  }
-  details.fold > summary::-webkit-details-marker { display: none; }
-  /* The open/shut mark is a shape, not a colour, and sits at the 18px floor. */
-  details.fold > summary::after {
-    content: "＋"; margin-left: auto; font-size: 26px; font-weight: 800;
-  }
-  details.fold[open] > summary::after { content: "－"; }
-  details.fold > summary .fsub {
-    display: block; font-size: 18px; font-weight: 700; margin-top: 3px;
-  }
-  details.fold > summary .fname { display: block; }
-  #foldEvent > summary { background: var(--tint-event); }
-  #foldMove  > summary { background: var(--tint-move); }
-  #foldAbout > summary { background: var(--tint-about); }
-
-  /* Setup list */
-  .prow {
-    display: flex; align-items: center; gap: 10px; width: 100%;
-    padding: 14px 12px; min-height: 72px;
-    background: var(--paper); color: var(--ink);
-    border: 0; border-bottom: 3px solid var(--ink);
-    text-align: left; font: inherit; cursor: pointer;
-  }
-  /* A row with something missing. The bar and the tint are there to catch the
-     eye across twenty-four rows; the word "missing" in the line below the name
-     is what actually says so, for anyone who cannot tell the tint from white. */
-  .prow.warn { background: var(--amberwash); box-shadow: inset 8px 0 0 var(--amber); padding-left: 22px; }
-  .prow .miss { font-weight: 800; }
-  /* Six pick dropdowns, each labelled with the slot it fills. */
-  .pickrow { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
-  .pickrow .picklab { flex: 0 0 42%; font-size: 18px; font-weight: 800; }
-  .pickrow select { flex: 1 1 auto; min-width: 0; }
-  .prow:active { background: var(--ink); color: var(--paper); }
-  .prow .pwho { flex: 1 1 auto; min-width: 0; }
-  .prow .pname { display: block; font-size: 24px; font-weight: 800; white-space: nowrap; overflow: hidden; line-height: 1.15; }
-  /* Setup is a sit-down screen, not an arm's-length one: the detail line wraps
-     onto a second line rather than shrinking, so nothing is ever cut off and
-     nothing drops below the 18px floor. */
-  .prow .pmeta { display: block; font-size: 18px; font-weight: 700; margin-top: 6px; line-height: 1.25; }
-  .prow .pch { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; }
-  .prow .pchn { display: block; font-size: 30px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.05; }
-  .prow .pchl { display: block; font-size: 18px; font-weight: 800; letter-spacing: .3px; }
-
-  /* Forms */
-  .field { padding: 14px; border-bottom: 3px solid var(--ink); }
-  .field > label, .field > .flab {
-    display: block; font-size: 18px; font-weight: 800;
-    text-transform: uppercase; letter-spacing: .4px; margin-bottom: 8px;
-  }
-  /* input[type=date] belongs here as much as the rest: left out of this list it
-     renders as bare 22px text, well under the 48px a thumb needs. */
-  input[type="text"], input[type="number"], input[type="file"], input[type="date"],
-  select, textarea {
-    display: block; width: 100%; min-height: 56px; padding: 12px;
-    font-family: inherit; font-size: 22px; font-weight: 700;
-    color: var(--ink); background: var(--paper);
-    border: 3px solid var(--ink); border-radius: 10px;
-    -webkit-appearance: none; appearance: none;
-  }
-  select {
-    /* a plain caret, drawn in ink so it survives sun and dark mode */
-    background-image: linear-gradient(45deg, transparent 50%, var(--ink) 50%),
-                      linear-gradient(135deg, var(--ink) 50%, transparent 50%);
-    background-position: calc(100% - 22px) 24px, calc(100% - 14px) 24px;
-    background-size: 8px 8px, 8px 8px;
-    background-repeat: no-repeat;
-    padding-right: 44px;
-  }
-  textarea { min-height: 220px; font-size: 18px; font-weight: 600; line-height: 1.35; white-space: pre; overflow-wrap: normal; overflow-x: auto; }
-  .seg { display: flex; gap: 0; }
-  .seg button {
-    flex: 1 1 0; min-height: 56px; font: inherit; font-size: 20px; font-weight: 800;
-    background: var(--paper); color: var(--ink);
-    border: 3px solid var(--ink); cursor: pointer;
-  }
-  .seg button:first-child { border-radius: 10px 0 0 10px; }
-  .seg button:last-child { border-radius: 0 10px 10px 0; }
-  .seg button + button { border-left-width: 0; }
-  .seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
-  .two { display: flex; gap: 12px; }
-  .two > * { flex: 1 1 0; min-width: 0; }
-  .err { font-size: 18px; font-weight: 800; color: var(--penalty); padding: 12px 14px 0; }
-  .chread { font-size: 20px; font-weight: 800; padding: 14px; border-bottom: 3px solid var(--ink); }
-  .chread b { font-size: 30px; }
-
-  /* Import preview */
-  .prev { display: flex; align-items: center; gap: 10px; padding: 12px; border-bottom: 2px solid var(--ink); min-height: 64px; }
-  .prev .pv { flex: 1 1 auto; min-width: 0; }
-  .prev .pvn { font-size: 21px; font-weight: 800; }
-  .prev .pvd { font-size: 18px; font-weight: 700; margin-top: 3px; }
-  .prev .pvt { flex: 0 0 auto; font-size: 18px; font-weight: 800; text-align: right; }
-  .tag { display: inline-block; padding: 4px 9px; border: 2px solid var(--ink); border-radius: 6px; font-size: 18px; font-weight: 800; }
-  .tag.no { color: var(--penalty); border-color: var(--penalty); }
-  .empty { padding: 28px 18px; font-size: 20px; font-weight: 700; }
-
-  /* The card, nine holes to a row. Numbers stay at 18px+ like everything else. */
-  .cardwrap { padding: 8px 12px 4px; }
-  table.card { width: 100%; border-collapse: collapse; margin-bottom: 10px; table-layout: fixed; }
-  table.card th, table.card td {
-    border: 2px solid var(--ink); text-align: center; padding: 8px 0;
-    font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums;
-  }
-  table.card tr.hn th { background: var(--wash); font-size: 18px; }
-  table.card td.blank { color: var(--ink); }
-  table.card td.xup { background: var(--ink); color: var(--paper); }
-</style>
+<link rel="stylesheet" href="clubhouse.css">
 </head>
 <body>
 
@@ -302,6 +20,7 @@
   <div id="boardFlights"></div>
   <div id="rows"></div>
   <div id="boardEmpty"></div>
+  <div id="shareBox"></div>
 </section>
 
 <section id="player" class="screen">
@@ -377,7 +96,9 @@
 <script src="engine.js"></script>
 <script src="importer.js"></script>
 <script src="exporter.js"></script>
+<script src="results.js"></script>
 <script src="version.js"></script>
+<script src="display.js"></script>
 <script>
 "use strict";
 /* Rendering and setup only — every number comes from engine.js
@@ -386,14 +107,13 @@
 const E = window.ClubhouseEngine;
 const IMP = window.ClubhouseImporter;
 const XP = window.ClubhouseExporter;
+const RS = window.ClubhouseResults;
+const D  = window.ClubhouseDisplay;
+/* The display helpers live in display.js so results.html can use the same ones.
+   Pulled onto locals here so every call site below reads exactly as it did. */
+const { esc, fmtFinal, fmtStrokes, fitText, abbreviate, fitName, niceDate,
+        MONTHS, CONTEST_NAMES } = D;
 
-const CONTEST_NAMES = {
-  watchTheBirdie: "Watch the Birdie", agonyAlley: "Agony Alley",
-  damageControl: "Damage Control", easyStreet: "Easy Street",
-  tripleThreat: "Triple Threat", goLong: "Go Long",
-  getShorty: "Get Shorty", bounceBack: "Bounce Back",
-  skins: "Skins",
-};
 const CONTEST_ORDER = ["watchTheBirdie","agonyAlley","damageControl","easyStreet",
                        "tripleThreat","goLong","getShorty","bounceBack","skins"];
 
@@ -795,46 +515,6 @@ function deleteNote(e){
 }
 
 /* ---------- small helpers ---------- */
-function esc(s){
-  return String(s == null ? "" : s).replace(/[&<>"']/g, (c) =>
-    ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
-}
-function fmtFinal(x){ return x==null ? "—" : x.toFixed(1); }  // golf scores: one decimal, no hundredths
-function fmtStrokes(s){
-  if(s===0) return "0.0";
-  let str = Math.abs(s).toFixed(2);
-  if(str.endsWith("0")) str = str.slice(0,-1);   // 2.00→2.0, 0.50→0.5, 0.75 stays
-  return (s<0 ? "−" : "+") + str;            // real minus sign
-}
-/* Shrink a nowrap element's font down from its max only as far as needed to fit
-   on one line within its box, but never below min. */
-function fitText(el, max, min){
-  if(!el) return;
-  el.style.fontSize = max + "px";
-  let size = max;
-  while(size > min && el.scrollWidth > el.clientWidth + 0.5){
-    size -= 1;
-    el.style.fontSize = size + "px";
-  }
-}
-/* "Christiaan Bezuidenhout" -> "Christiaan B." — first name kept, surname to an initial. */
-function abbreviate(full){
-  const p = String(full).trim().split(/\s+/);
-  return p.length < 2 ? full : p[0] + " " + p[p.length - 1].charAt(0) + ".";
-}
-/* Names never render below 18px (the legibility floor for this audience). Fit the
-   full name down to 18; if it still won't fit, shorten the surname to an initial the
-   way a clubhouse scoreboard always has, then fit that — still never below 18. */
-function fitName(el, max, min){
-  if(!el) return;
-  const full = el.dataset.full || (el.dataset.full = el.textContent.trim());
-  el.textContent = full;
-  fitText(el, max, min);
-  if(el.scrollWidth > el.clientWidth + 0.5){
-    el.textContent = abbreviate(full);
-    fitText(el, max, min);
-  }
-}
 function fitBoardNames(){
   document.querySelectorAll("#rows .name").forEach(el => fitName(el, 26, 18));
   document.querySelectorAll("#setupRows .pname").forEach(el => fitName(el, 24, 18));
@@ -1102,7 +782,100 @@ function renderBoard(){
     b.addEventListener("click", ()=>showPlayer(r.name));
     rowsEl.appendChild(b);
   });
+  drawShare(results);
   fitBoardNames();
+}
+
+/* ---------- one link, texted to the group ----------
+   Until now the result of a round was Rob reading numbers aloud in the bar.
+   This puts the finished leaderboard on the clipboard as one address he can
+   text; every man opens it on his own phone with nothing installed.
+
+   The round rides INSIDE the link — there is no server — and it is settled
+   before it leaves: finals, contest values and placings all travel as decided,
+   so the link keeps its numbers for good however the settings move afterwards.
+
+   OBFUSCATED, NOT ENCRYPTED. Nothing is legible in the address bar, so a
+   forwarded text gives away no names at a glance — but anyone who pastes it
+   into a decoder has them back in seconds. A shared link should be treated as
+   public. That is the right trade here: it is a golf leaderboard, the same
+   names and scores are already on the club's Golf Genius portal, and a
+   password to type would defeat the one thing the link is for. */
+
+/** Where results.html lives, next to whichever copy of the app is running. */
+function resultsBaseUrl(){
+  const here = location.href.split("#")[0].split("?")[0];
+  return here.replace(/[^/]*$/, "") + "results.html";
+}
+
+/** What travels beside the players: the heading, and anything off default. */
+function shareRound(){
+  const tees = [...new Set(readyPlayers().map(p => p.tee).filter(Boolean))];
+  const notes = [];
+  if(state.allowancePercent !== 100) notes.push(state.allowancePercent + "% handicap allowance");
+  if(!state.skinsOn) notes.push("skins not played");
+  return {
+    course: "Aberdeen Golf & Country Club",
+    date: state.date,
+    tee: tees.length === 1 ? tees[0] : "",       // blank when the field is spread
+    note: notes.join(" · "),
+  };
+}
+
+function drawShare(results){
+  const box = document.getElementById("shareBox");
+  const scored = results.filter(r => r.final != null);
+  if(scored.length === 0 || readyPlayers().length === 0){
+    box.innerHTML = "";                          // nothing to share until it is scored
+    return;
+  }
+
+  const link = RS.resultsLink(resultsBaseUrl(), shareRound(),
+    results.map(r => ({ ...r, tieNote: tieNote(r) })), contestsInPlay());
+
+  if(!link.fits){
+    // Say so on the button rather than hand over an address that will arrive
+    // cut in half — a truncated link looks like it worked.
+    box.innerHTML =
+      `<div class="pad"><button class="big" id="shareBtn" disabled>Too many players to share</button>
+        <div class="note warn">This round makes a link of ${link.length} characters and
+        ${link.limit} is the most that survives a text message. Share a flight at a time,
+        or send the CSV from <b>Setup → Move this event</b>.</div></div>`;
+    return;
+  }
+
+  box.innerHTML =
+    `<div class="pad"><button class="big solid" id="shareBtn">Share results</button>
+       <div id="shareOut"></div></div>`;
+  document.getElementById("shareBtn").addEventListener("click", () => copyShareLink(link));
+}
+
+function copyShareLink(link){
+  const out = document.getElementById("shareOut");
+  const done = (msg) =>
+    out.innerHTML = `<div class="note">${esc(msg)}<br>` +
+      `<b>${link.length} characters</b> — a text message carries it.<br>` +
+      `Anyone with the link can read the round, so treat it as public.</div>`;
+
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(link.url).then(
+      () => done("Copied. Paste it into a message to the group."),
+      () => showLinkToCopy(link));
+  } else {
+    showLinkToCopy(link);
+  }
+}
+
+/** The clipboard was refused — put the address on screen to be copied by hand. */
+function showLinkToCopy(link){
+  document.getElementById("shareOut").innerHTML =
+    `<div class="field"><label for="shareText">Copy this link</label>
+       <textarea id="shareText" readonly spellcheck="false" autocorrect="off"
+         autocapitalize="off" autocomplete="off">${esc(link.url)}</textarea>
+       <div class="cd" style="margin-top:10px;font-size:18px;font-weight:700">
+         The clipboard was not available, so here it is to copy by hand.</div></div>`;
+  const el = document.getElementById("shareText");
+  el.focus(); el.select();
 }
 
 function showPlayer(name){
@@ -1325,17 +1098,6 @@ function drawFoldSubs(){
  * guessing. Absent — someone opened the page without version.js beside it — it
  * says so rather than showing a number that means nothing.
  */
-const MONTHS = ["January","February","March","April","May","June",
-                "July","August","September","October","November","December"];
-
-function niceDate(iso){
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ""));
-  if(!m) return String(iso || "");
-  // Built by hand rather than by toLocaleDateString, which would read
-  // differently on a phone set to another language.
-  return Number(m[3]) + " " + MONTHS[Number(m[2]) - 1] + " " + m[1];
-}
-
 function drawAbout(){
   const v = window.ClubhouseVersion;
   const build = v && v.build
