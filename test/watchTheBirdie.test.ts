@@ -27,7 +27,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { ABERDEEN_TEE_IV, DEFAULT_CONTESTS } from "../src/courseConfig.ts";
-import { scorePlayer, birdiePickHoles, PICK_SLOTS, migratePicks, cappedNetByHole,
+import { scorePlayer, birdiePickHoles, PICK_SLOTS, migratePicks, randomPicks, cappedNetByHole,
          type PlayerCard, type BirdiePicks } from "../src/scoring.ts";
 
 const PAR = ABERDEEN_TEE_IV.par;
@@ -289,4 +289,70 @@ test("a hard hole can be made to pay more than an easy one", () => {
 
 test("Call Your Number is gone", () => {
   assert.equal((DEFAULT_CONTESTS as Record<string, unknown>).callYourNumber, undefined);
+});
+
+/* ---- picks drawn for a man who sent none in ---- */
+
+// Off by default and only ever used deliberately: Watch the Birdie is a contest
+// of nerve, and a drawn set is not a choice. What it stops is an empty contest
+// reading as a bad round, which is a different thing.
+test("a drawn set is legal in every slot", () => {
+  for (let i = 0; i < 200; i++) {
+    const picks = randomPicks(ABERDEEN_TEE_IV);
+    for (const s of PICK_SLOTS) {
+      assert.ok(LEGAL[s.key].includes(picks[s.key]!),
+        "hole " + picks[s.key] + " is not a legal " + s.label);
+    }
+  }
+});
+
+test("a drawn set never touches a barred hole", () => {
+  for (let i = 0; i < 200; i++) {
+    const holes = PICK_SLOTS.map((s) => randomPicks(ABERDEEN_TEE_IV)[s.key]);
+    for (const barred of [5, 6, 11, 12]) {
+      assert.ok(!holes.includes(barred), "hole " + barred + " was drawn");
+    }
+  }
+});
+
+test("a drawn set never draws the same hole twice", () => {
+  for (let i = 0; i < 200; i++) {
+    const picks = randomPicks(ABERDEEN_TEE_IV);
+    const holes = PICK_SLOTS.map((s) => picks[s.key]);
+    assert.equal(new Set(holes).size, holes.length, JSON.stringify(picks));
+  }
+});
+
+// It has to be indistinguishable from a chosen set BY THE RULES — the board is
+// what says it was drawn, not the engine refusing it.
+test("a drawn set scores without complaint", () => {
+  for (let i = 0; i < 50; i++) {
+    const c = card(randomPicks(ABERDEEN_TEE_IV));
+    assert.doesNotThrow(() => score(c));
+    assert.equal(score(c).detail, "0 of 6 picks", "all six slots filled");
+  }
+});
+
+test("the draw is the caller's randomness, so it can be pinned down", () => {
+  let n = 0;
+  const rng = () => [0, 0, 0, 0, 0, 0][n++ % 6];
+  assert.deepEqual(randomPicks(ABERDEEN_TEE_IV, rng),
+    { f3: 3, f4: 1, f5: 4, b3: 13, b4: 10, b5: 16 }, "the first of every list");
+  n = 0;
+  const last = () => [0.999, 0.999, 0.999, 0.999, 0.999, 0.999][n++ % 6];
+  assert.deepEqual(randomPicks(ABERDEEN_TEE_IV, last),
+    { f3: 8, f4: 9, f5: 7, b3: 17, b4: 15, b5: 18 }, "the last of every list");
+});
+
+test("every legal hole can come up", () => {
+  const seen: Record<string, Set<number>> = {};
+  for (const s of PICK_SLOTS) seen[s.key] = new Set();
+  for (let i = 0; i < 500; i++) {
+    const picks = randomPicks(ABERDEEN_TEE_IV);
+    for (const s of PICK_SLOTS) seen[s.key].add(picks[s.key]!);
+  }
+  for (const s of PICK_SLOTS) {
+    assert.equal(seen[s.key].size, LEGAL[s.key].length,
+      s.label + " never offered all of " + LEGAL[s.key].join(", "));
+  }
 });

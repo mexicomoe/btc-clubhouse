@@ -430,6 +430,31 @@
   }
 
   /**
+   * Six legal holes drawn at random, one for every slot.
+   *
+   * For the man who never sent his picks in. Drawn from the SAME lists the form
+   * offers, so a drawn set is indistinguishable from a chosen one by the rules —
+   * every hole legal for its slot, the bar list respected, no hole twice.
+   *
+   * `rng` returns a number in [0,1) and defaults to Math.random. It is an
+   * argument so the draw can be tested: with a fixed rng the result is fixed.
+   *
+   * A DRAWN SET IS NOT A CHOSEN ONE and the board says so. This does not pretend
+   * a man made a choice he never made — it stops an empty contest looking like a
+   * bad round, which is a different thing.
+   */
+  function randomPicks(course, rng) {
+    const roll = rng || Math.random;
+    const legal = birdiePickHoles(course);
+    const picks = {};
+    for (const slot of PICK_SLOTS) {
+      const holes = legal[slot.key];
+      picks[slot.key] = holes.length ? holes[Math.floor(roll() * holes.length)] : null;
+    }
+    return picks;
+  }
+
+  /**
    * Read whatever shape a card's picks arrive in.
    *
    * The six named slots are what the app stores now. `{ front, back }` is the
@@ -1050,7 +1075,7 @@
     skinsByGroup, cartSkins, teamSkins, skinStrokes, skinValue, matchOfCards, CARD_MATCH,
     courseHandicap, fullCourseHandicap, FULL_ALLOWANCE,
     resolveCourseHandicap, strokesOnHole, netOnHole, cappedNetByHole,
-    birdiePickHoles, PICK_SLOTS, migratePicks, readPicks,
+    birdiePickHoles, PICK_SLOTS, migratePicks, readPicks, randomPicks,
     scorePlayer, scoreField, computeLeaderboard,
     computeFlights, flightOf, flightsInUse, sortFlights,
   };

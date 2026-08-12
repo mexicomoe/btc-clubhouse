@@ -116,6 +116,14 @@ Reject a hole outside its slot's list, by name. Reject the same hole nominated t
 
 **Picks arrive by text**, one man a line: `Ridgeway, Ken — 8, 2, 4, 13, 14, 16`. Six bare numbers, always in slot order. Nothing in the line says which is which, so the order is the whole of the format and any other count of numbers is refused rather than guessed at. A block of those lines is pasted in together and read back before anything is applied. **A name is matched, never guessed** — and the first-name-plus-initial rule is accepted only when the line was written that way, or a misspelled surname would reduce to its first letter and write silently to the wrong man's card.
 
+**Picks can be DRAWN for a man who never sent his in — a toggle, off by default.** Watch the Birdie is a contest of nerve: a man says in advance which holes he fancies, and a drawn set is not a choice. What drawing stops is an empty contest reading as a bad round on the board, which is a different thing and worth fixing.
+
+The draw takes one legal hole per slot at random from the same lists the form offers, so a drawn set is indistinguishable from a chosen one *by the rules* — every hole legal, the bar list respected, no hole twice.
+
+It happens **once, when the scores go in**, and is written to the player. Drawing afresh on every render would give a man different holes each time the board was looked at, which is not a game. A man who chose even one slot is left alone: a half-filled card is still a choice.
+
+**The board always says which.** A drawn man's row reads *"picks drawn"* beside his net, and his own screen says his holes were drawn rather than chosen. The mark survives an edit to anything else — a corrected tee does not mean he chose his holes — and goes the moment a pick itself is changed, because then it is his.
+
 *A round stored with the two-pick form still opens: front and back were both par 4s, so they become the par 4 slots. A pick on a hole since barred is dropped rather than refused — it was chosen under the old rules and there is nothing to guess at.*
 
 *Replaced Call Your Number, which rewarded hitting a predicted number rather than playing well — a man could profit from a bad score.*

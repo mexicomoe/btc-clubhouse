@@ -54,6 +54,7 @@
     <div id="eventBox"></div>
     <div id="allowanceBox"></div>
     <div id="skinsSwitch"></div>
+    <div id="autoPicksSwitch"></div>
   </details>
 
   <details class="fold" id="foldMove">
@@ -169,7 +170,7 @@ function blankEvent(name, date){
     date: date || todayISO(),
     format: DEFAULT_FORMAT,
     nextId: 1, players: [], scores: {}, handicaps: {},
-    skinsOn: true, allowancePercent: 100, flight: "", lastTee: "IV", tab: "setup",
+    skinsOn: true, autoPicks: false, allowancePercent: 100, flight: "", lastTee: "IV", tab: "setup",
     exportedAt: null, exportedSignature: null,
   };
 }
@@ -210,6 +211,9 @@ function normaliseEvent(e, fallbackName){
     scores: e.scores || {},
     handicaps: e.handicaps || {},
     skinsOn: e.skinsOn !== false,            // on unless it was switched off
+    // Off unless it was deliberately switched on — a drawn pick is not a
+    // chosen one, so it never happens by default.
+    autoPicks: e.autoPicks === true,
     allowancePercent: typeof e.allowancePercent === "number" ? e.allowancePercent : 100,
     flight: typeof e.flight === "string" ? e.flight : "",
     lastTee: typeof e.lastTee === "string" ? e.lastTee : "IV",
@@ -774,12 +778,17 @@ function renderBoard(){
     const meta = r.net==null ? "no card yet" : "Net "+r.net+partial;
     // The holes played are already on the line above, and the heading says why,
     // so this only has to carry the one word that matters — and fit at 18px.
-    const tie = r.eligible ? tieNote(r) : "not eligible";
+    // A drawn set of picks is marked, always, because the board must never let a
+    // drawn pick pass for a chosen one. It rides on the same line as the tie
+    // note — both are things about a man's round rather than his score.
+    const src = state.players.find(p => displayName(p) === r.name);
+    const notes = [r.eligible ? tieNote(r) : "not eligible",
+                   src && src.picksAuto ? "picks drawn" : ""].filter(Boolean).join(" · ");
     b.innerHTML =
       `<span class="rank">${r.eligible ? r.rank : "–"}</span>` +
       `<span class="who"><span class="name">${esc(r.name)}</span>` +
       `<span class="meta">${esc(meta)}</span>` +
-      (tie ? `<span class="tie">${esc(tie)}</span>` : ``) + `</span>` +
+      (notes ? `<span class="tie">${esc(notes)}</span>` : ``) + `</span>` +
       `<span class="final">${fmtFinal(r.final)}</span><span class="chev">›</span>`;
     b.addEventListener("click", ()=>showPlayer(r.name));
     rowsEl.appendChild(b);
@@ -1007,6 +1016,11 @@ function showPlayer(name){
   }
 
   html += `<div class="section-label">The contests</div>`;
+  const own = state.players.find(p => displayName(p) === name);
+  if(own && own.picksAuto){
+    html += `<div class="note">His Watch the Birdie holes were <b>drawn</b>, not chosen —
+      he sent no picks in. Change them on his Setup page and the mark goes.</div>`;
+  }
   // The cap governs the SIX individual contests; Skins is added afterwards and
   // sits outside it. So the comparison has to be six-against-cap — `off`
   // includes Skins, and comparing it to the uncapped six made the note fire
@@ -1124,6 +1138,7 @@ function renderSetup(){
   drawEventBox();
   drawAllowance();
   drawSkinsSwitch();
+  drawAutoPicksSwitch();
   drawMoveBox();
   drawAbout();
   drawFoldSubs();
@@ -1358,6 +1373,67 @@ function drawSkinsSwitch(){
       if(state.skinsOn) renderSkins();
       show("setup");                     // stay where the switch is
     }));
+}
+
+/**
+ * Picks drawn for the man who never sent his in.
+ *
+ * OFF BY DEFAULT, and it stays that way unless somebody turns it on. Watch the
+ * Birdie is a contest of nerve — a man says in advance which holes he fancies —
+ * and a drawn set is not a choice. What it stops is an empty contest reading as
+ * a bad round on the board, which is a different thing and worth fixing.
+ *
+ * The draw happens ONCE, when the scores go in, and is written to the player.
+ * Drawing it afresh on every render would give a man different picks each time
+ * the board was looked at, which is not a game.
+ */
+function drawAutoPicksSwitch(){
+  const missing = readyPlayers().filter(p => E.PICK_SLOTS.every(sl => p[sl.key] == null)).length;
+  const drawn = state.players.filter(p => p.picksAuto).length;
+  const note = state.autoPicks
+    ? (missing > 0
+        ? missing + " player" + (missing===1?"":"s") + " with no picks — they will be drawn when the scores go in."
+        : "Everybody has picks. Nothing will be drawn.")
+    : "A man with no picks scores nothing on Watch the Birdie.";
+
+  document.getElementById("autoPicksSwitch").innerHTML =
+    `<div class="field"><span class="flab">Draw missing picks</span>
+       <div class="seg" id="autoPicksSeg">
+         <button type="button" data-on="1" aria-pressed="${state.autoPicks}">On</button>
+         <button type="button" data-on="0" aria-pressed="${!state.autoPicks}">Off</button>
+       </div>
+       <div class="cd" style="margin-top:10px;font-size:18px;font-weight:700">${esc(note)}` +
+       (drawn ? `<br>${drawn} man${drawn===1?"":"'s"} picks ${drawn===1?"was":"were"} drawn, and the board says so beside ${drawn===1?"his":"their"} name${drawn===1?"":"s"}.` : ``) +
+       `</div></div>`;
+
+  document.getElementById("autoPicksSeg").querySelectorAll("button").forEach(b =>
+    b.addEventListener("click", () => {
+      state.autoPicks = b.dataset.on === "1";
+      save();
+      renderSetup(); renderBoard();
+      show("setup");
+    }));
+}
+
+/**
+ * Draw picks for anybody who has none. Returns how many were drawn.
+ *
+ * Only ever ADDS to a man with nothing — a player who chose even one slot is
+ * left exactly as he is, because a half-filled card is still a choice and
+ * filling the rest of it would be putting words in his mouth.
+ */
+function drawMissingPicks(){
+  if(!state.autoPicks) return 0;
+  let drawn = 0;
+  for(const p of state.players){
+    if(!isReady(p)) continue;
+    if(E.PICK_SLOTS.some(sl => p[sl.key] != null)) continue;   // he chose something
+    const picks = E.randomPicks(courseOf(p));
+    E.PICK_SLOTS.forEach(sl => { p[sl.key] = picks[sl.key]; });
+    p.picksAuto = true;
+    drawn++;
+  }
+  return drawn;
 }
 
 /* ---------- setup: a whole list of players at once ----------
@@ -1738,6 +1814,15 @@ function saveEditing(){
   // The tee just used becomes the one the next man starts on.
   if(rec.tee) state.lastTee = rec.tee;
   const at = state.players.findIndex(x => x.id === p.id);
+
+  // A drawn set stays marked as drawn through an edit to anything else — a man
+  // whose tee was corrected did not thereby choose his holes. Touch a PICK,
+  // though, and it becomes his: the mark goes and the board stops saying it.
+  const was = at === -1 ? null : state.players[at];
+  const picksMoved = was == null ||
+    E.PICK_SLOTS.some(sl => (was[sl.key] == null ? null : was[sl.key]) !== rec[sl.key]);
+  if(was && was.picksAuto && !picksMoved) rec.picksAuto = true;
+
   if(at === -1) state.players.push(rec); else state.players[at] = rec;
   editing = null;
   save();
@@ -2136,6 +2221,10 @@ function commitImport(){
     // now but so a later reload still scores the round as it was played.
     if(a.card.handicap != null) state.handicaps[a.player.id] = a.card.handicap;
   });
+  // Score entry is the moment: the round is being scored now, and a man who has
+  // not sent his picks in by now is not going to.
+  drawMissingPicks();
+
   importPreview = null;
   save();
   renderBoard();

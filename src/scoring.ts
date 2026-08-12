@@ -222,6 +222,13 @@ export const PICK_SLOTS: PickSlot[] = E.PICK_SLOTS;
 /** Read the two-pick form into the six-slot one; null when there are no picks. */
 export const migratePicks: (picks: BirdiePicks | null | undefined) => BirdiePicks | null = E.migratePicks;
 
+/**
+ * Six legal holes drawn at random, one per slot — for a man who never sent his
+ * picks in. `rng` defaults to Math.random and exists so the draw can be tested.
+ */
+export const randomPicks: (course: CourseConfig, rng?: () => number) => BirdiePicks
+  = E.randomPicks;
+
 /** The six picks as holes, throwing on anything outside the table. */
 export const readPicks: (picks: BirdiePicks, course: CourseConfig, who: string) =>
   Record<string, number | null> = E.readPicks;
