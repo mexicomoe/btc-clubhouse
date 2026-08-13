@@ -131,3 +131,82 @@ test("splitting a line honours quotes", () => {
   assert.deepEqual(splitCsvLine('"a,b",c'), ["a,b", "c"]);
   assert.deepEqual(splitCsvLine('"he said ""no""",c'), ['he said "no"', "c"]);
 });
+
+/* ---- a Golf Genius tee sheet ----
+   "Finkelstein, Dave (26.9 / 21 / 21) IV" — the bracket carries the index, the
+   playing handicap and the course handicap. Only the index is a property of the
+   man; the other two are worked out again from the tee and the allowance every
+   time the round is scored, so keeping them would keep a stale copy. */
+
+test("a tee sheet line gives up its name, index and tee", () => {
+  const { rows } = parseRoster("Finkelstein, Dave (26.9 / 21 / 21) IV", RULES);
+  assert.equal(rows.length, 1);
+  assert.deepEqual(rows[0], {
+    name: "Finkelstein, Dave", indexText: "26.9", tee: "IV",
+    group: "", front: "", back: "", problems: [],
+  });
+});
+
+test("the two handicaps in the middle are thrown away, not stored", () => {
+  const { rows } = parseRoster("Ridgeway, Ken (12.4 / 11 / 13) III", RULES);
+  assert.equal(rows[0].indexText, "12.4");
+  // Nowhere on the row does an 11 or a 13 survive.
+  assert.equal(JSON.stringify(rows[0]).includes("11"), false);
+  assert.equal(JSON.stringify(rows[0]).includes("13"), false);
+});
+
+test("the comma in a reversed name does not split it into two fields", () => {
+  // Read as a comma list this would be "Finkelstein" plus a stray fragment.
+  const { rows } = parseRoster("Kingsley, Mitchell (18.0 / 16 / 17) IV", RULES);
+  assert.equal(rows[0].name, "Kingsley, Mitchell");
+});
+
+test("a shared tee written IV/V survives the slashes in the bracket", () => {
+  const { rows } = parseRoster("Merrick, Sal (9.1 / 8 / 9) IV/V", RULES);
+  assert.equal(rows[0].tee, "IV/V");
+  assert.deepEqual(rows[0].problems, []);
+});
+
+test("no tee after the bracket falls back to the round's own tee", () => {
+  const { rows } = parseRoster("Danforth, Mike (30.2 / 26 / 27)", RULES);
+  assert.equal(rows[0].tee, "IV");
+  assert.deepEqual(rows[0].problems, []);
+});
+
+test("a tee that is not a tee is reported, not guessed at", () => {
+  const { rows } = parseRoster("Broser, Alan (14.7 / 13 / 13) XI", RULES);
+  assert.deepEqual(rows[0].problems, ["no tee called “XI”"]);
+  assert.equal(rows[0].tee, "IV");
+});
+
+test("a plus handicap comes through as the minus the engine wants", () => {
+  // Golf Genius "+2.1" means 2.1 BETTER than scratch. Read with the sign it is
+  // written with, a scratch man would be entered 4.2 strokes adrift.
+  const { rows } = parseRoster("Lowe, Peter (+2.1 / -1 / 0) I", RULES);
+  assert.equal(rows[0].indexText, "-2.1");
+});
+
+test("a scorecard name carrying a course handicap is NOT a tee sheet line", () => {
+  // "(18)" is one figure, not two. Reading that 18 as an index would enter a
+  // man at nearly double his handicap, which is why the slash is required.
+  const { rows } = parseRoster("Ridgeway, Ken (18)", RULES);
+  assert.notEqual(rows[0].indexText, "18");
+});
+
+test("a comma decimal in the bracket is still an index", () => {
+  const { rows } = parseRoster("Weiss, Hans (26,9 / 21 / 21) IV", RULES);
+  assert.equal(rows[0].indexText, "26,9");
+});
+
+test("a tee sheet pastes sixteen at a time, and mixes with the old shapes", () => {
+  const text = [
+    "Finkelstein, Dave (26.9 / 21 / 21) IV",
+    "Ridgeway, Ken (12.4 / 11 / 12) III",
+    "Old, Shape\t19.4\tIV",
+  ].join("\n");
+  const { rows, ignored } = parseRoster(text, RULES);
+  assert.equal(rows.length, 3);
+  assert.equal(ignored, 0);
+  assert.deepEqual(rows.map((r) => r.indexText), ["26.9", "12.4", "19.4"]);
+  assert.deepEqual(rows.map((r) => r.tee), ["IV", "III", "IV"]);
+});

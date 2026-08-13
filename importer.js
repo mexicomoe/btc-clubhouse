@@ -428,6 +428,53 @@
    * defaultTee }. Passing them in keeps this readable on its own and testable
    * without the engine.
    */
+  /**
+   * A Golf Genius TEE SHEET line:
+   *
+   *     Finkelstein, Dave (26.9 / 21 / 21) IV
+   *
+   * The bracket carries the handicap index, the playing handicap and the course
+   * handicap, in that order. Only the FIRST is kept. The other two are
+   * properties of the DAY rather than of the man — the engine works both out
+   * from the tee, the index and the allowance every time it scores — so storing
+   * them would be storing a stale copy of something already derived, and a
+   * changed allowance would silently disagree with them.
+   *
+   * At least two figures are required inside the bracket. One figure is
+   * "Ridgeway, Ken (18)" — a scorecard name carrying a course handicap — and
+   * reading that 18 as an index would enter a man at nearly double his true
+   * handicap. The slash is what says "tee sheet".
+   */
+  const TEE_SHEET_LINE =
+    /^(.+?)\s*\(\s*([+-]?\d+(?:[.,]\d+)?(?:\s*\/\s*[+-]?\d+(?:[.,]\d+)?)+)\s*\)\s*(.*)$/;
+
+  function teeSheetRow(line) {
+    const m = String(line == null ? "" : line).trim().match(TEE_SHEET_LINE);
+    if (!m) return null;
+    const name = m[1].trim();
+    if (name === "") return null;
+    // The tee follows the bracket as a Roman numeral, and may be a shared tee
+    // written "IV/V". Only the first word is taken; a tee sheet that carries
+    // more columns after it does not make the tee unreadable.
+    const after = m[3].trim().split(/\s+/)[0] || "";
+    // Golf Genius writes a plus handicap "+2.1", meaning 2.1 BETTER than
+    // scratch. The engine refuses a TYPED "+2.1" on purpose, because a man
+    // writing it by hand may mean either sign and guessing wrong misplaces him
+    // by twice his handicap. A tee sheet has one convention and it is not in
+    // doubt, so here it is turned into the −2.1 the engine wants. The preview
+    // shows the converted figure, so it is still seen before it is committed.
+    const first = m[2].split("/")[0].trim();
+    return {
+      name: name,
+      indexText: first.charAt(0) === "+" ? "-" + first.slice(1) : first,
+      tee: after.toUpperCase(),
+      group: "",
+      front: "",
+      back: "",
+      problems: [],
+    };
+  }
+
   function parseRoster(text, options) {
     const opts = options || {};
     const tees = opts.tees || [];
@@ -440,30 +487,37 @@
     lines.forEach((line) => {
       if (line.trim() === "") return;
 
-      // A spreadsheet paste is tabs; anything else is treated as a comma list.
-      let cells = line.indexOf("\t") !== -1 ? line.split("\t") : splitCsvLine(line);
-      cells = cells.map((c) => String(c == null ? "" : c).trim());
+      // A tee sheet line is tried first. Its name carries a comma and its
+      // figures a slash, so splitting it as a comma list would take the name
+      // apart and leave the whole bracket sitting in the name field.
+      let row = teeSheetRow(line);
 
-      // "Ridgeway, Ken, 19.4, IV" — the name took two fields. Put it back when
-      // the row is one long and what follows the name is not a handicap.
-      if (line.indexOf("\t") === -1 && cells.length > 1 && !looksNumeric(cells[1]) && cells[1] !== "") {
-        const merged = [cells[0] + ", " + cells[1]].concat(cells.slice(2));
-        if (merged.length >= 1 && (merged.length < cells.length)) cells = merged;
+      if (row == null) {
+        // A spreadsheet paste is tabs; anything else is treated as a comma list.
+        let cells = line.indexOf("\t") !== -1 ? line.split("\t") : splitCsvLine(line);
+        cells = cells.map((c) => String(c == null ? "" : c).trim());
+
+        // "Ridgeway, Ken, 19.4, IV" — the name took two fields. Put it back when
+        // the row is one long and what follows the name is not a handicap.
+        if (line.indexOf("\t") === -1 && cells.length > 1 && !looksNumeric(cells[1]) && cells[1] !== "") {
+          const merged = [cells[0] + ", " + cells[1]].concat(cells.slice(2));
+          if (merged.length >= 1 && (merged.length < cells.length)) cells = merged;
+        }
+
+        if (cells[0] === "") { ignored++; return; }
+        // A heading row from the top of a spreadsheet is not a player.
+        if (ROSTER_HEADINGS.test(cells[0]) && !looksNumeric(cells[1] || "")) { ignored++; return; }
+
+        row = {
+          name: cells[0],
+          indexText: cells[1] || "",
+          tee: cells[2] || "",
+          group: cells[3] || "",
+          front: cells[4] || "",
+          back: cells[5] || "",
+          problems: [],
+        };
       }
-
-      if (cells[0] === "") { ignored++; return; }
-      // A heading row from the top of a spreadsheet is not a player.
-      if (ROSTER_HEADINGS.test(cells[0]) && !looksNumeric(cells[1] || "")) { ignored++; return; }
-
-      const row = {
-        name: cells[0],
-        indexText: cells[1] || "",
-        tee: cells[2] || "",
-        group: cells[3] || "",
-        front: cells[4] || "",
-        back: cells[5] || "",
-        problems: [],
-      };
 
       if (row.tee !== "" && tees.indexOf(row.tee) === -1) {
         row.problems.push("no tee called “" + row.tee + "”");

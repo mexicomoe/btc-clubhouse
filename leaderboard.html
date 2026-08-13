@@ -1452,10 +1452,14 @@ function showRosterBox(){
     `<div class="field"><label for="rosterPaste">One player a line</label>
        <textarea id="rosterPaste" spellcheck="false" autocorrect="off"
          autocapitalize="off" autocomplete="off"
-         placeholder="Ridgeway, Ken&#9;19.4&#9;IV&#9;1&#9;5&#9;14"></textarea>
+         placeholder="Finkelstein, Dave (26.9 / 21 / 21) IV"></textarea>
        <div class="cd" style="margin-top:10px;font-size:18px;font-weight:700">
-         Name, handicap index, tee, group, front par 4, back par 4 — tab or comma
-         separated. Anything after the name may be left out.</div></div>
+         A Golf Genius tee sheet pastes straight in: name, then the three figures
+         in brackets, then the tee. Only the first figure is kept — the other two
+         are worked out again when the round is scored.<br><br>
+         A spreadsheet also reads: name, handicap index, tee, group, front par 4,
+         back par 4 — tab or comma separated. Anything after the name may be left
+         out.</div></div>
      <div style="padding:0 0 12px"><button class="big solid" id="rosterRead">Show what this contains</button></div>
      <div id="rosterOut"></div>`;
   document.getElementById("rosterRead").addEventListener("click", readRoster);
