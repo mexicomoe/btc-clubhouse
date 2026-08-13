@@ -63,9 +63,11 @@
   #send[disabled]{border-color:#2c4433;color:#7f9186;cursor:default}
   #send:focus-visible{outline:3px solid #fff;outline-offset:2px}
   #copied{font-size:15px;margin:10px 0 0;min-height:20px}
-  /* The way back out. Without it this page is a dead end. */
-  #elsewhere{margin:8px 0 0;font-size:16px;text-align:center}
-  #elsewhere a{color:#e2eae4;text-decoration:underline;padding:6px 4px;display:inline-block}
+  /* The way back out. It lives on the page, NOT in the fixed tray — the tray
+     steals that much height from every screen, and the last pick box is what
+     gets covered. Navigation is not urgent enough to be always visible. */
+  #elsewhere{margin:4px 0 0;font-size:16px;text-align:center}
+  #elsewhere a{color:var(--felt);text-decoration:underline;padding:10px 6px;display:inline-block}
   @media (prefers-reduced-motion:no-preference){.hole{transition:background .12s}}
 </style>
 </head>
@@ -80,6 +82,7 @@
   <label class="namelab" for="who">Your name</label>
   <input id="who" type="text" autocomplete="name" placeholder="Rob Tanenbaum">
   <div id="slots"></div>
+  <p id="elsewhere"><a href="index.html">Clubhouse home</a> &middot; <a href="leaderboard.html">Leaderboard</a></p>
 </main>
 
 <div id="tray"><div class="inner">
@@ -87,7 +90,6 @@
   <a id="sendsms" role="button" aria-disabled="true">Text my picks</a>
   <button id="send" disabled>Copy my picks instead</button>
   <p id="copied"></p>
-  <p id="elsewhere"><a href="index.html">Clubhouse home</a> &middot; <a href="leaderboard.html">Leaderboard</a></p>
 </div></div>
 
 <script>
@@ -124,6 +126,7 @@ SLOTS.forEach(s => {
 });
 
 const who = document.getElementById("who");
+const tray = document.getElementById("tray");
 const summary = document.getElementById("summary");
 const sendsms = document.getElementById("sendsms");
 const send = document.getElementById("send");
@@ -178,7 +181,36 @@ function refresh(){
   // cannot be suppressed from a web page, and an unexplained dialog is exactly
   // where a man stops and puts the phone down. So it is announced beforehand.
   copied.textContent = ready ? "Your phone will ask to open Messages. Tap Open." : "";
+  fitTray();
 }
+
+/**
+ * The tray is fixed to the bottom of the screen, so the page must reserve
+ * exactly as much room underneath as the tray occupies. It was a hard-coded
+ * 140px, and when the tray grew, the sixth pick box ended up UNDERNEATH it —
+ * unreachable on a small phone, no matter how far you scrolled.
+ *
+ * So it is measured, not guessed: the tray's real height, plus the safe area it
+ * already includes, plus a thumb's worth of clearance. It cannot drift again.
+ */
+function fitTray(){
+  // Measured twice: once now, once on the next frame. On a rotation the tray's
+  // new height is not settled when the event fires, and a single measurement
+  // reserves the OLD height — which is the whole bug, one frame later. Setting
+  // body padding cannot itself change the tray, so this does not loop.
+  const set = () => {
+    document.body.style.paddingBottom = Math.max(160, tray.offsetHeight + 28) + "px";
+  };
+  set();
+  requestAnimationFrame(set);
+}
+fitTray();
+addEventListener("resize", fitTray);
+addEventListener("orientationchange", fitTray);
+// The tray changes height on its own: the hint line appears when the card is
+// complete, and the summary wraps to two lines for a long name.
+if (window.ResizeObserver) new ResizeObserver(fitTray).observe(tray);
+
 who.addEventListener("input", refresh);
 
 send.addEventListener("click", async () => {
