@@ -174,7 +174,10 @@ function refresh(){
   if (ready) sendsms.href = smsHref(line());
   else sendsms.removeAttribute("href");
   sendsms.setAttribute("aria-disabled", ready ? "false" : "true");
-  copied.textContent = "";
+  // iOS puts up "Open in Messages?" before handing over to another app. It
+  // cannot be suppressed from a web page, and an unexplained dialog is exactly
+  // where a man stops and puts the phone down. So it is announced beforehand.
+  copied.textContent = ready ? "Your phone will ask to open Messages. Tap Open." : "";
 }
 who.addEventListener("input", refresh);
 
