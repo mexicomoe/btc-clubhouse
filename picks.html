@@ -63,6 +63,9 @@
   #send[disabled]{border-color:#2c4433;color:#7f9186;cursor:default}
   #send:focus-visible{outline:3px solid #fff;outline-offset:2px}
   #copied{font-size:15px;margin:10px 0 0;min-height:20px}
+  /* The way back out. Without it this page is a dead end. */
+  #elsewhere{margin:8px 0 0;font-size:16px;text-align:center}
+  #elsewhere a{color:#e2eae4;text-decoration:underline;padding:6px 4px;display:inline-block}
   @media (prefers-reduced-motion:no-preference){.hole{transition:background .12s}}
 </style>
 </head>
@@ -84,6 +87,7 @@
   <a id="sendsms" role="button" aria-disabled="true">Text my picks</a>
   <button id="send" disabled>Copy my picks instead</button>
   <p id="copied"></p>
+  <p id="elsewhere"><a href="index.html">Clubhouse home</a> &middot; <a href="leaderboard.html">Leaderboard</a></p>
 </div></div>
 
 <script>

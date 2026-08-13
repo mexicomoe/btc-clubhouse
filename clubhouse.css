@@ -158,6 +158,9 @@
   .big.danger:active { background: var(--penalty); color: var(--paper); }
   .big[disabled] { opacity: .45; cursor: default; }
   .big + .big { margin-top: 12px; }
+  /* A .big that is a real link to another page, not a button. Buttons centre
+     their label on their own; anchors do not. */
+  a.big { text-align: center; text-decoration: none; }
 
   /* Setup: the two things checked first, before anything is opened — how many
      men are in, and whether their cards have arrived. */
