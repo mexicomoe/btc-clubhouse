@@ -93,6 +93,27 @@
 </div></div>
 
 <script>
+/**
+ * Where a completed card is filed, on top of the text message.
+ *
+ * WHY. Sixteen men texting sixteen lines meant sixteen copy-switch-paste-check
+ * cycles before a round could be scored. Filed here instead, they land in one
+ * column of a Google Sheet and paste into Setup > Paste birdie picks in a
+ * single action. Nothing about the scoring changes; this only replaces the
+ * fetching and carrying.
+ *
+ * WHAT IT DOES NOT DO. The browser is not allowed to read Google's reply, so
+ * this CANNOT confirm the row landed. It is deliberately silent: telling a man
+ * "sent" when nothing was sent is worse than telling him nothing. The text
+ * message remains his receipt and the authority — if the Sheet and a text ever
+ * disagree, the text wins.
+ *
+ * Sent with sendBeacon because the tap that files the card is the same tap that
+ * leaves for Messages, and an ordinary request dies with the page.
+ */
+const FORM_POST = "https://docs.google.com/forms/d/e/1FAIpQLSdbtFLO94Gq1RYC2-YJm-pDK1OMuBy8kzdkvY7MvfmOh8Fnuw/formResponse";
+const FORM_FIELD = "entry.1094711796";
+
 const SLOTS = [
   {key:"F3", label:"Front nine \u00b7 par 3", holes:[3,8]},
   {key:"F4", label:"Front nine \u00b7 par 4", holes:[1,2,9]},
@@ -213,8 +234,36 @@ if (window.ResizeObserver) new ResizeObserver(fitTray).observe(tray);
 
 who.addEventListener("input", refresh);
 
+/**
+ * File the card. Sending the same line twice does nothing — a man who taps the
+ * text button and then the copy button has not changed his mind. A man who
+ * CHANGES a pick and taps again files a second row, on purpose: it is stamped
+ * later than the first, so the last one is the one that counts.
+ */
+let filed = "";
+function fileWithRob(text){
+  if (text === filed) return;
+  filed = text;
+  const body = new URLSearchParams();
+  body.set(FORM_FIELD, text);
+  try {
+    if (navigator.sendBeacon) navigator.sendBeacon(FORM_POST, body);
+    else fetch(FORM_POST, { method: "POST", mode: "no-cors", keepalive: true, body: body });
+  } catch (e) {
+    // No signal, or the phone refused. He still has the text message, which is
+    // the path that was always going to work. Nothing to tell him.
+  }
+}
+
+// Filed on the way out to Messages, and on the copy fallback too — a man who
+// copies and texts by hand should not go missing from the Sheet.
+sendsms.addEventListener("click", () => {
+  if (sendsms.getAttribute("href")) fileWithRob(line());
+});
+
 send.addEventListener("click", async () => {
   const text = line();
+  fileWithRob(text);
   try {
     await navigator.clipboard.writeText(text);
     copied.textContent = "Copied. Now text it to Rob.";
