@@ -125,6 +125,13 @@ export type MatchHow = "exact" | "reversed" | "initial" | "ambiguous" | null;
  */
 export const matchName: (exportName: string, names: string[]) => { index: number; how: MatchHow } = I.matchName;
 
+/** The roster name a failed match was probably meant to be. Suggests only. */
+export const nearestName: (exportName: string, names: string[]) =>
+  { index: number; distance: number | null } = I.nearestName;
+
+/** Single-character edits between two strings. */
+export const editDistance: (a: string, b: string) => number = I.editDistance;
+
 /** One line of a pasted block of Watch the Birdie picks, read but not applied. */
 export interface PickRow {
   /** The name exactly as the line had it. */

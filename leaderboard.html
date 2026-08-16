@@ -2006,7 +2006,11 @@ function renderImport(){
       importMode = b.dataset.m;
       b.parentElement.querySelectorAll("button").forEach(x =>
         x.setAttribute("aria-pressed", String(x.dataset.m === importMode)));
-      if(importPreview) doPreview();
+      // Redraw, do NOT re-parse. Net/Gross changes how the eighteen numbers are
+      // read, not which rows are in the paste — and re-parsing threw away every
+      // player picked by hand, so a man who assigned six rows and then realised
+      // the columns were net lost all six and had no idea why.
+      if(importPreview) drawPreview();
     }));
   document.getElementById("parseBtn").addEventListener("click", doPreview);
 }
@@ -2017,7 +2021,10 @@ function assess(row, idx, all){
   const player = row.playerId ? state.players.find(p => p.id === row.playerId) || null : null;
   const mode = importMode === "auto" ? card.mode : importMode;
 
-  const out = { card, player, mode, gross: null, problems: [], warnings: [], skipped: false };
+  // `replaces` is what makes the difference between adding a flight and
+  // overwriting one, and the screen has to say which before anything is written.
+  const out = { card, player, mode, gross: null, problems: [], warnings: [],
+                skipped: false, replaces: !!(player && state.scores[player.id]), suggest: null };
   // Not a round at all — a blind, or a card never returned. Nothing to assign
   // and nothing to fix, so it is set aside and said so rather than dropped.
   if(card.skip){
@@ -2026,9 +2033,24 @@ function assess(row, idx, all){
     return out;
   }
   if(!player){
-    out.problems.push(row.how === "ambiguous"
-      ? "two players share that name — choose below"
-      : "no player chosen — pick one below");
+    if(row.how === "ambiguous"){
+      out.problems.push("two players share that name — choose below");
+    } else {
+      // "Score belongs to nobody" is true and useless. A typed "Gidaly, Mitch"
+      // against an exported "Gidaly, Mitchell" is a spelling, not a stranger,
+      // and the organiser should not have to find that himself six times over.
+      // The near miss is NAMED but never taken — confirming is still his.
+      const near = IMP.nearestName(card.name, state.players.map(p => p.name || ""));
+      const who = near.index >= 0 ? state.players[near.index] : null;
+      // Not if another row already claims him — two cards on one man is the
+      // thing the assignment rules refuse hardest.
+      if(who && !(all || []).some(r => r.playerId === who.id)){
+        out.suggest = who;
+        out.problems.push("did you mean " + (who.name || "(no name)") + "?");
+      } else {
+        out.problems.push("no player chosen — pick one below");
+      }
+    }
     return out;
   }
   // Two rows on one man would quietly drop a card, and hand-picking makes that
@@ -2154,6 +2176,7 @@ function drawPreview(){
       const bits = [row.card.holesPlayed + " of 18 holes"];
       if(!bad) bits.push(a.mode === "net" ? "net holes" : "gross holes");
       if(row.card.handicap != null) bits.push("hcp " + row.card.handicap);
+      if(!bad) bits.push(a.replaces ? "REPLACES his card already in" : "new card");
       const said = HOW_SAID[row.how];
       const detail = bad ? a.problems.join(" · ") : bits.concat(a.warnings).join(" · ");
       return `<div class="prev"><div class="pv">` +
@@ -2166,7 +2189,12 @@ function drawPreview(){
         (a.skipped ? `` :
           `<div class="field" style="border-bottom-width:2px">` +
             `<label for="pick${i}">Scores belong to</label>` +
-            `<select id="pick${i}" data-row="${i}">${options(row.playerId)}</select></div>`);
+            `<select id="pick${i}" data-row="${i}">${options(row.playerId)}</select>` +
+            // One tap to take the near miss, instead of hunting two dozen names
+            // in a dropdown. It sets the picker; it does not commit anything.
+            (a.suggest ? `<div style="padding-top:10px"><button class="big" ` +
+               `data-use="${i}" data-player="${a.suggest.id}">Yes — ${esc(a.suggest.name || "(no name)")}</button></div>` : ``) +
+          `</div>`);
     }).join("");
   }
 
@@ -2176,27 +2204,51 @@ function drawPreview(){
   }
 
   if(usable.length === 0){
-    // Refuse outright. A paste that matched nobody must never be allowed to
-    // clear a round that is already on the phone.
     html += `<div class="note warn"><b>Nothing to import, so nothing has changed.</b><br>` +
-      `None of these rows is assigned to a player in this round, so there is ` +
-      `nothing to replace the scores with. Pick the players above, or check you ` +
-      `pasted the right event. The round on this phone has been left exactly as it was.</div>`;
+      `None of these rows is assigned to a player in this round. Pick the players ` +
+      `above, or check you pasted the right event. Anything already scored on this ` +
+      `phone has been left exactly as it was.</div>`;
     html += `<div class="pad"><button class="big" id="discardBtn">Discard this paste</button></div>`;
   } else {
-    const cleared = state.players.filter(p =>
+    // A paste MERGES. What it will add, what it will overwrite, and who it will
+    // not touch — said in full before the button, because a round that arrives
+    // in flights is the ordinary case and the overwriting is the dangerous half.
+    const adding = usable.filter(a => !a.replaces);
+    const replacing = usable.filter(a => a.replaces);
+    const untouched = state.players.filter(p =>
       isReady(p) && state.scores[p.id] && !usable.some(a => a.player && a.player.id === p.id));
-    if(cleared.length){
-      html += `<div class="note warn"><b>These players are not in this paste</b><br>` +
-        cleared.map(p => esc(p.name)).join(", ") +
-        `<br>Their scores will be cleared — a paste replaces the round, it never merges.</div>`;
-    }
+
+    html += `<div class="note"><b>What this paste will do</b><br>` +
+      (adding.length
+        ? `Add ${adding.length} new card${adding.length===1?"":"s"}.<br>`
+        : `No new cards.<br>`) +
+      (replacing.length
+        ? `<b>Replace ${replacing.length} card${replacing.length===1?"":"s"} already in:</b> ` +
+          replacing.map(a => esc(a.player.name || "(no name)")).join(", ") + `.<br>`
+        : `Nothing already in will be replaced.<br>`) +
+      (untouched.length
+        ? `Left alone: ` + untouched.map(p => esc(p.name || "(no name)")).join(", ") + `.`
+        : `No other cards are in this round yet.`) +
+      `</div>`;
+
+    const label = [
+      adding.length ? "Add " + adding.length : "",
+      replacing.length ? "Replace " + replacing.length : "",
+    ].filter(Boolean).join(" · ") || "Use these cards";
+
     html += `<div class="pad">` +
-      `<button class="big solid" id="commitBtn">Use these ${usable.length} card${usable.length===1?"":"s"}</button>` +
+      `<button class="big solid" id="commitBtn">${esc(label)}</button>` +
       `<button class="big" id="discardBtn">Discard this paste</button></div>`;
   }
 
   box.innerHTML = html;
+  box.querySelectorAll("button[data-use]").forEach(b =>
+    b.addEventListener("click", () => {
+      const row = importPreview.rows[Number(b.dataset.use)];
+      row.playerId = b.dataset.player;
+      row.how = "chosen";
+      drawPreview();
+    }));
   box.querySelectorAll("select[data-row]").forEach(sel =>
     sel.addEventListener("change", () => {
       const row = importPreview.rows[Number(sel.dataset.row)];
@@ -2220,14 +2272,22 @@ function commitImport(){
   // the guard belongs next to the write, not only next to the button.
   if(usable.length === 0) return;
 
-  // A paste replaces the round rather than merging into it (brief section 4).
-  state.scores = {};
-  state.handicaps = {};
+  // A paste MERGES into the round. It used to empty state.scores first, on the
+  // grounds that a paste was the whole round — which is false the moment a
+  // round arrives in more than one piece. A two-flight event kept only the
+  // second flight, and three or four flights is ordinary at a club event.
+  //
+  // Only the men in THIS paste are touched. A man already scored and not
+  // mentioned here keeps the card he has; a man mentioned here has his card
+  // replaced entire, holes and handicap together.
   usable.forEach(a => {
     state.scores[a.player.id] = a.gross;
     // Keep the day's handicap with the card it belongs to, not just for scoring
-    // now but so a later reload still scores the round as it was played.
+    // now but so a later reload still scores the round as it was played. A
+    // replacement card with no handicap of its own must not inherit the one
+    // that came in with the card it just displaced.
     if(a.card.handicap != null) state.handicaps[a.player.id] = a.card.handicap;
+    else delete state.handicaps[a.player.id];
   });
   // Score entry is the moment: the round is being scored now, and a man who has
   // not sent his picks in by now is not going to.

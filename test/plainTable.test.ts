@@ -85,16 +85,23 @@ test("without a Total the columns are left unclassified, for a person to say", (
 
 // The old message said "no Total column — cannot read the card", which was
 // wrong twice: the card read fine, and it sent a man looking for a mistake in a
-// paste that had none. An empty Total where there IS a Total column is a real
-// fault and still says so.
-test("an empty Total cell, where there is a Total column, is still an error", () => {
+// paste that had none.
+//
+// An empty Total where there IS a Total column used to be treated as a real
+// fault and refused. That was wrong for the same reason: eight cards in one
+// round were thrown away over a missing summary of eighteen scores that were
+// all present. The card now comes through unclassified, and the screen asks
+// which the columns are — the same treatment a plain table gets.
+test("an empty Total cell no longer throws a complete card away", () => {
   const gg = [
     "\t1\t2\t3\t4\t5\t6\t7\t8\t9\tOut\t10\t11\t12\t13\t14\t15\t16\t17\t18\tIn\tTotal\tNet",
     ["Whitfield, Abe (19)", 5,5,4,6,6,5,6,4,6, 47, 6,4,5,4,6,6,5,3,6, 45, "", ""].join("\t"),
   ].join("\n");
-  const { errors } = parseScores(gg);
-  assert.equal(errors.length, 1);
-  assert.match(errors[0], /the Total column is empty/);
+  const { cards, errors } = parseScores(gg);
+  assert.deepEqual(errors, []);
+  assert.equal(cards.length, 1);
+  assert.equal(cards[0].holesPlayed, 18);
+  assert.equal(cards[0].mode, "unknown", "but it still cannot say gross from net");
 });
 
 /* ---- the scores are the ones that were pasted ---- */

@@ -139,9 +139,22 @@
       return { mode: "unknown" };
     }
     if (grossTotal == null) {
-      // There IS a Total column and this row's cell is empty or unreadable,
-      // which is a real fault in the row rather than a different shape.
-      return { mode: "unknown", error: name + ": the Total column is empty — cannot read the card." };
+      // There IS a Total column and this row's cell is empty. That used to
+      // refuse the card outright, which threw away eighteen perfectly good hole
+      // scores over a missing summary of them — a Golf Genius export leaves the
+      // cell blank often enough that eight cards in one round were lost to it.
+      //
+      // The total can be added up from the holes. What adding it up CANNOT do
+      // is say whether those holes are gross or net: a sum compared against
+      // itself always agrees, so classifying on it would assert "gross" for
+      // every card, including net ones. So the NET column is tried, and failing
+      // that the card comes through unclassified for the screen to ask about,
+      // exactly as a plain table does. It is a shape, not a fault.
+      const sum = holes.reduce((a, h) => a + (h == null ? 0 : h), 0);
+      if (netTotal != null && pickedUp === 0 && holesPlayed === HOLES && sum === netTotal) {
+        return { mode: "net" };
+      }
+      return { mode: "unknown" };
     }
     if (pickedUp > 0) {
       // A picked-up hole has no number to add, so the eighteen cannot be summed
@@ -383,6 +396,67 @@
       if (hits.length > 1) return { index: -1, how: "ambiguous" };
     }
     return { index: -1, how: null };
+  }
+
+  /**
+   * How many single-character edits separate two strings. Iterative and small
+   * rather than clever — the longest thing it is ever asked to compare is a
+   * man's name against two dozen others.
+   */
+  function editDistance(a, b) {
+    const m = a.length, n = b.length;
+    if (m === 0) return n;
+    if (n === 0) return m;
+    let prev = [];
+    for (let j = 0; j <= n; j++) prev[j] = j;
+    for (let i = 1; i <= m; i++) {
+      const cur = [i];
+      for (let j = 1; j <= n; j++) {
+        cur[j] = Math.min(
+          prev[j] + 1,
+          cur[j - 1] + 1,
+          prev[j - 1] + (a.charAt(i - 1) === b.charAt(j - 1) ? 0 : 1)
+        );
+      }
+      prev = cur;
+    }
+    return prev[n];
+  }
+
+  /**
+   * The roster name a failed match was most likely meant to be.
+   *
+   * WHY. "Score belongs to nobody" is true and useless. The organiser typed
+   * "Gidaly, Mitch" into Setup and Golf Genius printed "Gidaly, Mitchell", and
+   * he is left to find that himself among two dozen men, six times over. Naming
+   * the near miss turns a hunt into a tap.
+   *
+   * It only ever SUGGESTS. Nothing is assigned on a guess: a man scored on
+   * another man's card is far worse than a row that had to be pointed at by
+   * hand, and every rule in `matchName` above is built on refusing rather than
+   * risking it. This keeps that bargain — it hands the organiser a name to
+   * confirm, and confirming is still his to do.
+   */
+  function nearestName(exportName, names) {
+    const want = normaliseName(canonicalName(exportName));
+    const nothing = { index: -1, distance: null };
+    if (want === "") return nothing;
+
+    let best = -1, bestD = Infinity, runnerUp = Infinity;
+    names.forEach((n, i) => {
+      const d = editDistance(want, normaliseName(canonicalName(n)));
+      if (d < bestD) { runnerUp = bestD; bestD = d; best = i; }
+      else if (d < runnerUp) runnerUp = d;
+    });
+
+    // About a third of the name may differ, and never more than four letters.
+    // Past that it is not a spelling of the same name, it is a different man,
+    // and offering him would be worse than offering nobody.
+    const allowed = Math.max(1, Math.min(4, Math.floor(want.length / 3)));
+    if (best === -1 || bestD > allowed) return nothing;
+    // Two roster names equally close is not a suggestion, it is a coin toss.
+    if (bestD === runnerUp) return nothing;
+    return { index: best, distance: bestD };
   }
 
   /* ---- pasting a roster ----
@@ -674,6 +748,7 @@
     parseRoster, splitCsvLine, parseBirdiePicks,
     parseScores, splitName, grossCardToPlayer,
     normaliseName, unreverseName, stripHandicap, canonicalName, initialKey, matchName,
+    nearestName, editDistance,
     PICKED_UP,
   };
 })();
