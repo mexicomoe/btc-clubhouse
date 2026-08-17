@@ -28,8 +28,10 @@ export interface CourseConfig {
   courseRating: number;
   /** Hole numbers (1-based) making up the Agony Alley stretch. */
   agonyHoles: number[];
-  /** Lowest final allowed; `null` = no floor (the Clubhouse default). */
-  floor: number | null;
+  /** Holes Watch the Birdie may not be nominated on, whatever their par. */
+  barredPicks: number[];
+  /** Easy Street's three holes. */
+  easyStreetHoles: number[];
 }
 
 /** Rating and slope for one tee, per gender. Par is 72 from every Aberdeen tee. */
@@ -54,8 +56,12 @@ export interface BirdiePayout {
   birdie: number;
   /** What a net eagle or better pays. A hole pays this OR the birdie, never both. */
   eagle: number;
-  /** Override the pair for a named hole, so a hard hole can be worth more. */
-  byHole?: Record<number, { birdie: number; eagle: number }>;
+  /**
+   * What NOTHING on any of the six costs — the contest's only penalty side.
+   * Charged only once every pick has been played.
+   */
+  blank: number;
+}>;
 }
 
 /**
@@ -65,22 +71,24 @@ export interface BirdiePayout {
  */
 export interface SkinsConfig {
   /**
-   * What an EVEN SHARE of the eighteen on offer is worth, at any field size.
-   * One skin is therefore `fairShare × groups / 18` to the hundredth: two
-   * groups −0.09, four −0.18, six −0.27, twelve −0.53.
+   * The WHOLE contest's worth, divided among however many skins were actually
+   * won that round. Negative, like every other credit. A typical 11 skins makes
+   * one worth about 0.36; a lean 7 makes it 0.57.
    */
-  fairShare: number;
-  /**
-   * The most Skins may take off one man's card, or null for no ceiling. The
-   * winning group's haul does not shrink as the field grows, so without this
-   * the contest would outgrow the other seven in a large field.
-   */
-  maxSkinStrokes: number | null;
+  pot: number;
+  /** Below this many finishers there are no skins at all. */
+  minPlayers: number;
+  /** At this many finishers the format becomes Team Skins rather than Cart. */
+  teamFrom: number;
 }
 
 /** Triple Threat is a tally, not a ladder: one flat rate for every player. */
 export interface TripleThreatConfig {
-  /** What a gross triple bogey or worse costs. Positive — it adds strokes. */
+  /**
+   * What a NET DOUBLE BOGEY or worse costs. Positive — it adds strokes.
+   * It was a gross triple, which within one tee ran r = +0.43 with handicap
+   * index: it was measuring the handicap, not the round.
+   */
   perTriple: number;
   /**
    * What a BOUNCE BACK pays — a net par or better on the very next hole. Named
@@ -90,22 +98,59 @@ export interface TripleThreatConfig {
   perBounceBack: number;
 }
 
-/** Contest thresholds. Agony/Damage/Easy grade `<=`; Bounce grades `>=`. */
+/** Six Pack needs nothing but the par its six leftover holes always come to. */
+export interface SixPackConfig {
+  /**
+   * Always 24 at Aberdeen, and not by choice: the slot structure forces the
+   * leftovers to four par 4s, one par 3 and one par 5 for every player.
+   */
+  par: number;
+}
+
+/** What one Hit List result pays. */
+export interface HitListRates {
+  win: number;
+  tie: number;
+  loss: number;
+}
+
+/**
+ * Hit List is priced by the OPPONENT's band, because the choice is not a coin
+ * flip: backing yourself against a higher index wins 54% of the time and
+ * against a lower index only 39%. Flat pricing would make the weakest man on
+ * the list the only sane pick.
+ */
+export interface HitListConfig {
+  /** Two indexes this close count as equal. Lower index = the better player. */
+  equalBand: number;
+  lower: HitListRates;
+  equal: HitListRates;
+  higher: HitListRates;
+}
+
+/** Contest thresholds. Agony/Easy grade `<=`; Bounce grades `>=`. */
 export interface ContestConfig {
   /** Not a ladder — each nominated hole pays its own best result. */
   watchTheBirdie: BirdiePayout;
+  /** The six candidates he did NOT pick, scored as raw net strokes to par 24. */
+  sixPack: SixPackConfig | null;
   agonyAlley: Step[];
-  damageControl: Step[];
-  /** Graded on a COUNT of holes at gross par or better, not on a total. */
+  /** Graded on a COUNT of holes at NET par or better — gross measured handicap. */
   easyStreet: Step[];
   tripleThreat: TripleThreatConfig;
+  /** Settled field-wide, not in `scorePlayer` — it needs the opponent's card. */
+  hitList: HitListConfig | null;
+  /** Null switches the contest off — Triple Threat absorbed it. */
+  damageControl: Step[] | null;
   /** Null switches the contest off — Easy Street replaced both. */
   goLong: Step[] | null;
   /** Null switches the contest off — Easy Street replaced both. */
   getShorty: Step[] | null;
-  bounceBack: Step[];
-  maxContestStrokes: number;
-  /** Null switches Skins off; it then scores nothing and no cart is read. */
+  /** Null switches the contest off — Triple Threat carries the name now. */
+  bounceBack: Step[] | null;
+  /** Null means no ceiling. On a zero base a cap would cap the score itself. */
+  maxContestStrokes: number | null;
+  /** Null switches Skins off; it then scores nothing and no group is read. */
   skins: SkinsConfig | null;
 }
 

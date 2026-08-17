@@ -16,20 +16,23 @@
   const HOLES = 18;
 
   /** The contests, in the order they are scored and shown. */
+  /**
+   * The contests, in the order a card reads them.
+   *
+   * THIS IS A FRESH WORKBOOK. The zero base makes every past round
+   * incomparable, so the archive is kept as it stands and this file starts
+   * clean — which means the switched-off contests no longer need blank columns
+   * holding their place. Damage Control, Go Long, Get Shorty and the standalone
+   * Bounce Back are simply gone from it.
+   */
   const CONTEST_COLUMNS = [
     ["watchTheBirdie", "Watch the Birdie"],
+    ["sixPack", "Six Pack"],
     ["agonyAlley", "Agony Alley"],
-    ["damageControl", "Damage Control"],
-    // Go Long and Get Shorty are switched off and now write a blank cell. The
-    // columns STAY: the archive workbook already holds rounds under them, and a
-    // column that disappears shifts every one to its right.
-    ["goLong", "Go Long"],
-    ["getShorty", "Get Shorty"],
-    ["bounceBack", "Bounce Back"],
-    ["skins", "Skins"],
-    // Appended after Skins, so nothing before them moves. Only "Final" shifts.
     ["easyStreet", "Easy Street"],
     ["tripleThreat", "Triple Threat"],
+    ["hitList", "Hit List"],
+    ["skins", "Skins"],
   ];
 
   function headerRow() {
@@ -41,15 +44,13 @@
                   // only the organiser's own typing will do for that.
                   "Name", "Name as entered", "GHIN",
                   "Handicap index", "Tee", "Gender", "Group", "Flight",
-                  // Watch the Birdie went from two picks to six. The four new
-                  // ones are APPENDED here and nothing before them moves: the
-                  // archive workbook pastes against this header order, and a
-                  // column that shifts silently corrupts every past round in it.
-                  // "Front pick" and "Back pick" keep their places and their
-                  // meaning — they are the par 4 on each nine.
-                  "Front pick", "Back pick",
-                  "Front par 3 pick", "Front par 5 pick",
-                  "Back par 3 pick", "Back par 5 pick",
+                  // The six picks, in slot order. Par 4s are split front and
+                  // back; the par 3s and par 5s float across the whole course.
+                  "Front par 4 pick", "Back par 4 pick",
+                  "Par 3 pick 1", "Par 3 pick 2",
+                  "Par 5 pick 1", "Par 5 pick 2",
+                  // Who he named on his Hit List, by name, as he named him.
+                  "Hit List",
                   "Course handicap"];
     // Gross per hole, then the capped net per hole beside it. The net columns
     // are what the contests are actually graded on, so anything reading this
@@ -117,12 +118,13 @@
         p.gender || "",
         p.cart == null ? "" : p.cart,
         (p.flight || "").trim(),
-        p.f4 == null ? "" : p.f4,
-        p.b4 == null ? "" : p.b4,
-        p.f3 == null ? "" : p.f3,
-        p.f5 == null ? "" : p.f5,
-        p.b3 == null ? "" : p.b3,
-        p.b5 == null ? "" : p.b5,
+        p.p4f == null ? "" : p.p4f,
+        p.p4b == null ? "" : p.p4b,
+        p.p3a == null ? "" : p.p3a,
+        p.p3b == null ? "" : p.p3b,
+        p.p5a == null ? "" : p.p5a,
+        p.p5b == null ? "" : p.p5b,
+        p.hitList == null ? "" : p.hitList,
         r ? r.courseHandicap : "",
       ];
       for (let i = 0; i < HOLES; i++) {
@@ -175,7 +177,7 @@
       skinsOn: e.skinsOn !== false,
       players: (e.players || []).map((p) => [
         p.id, p.name, p.ghin, p.index, p.tee, p.gender, p.cart, p.flight,
-        p.f3, p.f4, p.f5, p.b3, p.b4, p.b5,
+        p.p4f, p.p4b, p.p3a, p.p3b, p.p5a, p.p5b, p.hitList,
       ]),
       scores: e.scores || {},
       handicaps: e.handicaps || {},
@@ -293,14 +295,16 @@
       // code written by this one still reads on a phone that has not updated —
       // it will simply see the two picks it knows about. The four new slots are
       // APPENDED past the end for the same reason.
-      p.f4 == null ? null : p.f4,
-      p.b4 == null ? null : p.b4,
+      p.p4f == null ? null : p.p4f,
+      p.p4b == null ? null : p.p4b,
       packHoles(scores[p.id]),
       handicaps[p.id] == null ? null : handicaps[p.id],
-      p.f3 == null ? null : p.f3,
-      p.f5 == null ? null : p.f5,
-      p.b3 == null ? null : p.b3,
-      p.b5 == null ? null : p.b5,
+      p.p3a == null ? null : p.p3a,
+      p.p3b == null ? null : p.p3b,
+      p.p5a == null ? null : p.p5a,
+      p.p5b == null ? null : p.p5b,
+      // Appended past the end, so a code written by an older app still reads.
+      p.hitList == null ? null : p.hitList,
     ]));
 
     // What travels is the round itself. Which tab was open, and whether THIS
@@ -331,12 +335,13 @@
         gender: row[4] === "F" ? "F" : "M",
         cart: row[5] == null ? null : row[5],
         flight: row[6] == null ? "" : row[6],
-        f4: row[7] == null ? null : row[7],
-        b4: row[8] == null ? null : row[8],
-        f3: row[11] == null ? null : row[11],
-        f5: row[12] == null ? null : row[12],
-        b3: row[13] == null ? null : row[13],
-        b5: row[14] == null ? null : row[14],
+        p4f: row[7] == null ? null : row[7],
+        p4b: row[8] == null ? null : row[8],
+        p3a: row[11] == null ? null : row[11],
+        p3b: row[12] == null ? null : row[12],
+        p5a: row[13] == null ? null : row[13],
+        p5b: row[14] == null ? null : row[14],
+        hitList: row[15] == null ? "" : row[15],
       });
       if (row[9]) scores[id] = unpackHoles(row[9]);
       if (row[10] != null) handicaps[id] = row[10];

@@ -76,9 +76,19 @@
    */
   const MAX_URL_LENGTH = 2000;
 
-  /** The seven contests, in the order they are shown. Index, not name, travels. */
+  /**
+   * The contests, in the order they are shown. THE INDEX TRAVELS, NOT THE NAME,
+   * so this list may only ever be APPENDED to. Reordering it would silently
+   * re-label every contest on every link already sent.
+   *
+   * The first seven are the order links were written in before the rebuild, and
+   * they stay put for exactly that reason — even the three now switched off,
+   * whose slots are simply never referenced by a new link.
+   */
   const RESULT_CONTESTS = ["watchTheBirdie", "agonyAlley", "damageControl",
-                           "easyStreet", "tripleThreat", "bounceBack", "skins"];
+                           "easyStreet", "tripleThreat", "bounceBack", "skins",
+                           // appended by the 15 August rebuild
+                           "sixPack", "hitList"];
 
   /* ---- base64url, which survives a text message ---- */
   function toBase64Url(text) {

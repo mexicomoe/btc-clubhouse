@@ -66,9 +66,10 @@
 
     /** The contests, by the names a man reads on the card. */
     const CONTEST_NAMES = {
-      watchTheBirdie: "Watch the Birdie", agonyAlley: "Agony Alley",
-      damageControl: "Damage Control", easyStreet: "Easy Street",
-      tripleThreat: "Triple Threat", goLong: "Go Long",
+      watchTheBirdie: "Watch the Birdie", sixPack: "Six Pack",
+      agonyAlley: "Agony Alley", easyStreet: "Easy Street",
+      tripleThreat: "Triple Threat", hitList: "Hit List",
+      damageControl: "Damage Control", goLong: "Go Long",
       getShorty: "Get Shorty", bounceBack: "Bounce Back",
       skins: "Skins",
     };

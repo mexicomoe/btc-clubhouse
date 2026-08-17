@@ -131,19 +131,33 @@ export interface PlayerResult {
   holesPlayed: number;
   contests: {
     watchTheBirdie: ContestResult;
-    /** Absent when the contest is switched off in the config. */
-    easyStreet?: ContestResult;
-    /** Absent when the contest is switched off in the config. */
-    tripleThreat?: ContestResult;
+    /** The six he did NOT pick, always par 24. Absent when switched off. */
+    sixPack?: ContestResult;
     agonyAlley: ContestResult;
-    damageControl: ContestResult;
-    goLong: ContestResult;
-    getShorty: ContestResult;
-    bounceBack: ContestResult;
+    /** Counted on NET par or better. Absent when switched off. */
+    easyStreet?: ContestResult;
+    /** Fires on a net double bogey. Absent when switched off. */
+    tripleThreat?: ContestResult;
+    /** Added field-wide — it needs the opponent's card. Absent when off. */
+    hitList?: ContestResult;
+    /** Absent when the contest is switched off in the config. */
+    damageControl?: ContestResult;
+    /** Absent when the contest is switched off in the config. */
+    goLong?: ContestResult;
+    /** Absent when the contest is switched off in the config. */
+    getShorty?: ContestResult;
+    /** Absent when the contest is switched off in the config. */
+    bounceBack?: ContestResult;
     /** Added by `computeLeaderboard` — Skins can only be settled field-wide. */
     skins?: ContestResult;
   };
   strokesEarned: number;
+  /**
+   * The whole score. THE BASE IS ZERO: this IS the contest total, and the net
+   * no longer carries into it. Null below eighteen holes — a man who did not
+   * finish is not scored at all, and on a zero base an empty card would
+   * otherwise come out at 0 and lead the field.
+   */
   final: number | null;
   /** Skins won by this player's cart; present when Skins is on. */
   skins?: number;

@@ -121,8 +121,12 @@ const D  = window.ClubhouseDisplay;
 const { esc, fmtFinal, fmtStrokes, fitText, abbreviate, fitName, niceDate,
         MONTHS, CONTEST_NAMES } = D;
 
-const CONTEST_ORDER = ["watchTheBirdie","agonyAlley","damageControl","easyStreet",
-                       "tripleThreat","goLong","getShorty","bounceBack","skins"];
+/* The order a card reads down the screen. Six Pack sits directly under Watch
+   the Birdie because they are two halves of the same twelve holes — the six he
+   chose and the six he did not — and reading them apart makes neither clear. */
+const CONTEST_ORDER = ["watchTheBirdie","sixPack","agonyAlley","easyStreet",
+                       "tripleThreat","hitList","damageControl","goLong",
+                       "getShorty","bounceBack","skins"];
 
 /**
  * The contests this club actually plays. A contest switched off in the engine's
