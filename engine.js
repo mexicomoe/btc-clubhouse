@@ -80,13 +80,18 @@
       // par. Kept beside the course rather than in the contest because it is
       // the COURSE that says which holes are already spoken for.
       //
-      // 5 and 6 are Agony Alley's par 4s. 4 is an Agony Alley hole too and is
-      // NOT barred, because the front nine has only two par 5s and barring it
-      // would leave hole 7 as the only one — a slot with a single legal hole is
-      // not a choice, it is a formality. Hole 13 stays legal for the same
-      // reason. The rule is that every slot keeps at least two holes in it.
-      barredPicks: [5, 6, 11, 12],
-      floor: null,
+      // THE EIGHTEEN NOW PARTITION CLEANLY. Agony Alley takes 4, 5, 6 (par 13),
+      // Easy Street takes 11, 12, 13 (par 11), and the remaining twelve (par
+      // 48) are Watch the Birdie's candidates. No hole is used twice and none
+      // is unused; 13 + 11 + 48 = 72.
+      //
+      // Holes 4 and 13 used to stay legal despite belonging to another contest,
+      // because barring them would have left a slot with only one hole in it —
+      // not a choice. Floating the par 3s and par 5s across the whole course
+      // removes that constraint: three par 3s (3, 8, 17) and three par 5s
+      // (7, 16, 18) remain, so every slot keeps a genuine three-way choice and
+      // both old overlaps go.
+      barredPicks: [4, 5, 6, 11, 12, 13],
     };
   }
 
@@ -111,123 +116,140 @@
      Graded first-match: Agony/Damage/Long/Shorty use `<=`, Bounce uses `>=`.
      Watch the Birdie is not graded — each pick pays its own value. */
   const DEFAULT_CONTESTS = {
-    // Six nominated holes — a par 3, a par 4 and a par 5 on each nine — each
-    // paid on its own. A net birdie pays the birdie rate, a net eagle or better
-    // the eagle rate, and a hole pays ONE of them, never both. Net par pays
-    // nothing. `byHole` overrides the pair for a named hole, so a hard hole can
-    // be made worth more than an easy one without touching code.
-    //
-    // The ceiling of six eagles — 6.0 — is theoretical and not what this is
-    // tuned against. A realistic good round is nearer 3.0 and the field average
-    // nearer 0.4.
-    watchTheBirdie: {
-      birdie: -0.8, eagle: -1.5,
-      // Holes 4 and 18 pay double. Measured over 111 rounds they were the two
-      // worst par 5s to nominate — hole 7 was worth 2.3× hole 4 — so nobody
-      // rational picked 4, and its slot was a formality. Doubling makes the
-      // choice a choice. Hole 18 was already the best of its pair; doubling it
-      // was asked for anyway and it makes 18 the pick of the back nine.
-      byHole: { 4: { birdie: -1.6, eagle: -3.0 }, 18: { birdie: -1.6, eagle: -3.0 } },
-    },
+    /**
+     * Watch the Birdie — six holes nominated before the round, settled one by
+     * one. A net eagle pays 1.5, a net birdie 0.5, and a hole pays one of them,
+     * never both.
+     *
+     * `blank` is new and is the contest's only penalty side: a man who makes no
+     * net birdie or better on ANY of his six pays half a stroke. Without it the
+     * contest could only ever help, which made nominating holes free.
+     *
+     * THE DOUBLING ON 4 AND 18 IS GONE. It was printed on the card and changed
+     * nobody's behaviour — 8 of 10 still took hole 7 and 9 of 10 still took 16
+     * — so it was paying extra for choices men were making anyway. Hole 4 is
+     * not a candidate at all now; it belongs to Agony Alley.
+     */
+    watchTheBirdie: { birdie: -0.5, eagle: -1.5, blank: 0.5 },
+    /**
+     * Six Pack — the six candidate holes a man did NOT nominate.
+     *
+     * The slot structure forces their shape: two par 4s of six are picked, one
+     * par 3 of three and one par 5 of three, so what is left is always four par
+     * 4s, one par 3 and one par 5. PAR 24, for every player, every round,
+     * whatever he chose. Nothing needs configuring except the par itself.
+     *
+     * Scored as raw net strokes over or under that 24. No ladder, no threshold,
+     * no multiplier — it is deliberately the ONE contest scored as plain
+     * net-to-par, because it is the base the other six move a man away from. If
+     * they were all scored this way the total would just be his net score again.
+     *
+     * Measured over 135 rounds: mean +1.1, range -4 to +8, r = +0.05 with index.
+     */
+    sixPack: { par: 24 },
+    /**
+     * Agony Alley — the net total on 4, 5, 6, whose par is 13. Structure
+     * unchanged from the net base; the values are rescaled to zero.
+     */
     agonyAlley: [
-      { threshold: 12, strokes: -3.8 }, { threshold: 13, strokes: -2.3 },
-      { threshold: 14, strokes: -0.8 }, { threshold: 15, strokes: 0 },
-      { threshold: 16, strokes: 1.5 }, { threshold: 99, strokes: 2.3 },
+      { threshold: 12, strokes: -2 }, { threshold: 13, strokes: -1 },
+      { threshold: 15, strokes: 0 }, { threshold: 16, strokes: 1 },
+      { threshold: 99, strokes: 2 },
     ],
     /**
-     * Damage Control and Bounce Back are SWITCHED OFF — Triple Threat replaced
-     * both. It is the same contest in one: the gross triple is the damage and
-     * the net par on the next hole is the bounce back, scored as one event
-     * rather than two that overlapped. Thirty-one per cent of Triple Threat's
-     * recoveries were already paying Bounce Back for the same two holes.
+     * Easy Street — holes 11, 12, 13 at NET par or better, counted.
      *
-     * Null is the signal Skins uses. The ladders and their graders stay below,
-     * because they were calibrated on real rounds and may come back.
+     * THIS REVERSES THE DECISION OF 9 AUGUST, which scored it on gross. Gross
+     * failed badly and in the direction that matters: on 14 August five of
+     * seven finishers made ZERO gross pars on these holes and nobody made two,
+     * so the contest penalised 71% of the field and rewarded no one. Across the
+     * archive gross pars run r = -0.36 with index WITHIN a single tee — it was
+     * measuring handicap, not play. Net pars run r = +0.08.
      *
-     *   damageControl: [ 0 → −1.2 · 1 → −0.6 · 2 → −0.3 · 99 → 0 ]
-     *   bounceBack:    [ 3 → −0.9 · 2 → −0.6 · 1 → −0.3 · 0 → 0 ]
-     */
-    damageControl: null,
-    /**
-     * Easy Street — the three holes the card gives back, counted on GROSS.
-     *
-     * A hole at par or better counts ONE, however far under it went: a birdie
-     * is a par for this purpose, so a lone birdie is a count of one and pays
-     * nothing. Two is the most that can be reached in practice, and three pays
-     * the same as two.
-     *
-     * It is the only hole contest graded on gross. Every other one runs on net,
-     * where a high handicap gets strokes; here he does not, and the contest
-     * therefore runs mildly against him (r = +0.24 with index over 111 rounds).
-     * That is the design as specified, not an accident of it.
+     * The threshold moves up a rung because net pars are common: all three on
+     * 34% of rounds, two on 47%.
      */
     easyStreet: [
-      { threshold: 0, strokes: 0.8 }, { threshold: 1, strokes: 0 },
-      { threshold: 99, strokes: -0.8 },
+      { threshold: 0, strokes: 2 }, { threshold: 1, strokes: 1 },
+      { threshold: 2, strokes: 0 }, { threshold: 99, strokes: -1 },
     ],
     /**
-     * Triple Threat — a gross triple bogey or worse costs, and a BOUNCE BACK
-     * off it, a net par or better on the very next hole, more than pays it back.
+     * Triple Threat — a blow-up hole costs 0.5, and a BOUNCE BACK off it, a net
+     * par or better on the very next hole, pays 1.0.
      *
-     * The second half carries the name of the contest it absorbed. Bounce Back
-     * used to stand on its own and 31% of its scores were already being paid
-     * twice, once here and once there, because a gross triple is usually a net
-     * bogey and a net par usually satisfies both. It is one contest now, and
-     * the half that answers the damage is still called what it always was.
+     * A BLOW-UP IS NOW A NET DOUBLE BOGEY, not a gross triple. The net double
+     * is the worst the cap allows, so it is the true ceiling of a bad hole.
+     * Gross triples were a handicap measurement wearing a contest's clothes:
+     * within a single tee they run r = +0.43 with index. Net doubles run +0.01.
      *
-     * One flat rate for everybody. A picked-up hole is NOT a triple: it shows a
-     * gross of par + 4 and would otherwise be caught by the bar, which would
-     * mean a Stableford round punishing a man for the thing Stableford tells
-     * him to do.
+     * The name stays. For a man with a stroke on the hole a net double IS a
+     * gross triple — the same figure on the card — so it stays true for most
+     * players on most holes.
+     *
+     * A picked-up hole is filled in at par + 4 and so is a net double by
+     * definition; that is correct here, it was a blow-up.
      */
-    tripleThreat: { perTriple: 0.5, perBounceBack: -0.9 },
+    tripleThreat: { perTriple: 0.5, perBounceBack: -1.0 },
     /**
-     * Go Long and Get Shorty are SWITCHED OFF — Easy Street replaces both. Null
-     * is the same signal Skins uses: not scored, not shown, not exported. The
-     * ladders and `scorePar` are left in place below, because the contests were
-     * calibrated and may come back; nothing reads them while this is null.
+     * Hit List — before the round each man privately names one opponent from
+     * the eight players nearest his own index and backs himself to post the
+     * better 18-hole net score.
      *
-     *   goLong:    [ -1 → −1.5 · 0 → −1.0 · 1 → −0.5 · 99 → 0 ]
-     *   getShorty: [ -2 → −1.5 · -1 → −1.0 · 0 → −0.5 · 99 → 0 ]
+     * PRICED BY THE OPPONENT'S BAND, because head-to-head net is not a coin
+     * flip once a man chooses his opponent. Across all in-field pairings it is
+     * 46.6% win / 46.6% loss / 6.7% tie — but backing yourself against a HIGHER
+     * index wins 54% and against a LOWER index only 39%. Flat pricing would
+     * make picking the weakest man on the list the only sane move.
+     *
+     * Priced as below, picking the better player returns -0.20 on average and
+     * picking the weaker -0.09. Backing yourself against the good player is the
+     * better bet, but only just: a real choice rather than an obvious one.
+     *
+     * "Equal" is the two indexes within 1.0 of each other. Lower index = the
+     * better player.
      */
+    hitList: {
+      equalBand: 1.0,
+      lower:  { win: -1.1, tie: -0.2, loss: 0.3 },
+      equal:  { win: -0.9, tie: 0.1, loss: 0.3 },
+      higher: { win: -0.7, tie: 0.1, loss: 0.5 },
+    },
+    /**
+     * Damage Control, Bounce Back, Go Long and Get Shorty are SWITCHED OFF.
+     * Null is the signal Skins uses: not scored, not shown, not exported.
+     * Triple Threat absorbed the first two; Easy Street replaced the last two.
+     */
+    damageControl: null,
     goLong: null,
     getShorty: null,
     bounceBack: null,
     /**
-     * NO CEILING. `maxContestStrokes` was 11.0, then 6.0, and is now gone: with
-     * every value cut by 40% the contests cannot reach far enough for a ceiling
-     * to be the thing holding them back. Over 111 real rounds the highest total
-     * a card reached at the old rates was 9.2, and 40% of that is 5.5.
-     *
-     * Null means no cap, the same signal Skins uses. The knob is left here
-     * rather than deleted so that putting a ceiling back is a one-line edit and
-     * so that its absence is a stated decision rather than a missing feature.
-     *
-     * What a ceiling was covering up is still true: the four ladders were each
-     * calibrated on its own and they are CORRELATED, so a strong net round
-     * clears several top rungs at once. Cutting every value shrinks the symptom
-     * without touching the cause. That still wants its own calibration pass.
+     * NO CEILING, and on a zero base there is less for one to do: a man's final
+     * IS his contest total, so a cap would be a cap on the score itself.
+     * Left here so its absence stays a stated decision.
      */
     maxContestStrokes: null,
-    // Skins scores into FINAL. It sits outside maxContestStrokes, which governs
-    // the six individual contests. Set to null to switch it off.
-    //
-    // A "group" is whatever the round is played in — carts of two some weeks,
-    // teams of four others. The field is one and the same either way.
-    //
-    // A skin is worth `fairShare × groups / 18`, rounded to a hundredth. That
-    // is the value at which an EVEN SHARE of the eighteen on offer — 18/groups
-    // skins — is worth `fairShare` whatever the size of the field: two groups
-    // −0.09 a skin, four −0.18, six −0.27, twelve −0.53.
-    //
-    // The winner is not on an even share, though, and that is the thing to
-    // watch. The best group's haul barely moves with the field — six or seven
-    // skins over four groups, six or seven over twelve — because more groups
-    // both split the eighteen finer AND give more chances for one group to run
-    // hot, and the two effects cancel. So the winner's PAY rises with the field
-    // even though a fair share's does not, which is what maxSkinStrokes is for:
-    // no one contest may outweigh Agony Alley's 2.5, however large the field.
-    skins: { fairShare: -1.2, maxSkinStrokes: -3.8 },
+    /**
+     * Skins — the format is decided by the size of the field, not by a switch:
+     * under 8 there are none, 8 to 15 is Cart Skins, 16 or more is Team Skins.
+     *
+     * A GROUP'S SCORE ON A HOLE IS ITS BEST TWO NET BALLS, not its average.
+     * Averaging punished bigger groups badly. Measured over 33 groups, a pair
+     * won 1.62x a fair share, a threesome 1.07x and a foursome 0.85x — a
+     * threesome took 25% more than a foursome, because skins go to the lowest
+     * score and averaging fewer balls produces more extreme ones. Best two cuts
+     * the spread to 1.12x: every group contributes exactly two scores whatever
+     * its size. A man out on his own counts his ball twice, which takes him
+     * from 0.22x a fair share to 1.06x.
+     *
+     * NO CARRYOVER. A tied hole is simply not won. A FIXED POT of `pot` strokes
+     * is divided among however many skins were won that round, so a typical 11
+     * skins makes one worth about 0.36 and a lean 7 makes it 0.57. Every player
+     * in a winning group takes the full per-skin amount.
+     *
+     * Jay's league already plays low net best 2 balls, so the format is familiar.
+     */
+    skins: { pot: -4, minPlayers: 8, teamFrom: 16 },
   };
 
   /* ---- Reading a handicap index that someone typed in ----
@@ -397,21 +419,34 @@
    * numbers and has nothing else to go on.
    */
   const PICK_SLOTS = [
-    { key: "f3", par: 3, nine: "front", label: "front par 3" },
-    { key: "f4", par: 4, nine: "front", label: "front par 4" },
-    { key: "f5", par: 5, nine: "front", label: "front par 5" },
-    { key: "b3", par: 3, nine: "back",  label: "back par 3"  },
-    { key: "b4", par: 4, nine: "back",  label: "back par 4"  },
-    { key: "b5", par: 5, nine: "back",  label: "back par 5"  },
+    { key: "p4f", par: 4, nine: "front", label: "front par 4" },
+    { key: "p4b", par: 4, nine: "back",  label: "back par 4" },
+    // `nine: null` means anywhere on the course. Par 3s and par 5s float: there
+    // are only three of each left once Agony Alley and Easy Street take their
+    // holes, and splitting three across two nines would leave a slot with one
+    // hole in it. Par 4s stay split because six of them remain, three a side.
+    { key: "p3a", par: 3, nine: null, label: "first par 3" },
+    { key: "p3b", par: 3, nine: null, label: "second par 3" },
+    { key: "p5a", par: 5, nine: null, label: "first par 5" },
+    { key: "p5b", par: 5, nine: null, label: "second par 5" },
   ];
+
+  /** The slot keys as they were before the par 3s and par 5s floated. */
+  const LEGACY_SLOT_KEYS = { f4: "p4f", b4: "p4b", f3: "p3a", b3: "p3b", f5: "p5a", b5: "p5b" };
 
   /**
    * Which holes each slot allows. Derived from the course's par and its barred
    * list, never hardcoded — at Aberdeen that gives front 3/8, 1/2/9, 4/7 and
    * back 13/17, 10/14/15, 16/18.
    *
-   * Every hole falls in at most one slot, so the six lists never overlap: a
-   * hole nominated twice is caught as a duplicate before anything else.
+   * THE LISTS NOW OVERLAP, and that is a change of kind rather than of degree.
+   * `p3a` and `p3b` are handed the identical three holes, as are `p5a` and
+   * `p5b`. It used to be true that every hole fell in at most one slot, which
+   * is why nominating a hole twice was ALSO illegal for one of the two slots
+   * and either check would have caught it. That is no longer so: hole 8 is
+   * perfectly legal as both par 3s, and only the duplicate check stops a man
+   * nominating it twice and being paid twice for one birdie. The duplicate pass
+   * in `readPicks` runs first and is now the ONLY thing standing there.
    */
   function birdiePickHoles(course) {
     const barred = course.barredPicks || [];
@@ -421,12 +456,25 @@
       for (let i = 0; i < HOLES; i++) {
         const hole = i + 1;
         if (course.par[i] !== slot.par) continue;
-        if ((i < 9 ? "front" : "back") !== slot.nine) continue;
+        // A slot with no nine of its own takes the hole wherever it lies.
+        if (slot.nine && (i < 9 ? "front" : "back") !== slot.nine) continue;
         if (barred.includes(hole)) continue;
         out[slot.key].push(hole);
       }
     }
     return out;
+  }
+
+  /**
+   * Every hole Watch the Birdie may be played on — the union of the six slots,
+   * which at Aberdeen is the twelve left once Agony Alley and Easy Street have
+   * taken theirs. Six are nominated and the other six are the Six Pack.
+   */
+  function birdiePickCandidates(course) {
+    const legal = birdiePickHoles(course);
+    const seen = new Set();
+    for (const slot of PICK_SLOTS) for (const h of legal[slot.key]) seen.add(h);
+    return Array.from(seen).sort((a, b) => a - b);
   }
 
   /**
@@ -447,9 +495,17 @@
     const roll = rng || Math.random;
     const legal = birdiePickHoles(course);
     const picks = {};
+    // Drawn WITHOUT REPLACEMENT. The two par 3 slots are offered the identical
+    // three holes and so are the two par 5s, so drawing each slot on its own
+    // put hole 8 in both par 3 slots about a third of the time — a set no man
+    // could have chosen, which `readPicks` would then refuse as a duplicate.
+    const taken = new Set();
     for (const slot of PICK_SLOTS) {
-      const holes = legal[slot.key];
-      picks[slot.key] = holes.length ? holes[Math.floor(roll() * holes.length)] : null;
+      const holes = legal[slot.key].filter((h) => !taken.has(h));
+      if (holes.length === 0) { picks[slot.key] = null; continue; }
+      const hole = holes[Math.floor(roll() * holes.length)];
+      picks[slot.key] = hole;
+      taken.add(hole);
     }
     return picks;
   }
@@ -471,9 +527,22 @@
   function migratePicks(picks) {
     if (picks == null) return null;
     if (PICK_SLOTS.some((s) => picks[s.key] != null)) return picks;
+
+    // The six-key form that came before the par 3s and par 5s floated. Its keys
+    // map straight across; the holes themselves may since have been barred (4
+    // and 13 both were), and those are dropped by the `legacy` rule below
+    // rather than refused, exactly as a two-pick set's are.
+    if (Object.keys(LEGACY_SLOT_KEYS).some((k) => picks[k] != null)) {
+      const out = { legacy: true };
+      for (const [was, now] of Object.entries(LEGACY_SLOT_KEYS)) {
+        out[now] = picks[was] == null ? null : picks[was];
+      }
+      return out;
+    }
+
     if (picks.front == null && picks.back == null) return null;
-    return { f4: picks.front == null ? null : picks.front,
-             b4: picks.back == null ? null : picks.back, legacy: true };
+    return { p4f: picks.front == null ? null : picks.front,
+             p4b: picks.back == null ? null : picks.back, legacy: true };
   }
 
   /**
@@ -552,12 +621,12 @@
     // played hole that cannot possibly be a birdie — it pays nothing rather
     // than leaving a gap. A hole never played pays nothing either, and neither
     // takes the contest off the card.
-    let watchTheBirdie;
+    let watchTheBirdie, sixPack;
     const picks = migratePicks(card.picks);
-    const chosen = picks == null ? [] : (() => {
-      const read = readPicks(picks, course, card.name);
-      return PICK_SLOTS.map((s) => read[s.key]).filter((h) => h != null);
-    })();
+    const read = picks == null ? null : readPicks(picks, course, card.name);
+    const chosen = read == null ? []
+      : PICK_SLOTS.map((s) => read[s.key]).filter((h) => h != null);
+
     if (chosen.length === 0) {
       watchTheBirdie = { strokes: 0, detail: "no picks made", live: false };
     } else {
@@ -567,14 +636,48 @@
         const value = pickValue(h, contests.watchTheBirdie, over(h - 1));
         if (value !== 0) { birdieStrokes += value; paid++; }
       }
+      // The penalty side, and the contest's only one: nothing on any of the six
+      // costs half a stroke. Charged only once every pick has been PLAYED —
+      // a man cannot be charged for failing to birdie a hole he never stood on.
+      const allPlayed = chosen.every((h) => played(h - 1));
+      const blank = contests.watchTheBirdie.blank || 0;
+      if (paid === 0 && allPlayed && blank !== 0) birdieStrokes += blank;
       watchTheBirdie = {
         strokes: toTenth(birdieStrokes),
-        detail: paid + " of " + chosen.length + " pick" + (chosen.length === 1 ? "" : "s"),
+        detail: paid === 0
+          ? (allPlayed ? "nothing on any of the six" : "nothing yet")
+          : paid + " of " + chosen.length + " pick" + (chosen.length === 1 ? "" : "s"),
         live: true,
       };
     }
 
-    // 2 · Agony Alley (needs the stretch holes)
+    // 2 · Six Pack — the six candidates he did NOT nominate.
+    //
+    // The slot structure forces their shape, so this is always four par 4s, one
+    // par 3 and one par 5: par 24, for every man, every round. Scored as raw
+    // net strokes over or under that 24 — no ladder, no threshold. It is the
+    // base the other contests move him away from.
+    //
+    // Needs the picks, because without them there is no "did not choose". And
+    // needs all six played, because a missing hole would silently flatter the
+    // total by the whole of its par.
+    const candidates = birdiePickCandidates(course);
+    const leftovers = candidates.filter((h) => chosen.indexOf(h) === -1);
+    if (contests.sixPack == null) {
+      sixPack = null;
+    } else if (chosen.length !== PICK_SLOTS.length || leftovers.length !== PICK_SLOTS.length) {
+      sixPack = { strokes: 0, live: false,
+        detail: chosen.length === 0 ? "no picks made" : "needs all six picks" };
+    } else if (!leftovers.every((h) => played(h - 1))) {
+      sixPack = { strokes: 0, detail: "needs all six played", live: false };
+    } else {
+      const total = sum(leftovers.map((h) => net[h - 1]));
+      const par = contests.sixPack.par;
+      sixPack = { strokes: toTenth(total - par),
+        detail: "net " + total + " on the six left, par " + par, live: true };
+    }
+
+    // 3 · Agony Alley — the net total on the stretch. Structure unchanged.
     const agonyIdx = course.agonyHoles.map((h) => h - 1);
     let agonyAlley;
     if (!agonyIdx.every(played)) {
@@ -584,7 +687,7 @@
       agonyAlley = { strokes: gradeAtMost(total, contests.agonyAlley), detail: "net " + total + " across the stretch", live: true };
     }
 
-    // 3 · Damage Control — switched off, Triple Threat replaced it. The counter
+    // Damage Control — switched off, Triple Threat replaced it. The counter
     // stays for the day it comes back.
     let damageControl = null;
     if (contests.damageControl != null) {
@@ -593,10 +696,14 @@
         detail: netDoubles + " net double" + (netDoubles === 1 ? "" : "s"), live: true };
     }
 
-    // 4 · Easy Street — pars or better on the three giving holes, on GROSS.
+    // 4 · Easy Street — holes 11, 12, 13 at NET par or better, counted.
+    //
+    // NET, not gross. Scored on gross this contest measured handicap rather
+    // than play: on 14 August five of seven finishers made no gross par at all
+    // on these three, so it penalised 71% of the field and rewarded nobody.
     //
     // All three must be played. The contest can PENALISE, and a man cannot be
-    // charged +0.5 for failing to par holes he never stood on — the same reason
+    // charged for failing to par holes he never stood on — the same reason
     // Agony Alley waits for its stretch.
     const easyIdx = (course.easyStreetHoles || []).map((h) => h - 1);
     let easyStreet;
@@ -606,37 +713,41 @@
       easyStreet = { strokes: 0, live: false,
         detail: "needs holes " + course.easyStreetHoles[0] + "–" + course.easyStreetHoles[course.easyStreetHoles.length - 1] };
     } else {
-      // Gross, not net. A hole counts once whatever it was: par or better is a
-      // par here, so a birdie and a par together are two, not three.
-      const made = easyIdx.filter((i) => grossByHole[i] <= course.par[i]).length;
+      // A hole counts ONCE however far under par it went: a net birdie is a net
+      // par for this purpose, so a birdie and a par together are two, not three.
+      const made = easyIdx.filter((i) => over(i) <= 0).length;
       easyStreet = { strokes: gradeAtMost(made, contests.easyStreet),
-        detail: made === 0 ? "no pars on the three" : made + " of 3 at par or better",
+        detail: made === 0 ? "no net pars on the three" : made + " of 3 at net par or better",
         live: true };
     }
 
-    // 5 · Triple Threat — a gross triple or worse costs, answering it pays.
+    // 5 · Triple Threat — a blow-up costs, answering it on the next hole pays.
     //
-    // A picked-up hole is excluded: it shows a gross of par + 4 and would sail
-    // over the bar, so a Stableford round would charge a man for picking up,
-    // which is what Stableford asks him to do. The bounce back is read on NET —
-    // the man is being asked to steady the ship, not to match a scratch card.
+    // A BLOW-UP IS A NET DOUBLE BOGEY, the worst the cap allows. It was a gross
+    // triple, which within one tee ran r = +0.43 with handicap index — it was
+    // measuring the handicap, not the round. Net doubles run +0.01.
+    //
+    // A picked-up hole IS counted, unlike before. It is filled in at par + 4,
+    // which caps to a net double, and a hole a man picked up on was a blow-up
+    // by any reading. Under the old gross-triple rule it had to be excluded to
+    // avoid charging a Stableford player for doing what Stableford asks.
     let tripleThreat;
     if (contests.tripleThreat == null) {
       tripleThreat = null;
     } else {
       let triples = 0, bounces = 0;
       for (let i = 0; i < HOLES; i++) {
-        if (!played(i) || isPickedUp(card.gross[i])) continue;
-        if (grossByHole[i] - course.par[i] < 3) continue;
+        if (!played(i) || over(i) < 2) continue;
         triples++;
-        // The 18th has no next hole, so a triple there can only cost.
+        // The 18th has no next hole, so a blow-up there can only cost. Two net
+        // doubles running leave the first unanswered, which is the intent.
         if (i + 1 < HOLES && played(i + 1) && over(i + 1) <= 0) bounces++;
       }
       const raw = triples * contests.tripleThreat.perTriple
                 + bounces * contests.tripleThreat.perBounceBack;
       tripleThreat = { strokes: toTenth(raw),
-        detail: triples === 0 ? "no triples"
-          : triples + " triple" + (triples === 1 ? "" : "s") + ", " +
+        detail: triples === 0 ? "no net doubles"
+          : triples + " net double" + (triples === 1 ? "" : "s") + ", " +
             bounces + " bounce-back" + (bounces === 1 ? "" : "s"),
         live: true };
     }
@@ -652,16 +763,7 @@
       return { strokes: gradeAtMost(total, ladder), detail: signed(total) + " vs par on the " + label, live: true };
     }
 
-    // 6 · Bounce Back — a net bogey or worse, answered by a net birdie or
-    // better on the very next hole.
-    //
-    // It used to need a net DOUBLE to recover from, which made the contest
-    // punish good play: a bogey-free round could not score it at all. Ten of
-    // sixty-three real rounds were shut out and the correlation with making net
-    // doubles was +0.69 — the better you played, the fewer chances you were
-    // given, which is the opposite of what Damage Control rewards. On the same
-    // sixty-three rounds the rule below shuts nobody out, 30% clear two or
-    // more, and the handicap correlation falls to −0.09.
+    // Bounce Back — switched off; Triple Threat's second half carries the name.
     let bounceBack = null;
     if (contests.bounceBack != null) {
       let bounces = 0;
@@ -672,11 +774,16 @@
         detail: bounces + " bounce-back" + (bounces === 1 ? "" : "s"), live: true };
     }
 
+    // Hit List is NOT scored here. It needs the opponent's card, and this
+    // function sees one card in isolation — so it is settled field-wide in
+    // `computeLeaderboard`, exactly where Skins is.
+
     // A contest switched off in the config is not in the result at all — not a
     // zero, which would read as "he scored nothing on it". The CSV writes a
     // blank cell for a missing key and the detail screen leaves the line out.
     const allContests = {};
-    for (const [key, value] of [["watchTheBirdie", watchTheBirdie], ["agonyAlley", agonyAlley],
+    for (const [key, value] of [["watchTheBirdie", watchTheBirdie], ["sixPack", sixPack],
+                                ["agonyAlley", agonyAlley],
                                 ["damageControl", damageControl], ["easyStreet", easyStreet],
                                 ["tripleThreat", tripleThreat], ["goLong", goLong],
                                 ["getShorty", getShorty], ["bounceBack", bounceBack]]) {
@@ -704,11 +811,19 @@
       earned = -contests.maxContestStrokes;
     }
 
-    let final = null;
-    if (netTotal != null) {
-      final = toTenth(netTotal + earned);
-      if (course.floor != null) final = Math.max(course.floor, final);
-    }
+    /**
+     * THE BASE IS ZERO. Every man starts at 0 and the contests move him from
+     * there; the net total no longer carries into the final. The measure is
+     * strokes under and over par, and a board reads −4, −2, +1, +3.
+     *
+     * NULL UNLESS THE ROUND IS COMPLETE, and that gate is doing more work than
+     * it looks. On a net base an unfinished card scored a low total and needed
+     * holding back for that reason. On a zero base it scores near NOTHING —
+     * contests simply never fire — and a man who never teed off would come out
+     * at exactly 0, which on this scale beats a median round of −0.5. He would
+     * lead the field by walking in. Eighteen holes or no final at all.
+     */
+    const final = holesPlayed === HOLES ? earned : null;
 
     return {
       name: card.name, courseHandicap: ch,
@@ -793,32 +908,50 @@
 
     const skins = new Map(order.map((id) => [id, 0]));
     const holes = [];
-    let pot = 1;
 
     for (let h = 0; h < HOLES; h++) {
-      const averages = new Map();
+      const scores = new Map();
       for (const id of order) {
         const played = members.get(id).map((nets) => nets[h]).filter((n) => n != null);
-        if (played.length > 0) {
-          averages.set(id, played.reduce((a, b) => a + b, 0) / played.length);
-        }
+        if (played.length === 0) continue;
+        scores.set(id, bestTwo(played));
       }
       let wonBy = null;
-      if (averages.size > 0) {
+      if (scores.size > 0) {
         let best = Infinity;
-        averages.forEach((avg) => { if (avg < best) best = avg; });
+        scores.forEach((v) => { if (v < best) best = v; });
         const winners = [];
-        averages.forEach((avg, id) => { if (avg === best) winners.push(id); });
+        scores.forEach((v, id) => { if (v === best) winners.push(id); });
         if (winners.length === 1) {
           wonBy = winners[0];
-          skins.set(wonBy, skins.get(wonBy) + pot);
+          skins.set(wonBy, skins.get(wonBy) + 1);
         }
-        // A tie leaves the pot to carry into the next hole.
+        // NO CARRYOVER. A tied hole is simply not won and nothing rolls on.
       }
-      holes.push({ hole: h + 1, averages, pot, wonBy });
-      pot = wonBy == null ? pot + 1 : 1;
+      holes.push({ hole: h + 1, scores, wonBy });
     }
-    return { skins, holes, carried: pot - 1 };
+    return { skins, holes, carried: 0 };
+  }
+
+  /**
+   * A group's score on a hole: its BEST TWO net balls, added.
+   *
+   * Not the average, which was badly unfair to bigger groups. Measured over 33
+   * real groups, a pair won 1.62x a fair share, a threesome 1.07x and a
+   * foursome 0.85x — a threesome took a quarter more than a foursome, because
+   * skins go to the lowest score and averaging fewer balls produces more
+   * extreme ones. Best two cuts the spread to 1.12x: every group contributes
+   * exactly two scores whatever its size.
+   *
+   * A MAN ON HIS OWN COUNTS HIS BALL TWICE. Left with one ball against everyone
+   * else's two he took 0.22x a fair share — he was not playing the same contest.
+   * Counting it twice gives 1.06x.
+   */
+  function bestTwo(played) {
+    if (played.length === 0) return null;
+    if (played.length === 1) return played[0] * 2;
+    const sorted = played.slice().sort((a, b) => a - b);
+    return sorted[0] + sorted[1];
   }
 
   /** Cart Skins: group by cart. Same engine as teams — only membership differs. */
@@ -831,39 +964,41 @@
   }
 
   /**
-   * What ONE skin is worth in a field of `groupCount` groups: the value that
-   * makes an even share of the eighteen — 18/groupCount skins — come to
-   * `fairShare` at every field size. So a skin is worth LESS in a small field,
-   * where each group's share of the eighteen is larger, and more in a big one.
+   * Which format a field of this size plays, or null for none at all.
    *
-   * Rounded to a hundredth, because this is the figure printed on the Skins
-   * tab and a man checking five skins against it must get the number the board
-   * paid him. The unrounded value would pay 0.09 a skin and total as if it were
-   * 0.0889, and the difference shows up over a dozen skins.
-   *
-   * With no groups out there is nothing to divide the eighteen between, so a
-   * skin is simply worth the fair share.
+   * Under 8 there is not enough of a field to divide; 8 to 15 is Cart Skins;
+   * 16 or more is Team Skins, which is what Jay's Saturday field actually is.
    */
-  function skinValue(config, groupCount) {
-    if (!(groupCount > 0)) return config.fairShare;
-    return Math.round((config.fairShare * groupCount / 18) * 100) / 100;
+  function skinsFormat(playerCount, config) {
+    if (!config) return null;
+    if (playerCount < (config.minPlayers == null ? 8 : config.minPlayers)) return null;
+    return playerCount >= (config.teamFrom == null ? 16 : config.teamFrom) ? "team" : "cart";
   }
 
   /**
-   * What a count of skins is worth in a field of this many groups, in tenths
-   * like every other value in the game.
+   * What ONE skin is worth: a FIXED POT divided among however many skins were
+   * actually won that round.
    *
-   * Capped at `maxSkinStrokes`. Skins is the one contest that scales with the
-   * field, and unchecked it would dwarf the other seven: the best group's haul
-   * holds at six or seven skins however many groups are out, so at twelve
-   * groups the ordinary winner would take 3.2 and a hot one 6.9, against Agony
-   * Alley's hardest-earned 2.5. The cap is slack at the field sizes this club
-   * plays — over four groups it is past the 99th percentile of anything seen in
-   * the record, so winning more still pays more all the way up.
+   * So the whole contest is worth the same every week whatever falls — a
+   * typical 11 skins makes one worth about 0.36, a lean 7 makes it 0.57 — and
+   * it can no longer outgrow the other six in a big field, which is what the
+   * old per-skin value with a cap on top was there to stop.
+   *
+   * Rounded to a hundredth, because this is the figure printed on the Skins tab
+   * and a man checking five skins against it must get the number the board paid.
+   *
+   * Every player in a winning group takes the FULL per-skin amount; it is not
+   * divided among them.
    */
-  function skinStrokes(count, config, groupCount) {
-    const raw = toTenth(count * skinValue(config, groupCount));
-    return config.maxSkinStrokes == null ? raw : Math.max(raw, config.maxSkinStrokes);
+  function skinValue(config, skinsWon) {
+    if (!config) return 0;
+    if (!(skinsWon > 0)) return 0;
+    return Math.round((config.pot / skinsWon) * 100) / 100;
+  }
+
+  /** What a count of skins is worth, in tenths like every other value. */
+  function skinStrokes(count, config, skinsWon) {
+    return toTenth(count * skinValue(config, skinsWon));
   }
 
   /** Score a field, sorted by final (lowest first). Ties are left as ties. */
@@ -902,7 +1037,8 @@
       const group = byFlight.get(flight);
       // Carts only face carts in the same flight, and the cap is set by how
       // many carts are out in THIS flight, not across the whole field.
-      applyCartSkins(group.cards, group.results, course, contests);
+      applyHitList(group.cards, group.results, contests);
+      applySkins(group.cards, group.results, course, contests);
       placeField(group.results);
       placed.push.apply(placed, group.results);
     }
@@ -912,10 +1048,15 @@
   /** Sort one flight into finishing order and give out its places. */
   function placeField(results) {
     /**
-     * A finished card outranks an unfinished one however the numbers fall.
-     * Twelve holes of net will always total less than eighteen, so comparing
-     * them on the final rewards walking in — a short card is placed below every
-     * complete one and takes no position at all.
+     * EIGHTEEN HOLES OR YOU ARE NOT SCORED. A short card takes no final, no
+     * position, no skins and no place on anyone's Hit List; it is listed as not
+     * scored with a reason and nothing else.
+     *
+     * The old reasoning here was that twelve holes of net always total less
+     * than eighteen, so an unfinished card would flatter itself on the final.
+     * That argument died with the net base — on a zero base a short card scores
+     * near nothing rather than something too good. The rule survives it for a
+     * plainer reason: half a round is not a round.
      */
     const tier = (r) => (r.holesPlayed === HOLES ? 0 : r.holesPlayed > 0 ? 1 : 2);
 
@@ -999,72 +1140,167 @@
    * A player with no cart number simply doesn't compete for skins — he scores
    * zero from it rather than breaking the round for everyone else.
    */
-  function applyCartSkins(cards, results, course, contests) {
-    if (!contests.skins) return null;
-    const hasCart = (c) => c.cart != null && String(c.cart).trim() !== "";
-    const entered = [];
-    cards.forEach((c) => { if (hasCart(c)) entered.push({ card: c, cart: c.cart }); });
-    if (entered.length === 0) return null;
+  function applySkins(cards, results, course, contests) {
+    const config = contests.skins;
+    if (!config) return null;
 
-    // One cart is nobody to play against. Uncontested it wins every hole by
-    // default and takes all eighteen skins for going round on its own, so there
-    // are no skins on a round that never divided into two carts.
-    const distinctCarts = new Set(entered.map((e) => String(e.cart)));
-    if (distinctCarts.size < 2) {
+    // EIGHTEEN HOLES OR YOU ARE NOT IN IT. A man who did not finish plays no
+    // part in his group's best two, because a card that stops at the twelfth
+    // would otherwise win holes 1-12 for his group and then abandon it.
+    const complete = (i) => results[i].holesPlayed === HOLES;
+    const format = skinsFormat(cards.filter((c, i) => complete(i)).length, config);
+
+    const groupOf = (c) => (format === "team" ? c.team : c.cart);
+    const has = (c) => groupOf(c) != null && String(groupOf(c)).trim() !== "";
+
+    const say = (detail) => {
       cards.forEach((card, i) => {
-        const r = results[i];
-        if (r.holesPlayed === 0) r.contests.skins = { strokes: 0, detail: "no card", live: false };
-        else if (!hasCart(card)) r.contests.skins = { strokes: 0, detail: "no group", live: false };
-        else r.contests.skins = { strokes: 0, detail: "only one group out", live: false };
+        results[i].contests.skins = { strokes: 0, detail: detail(card, i), live: false };
       });
       return null;
+    };
+
+    if (format == null) {
+      const n = cards.filter((c, i) => complete(i)).length;
+      return say(() => "no skins under " + (config.minPlayers == null ? 8 : config.minPlayers) +
+                       " players (" + n + " finished)");
     }
 
-    const table = cartSkins(entered, course);
-    // The cap is set by how many carts are actually competing, not by the
-    // number of players — two men in a cart share one cart's share.
-    const cartCount = table.skins.size;
-    table.cartCount = cartCount;
-    table.skinValue = skinValue(contests.skins, cartCount);
+    const entered = [];
+    cards.forEach((c, i) => { if (has(c) && complete(i)) entered.push({ card: c, group: groupOf(c) }); });
+    if (entered.length === 0) {
+      return say(() => (format === "team" ? "no teams entered" : "no carts entered"));
+    }
+
+    // One group is nobody to play against: uncontested it wins every hole by
+    // default and takes all eighteen for going round on its own.
+    const distinct = new Set(entered.map((e) => String(e.group)));
+    if (distinct.size < 2) {
+      return say((card, i) => !complete(i) ? "no full round"
+        : !has(card) ? (format === "team" ? "no team" : "no group")
+        : "only one " + (format === "team" ? "team" : "group") + " out");
+    }
+
+    const table = skinsByGroup(entered, course);
+    // The pot is fixed and divided by how many skins were actually WON, so the
+    // contest is worth the same every week whatever falls.
+    let won = 0;
+    table.skins.forEach((n) => { won += n; });
+    table.format = format;
+    table.groupCount = distinct.size;
+    table.skinsWon = won;
+    table.skinValue = skinValue(config, won);
+
     cards.forEach((card, i) => {
       const r = results[i];
-      if (r.holesPlayed === 0) {
-        // His group may well have won skins; he did not play for any of them.
-        r.contests.skins = { strokes: 0, detail: "no card", live: false };
+      if (!complete(i)) {
+        r.contests.skins = { strokes: 0, detail: "no full round", live: false };
         return;
       }
-      if (card.cart == null || String(card.cart).trim() === "") {
-        r.contests.skins = { strokes: 0, detail: "no group", live: false };
+      if (!has(card)) {
+        r.contests.skins = { strokes: 0, live: false,
+          detail: format === "team" ? "no team" : "no group" };
         return;
       }
-      const count = table.skins.get(String(card.cart)) || 0;
-      const strokes = skinStrokes(count, contests.skins, cartCount);
+      const count = table.skins.get(String(groupOf(card))) || 0;
+      const strokes = skinStrokes(count, config, won);
       r.contests.skins = {
         strokes, live: true,
-        detail: count + " skin" + (count === 1 ? "" : "s") + " for group " + card.cart,
+        detail: count + " skin" + (count === 1 ? "" : "s") + " for " +
+                (format === "team" ? "team " : "group ") + groupOf(card),
       };
       r.skins = count;
-      r.strokesEarned = Math.round((r.strokesEarned + strokes) * 100) / 100;
-      if (r.net != null) {
-        let f = Math.round((r.net + r.strokesEarned) * 100) / 100;
-        const c = courseFor(card, course);
-        if (c.floor != null) f = Math.max(c.floor, f);
-        r.final = f;
-      }
+      r.strokesEarned = toTenth(r.strokesEarned + strokes);
+      // Zero base: the final IS the contest total.
+      r.final = r.strokesEarned;
     });
     return table;
   }
 
+  /** Kept under its old name — the app and the tests both call it. */
+  function applyCartSkins(cards, results, course, contests) {
+    return applySkins(cards, results, course, contests);
+  }
+
+  /**
+   * Hit List — settled field-wide, because it needs the opponent's card and
+   * `scorePlayer` only ever sees one.
+   *
+   * Each man named one opponent before the round and backed himself to post the
+   * better 18-hole net. Priced by the opponent's BAND, because the choice is
+   * not a coin flip: backing yourself against a higher index wins 54% of the
+   * time and against a lower index only 39%, so a flat price would make picking
+   * the weakest man on the list the only sane move.
+   *
+   * VOID AT ZERO if either card is short. Settled on capped net, the same
+   * figure the board is built on.
+   */
+  function applyHitList(cards, results, contests) {
+    const config = contests.hitList;
+    if (!config) return;
+
+    const byName = new Map();
+    cards.forEach((c, i) => { if (c.name != null) byName.set(String(c.name), i); });
+
+    cards.forEach((card, i) => {
+      const r = results[i];
+      const target = card.hitList == null ? "" : String(card.hitList).trim();
+      if (target === "") {
+        r.contests.hitList = { strokes: 0, detail: "nobody named", live: false };
+        return;
+      }
+      const j = byName.has(target) ? byName.get(target) : -1;
+      if (j === -1 || j === i) {
+        r.contests.hitList = { strokes: 0, live: false,
+          detail: j === i ? "named himself" : "“" + target + "” is not in this round" };
+        return;
+      }
+      const mine = results[i], theirs = results[j];
+      if (mine.holesPlayed !== HOLES || theirs.holesPlayed !== HOLES) {
+        r.contests.hitList = { strokes: 0, live: false,
+          detail: mine.holesPlayed !== HOLES ? "no full round"
+                : target + " has no full round — void" };
+        return;
+      }
+
+      // Lower index is the better player. With no index to compare, the two are
+      // treated as equals rather than guessed at.
+      const a = card.handicapIndex, b = cards[j].handicapIndex;
+      const band = (a == null || b == null) ? "equal"
+        : Math.abs(a - b) <= (config.equalBand == null ? 1.0 : config.equalBand) ? "equal"
+        : b < a ? "lower" : "higher";
+      const rates = config[band] || config.equal;
+
+      const result = mine.net < theirs.net ? "win" : mine.net > theirs.net ? "loss" : "tie";
+      const said = { lower: "a lower handicap", equal: "an equal handicap", higher: "a higher handicap" };
+      r.contests.hitList = {
+        strokes: toTenth(rates[result]), live: true,
+        detail: (result === "win" ? "beat " : result === "loss" ? "lost to " : "tied ") +
+                target + " · " + said[band],
+      };
+      r.strokesEarned = toTenth(r.strokesEarned + rates[result]);
+      if (r.holesPlayed === HOLES) r.final = r.strokesEarned;
+    });
+  }
+
   /* ---- Section 11 round: the leaderboard's initial data (31 July) ---- */
   const SAMPLE_ROUND = [
-    { name: "Alex",  courseHandicap: 18, picks: { f3: 8, f4: 2, f5: 7, b3: 17, b4: 14, b5: 18 }, gross: [5,5,3,6,5,5,6,3,5,7,5,5,4,4,6,6,3,7] },
-    { name: "Boyd",  courseHandicap: 21, picks: { f3: 8, f4: 1, f5: 7, b3: 17, b4: 10, b5: 18 }, gross: [6,5,4,7,6,5,7,4,5,6,6,5,4,5,7,4,4,6] },
-    { name: "Chip",  courseHandicap: 15, picks: { f3: 8, f4: 9, f5: 7, b3: 17, b4: 15, b5: 18 }, gross: [6,5,4,8,6,5,5,4,5,5,6,3,5,6,6,5,4,6] },
-    { name: "Dex",   courseHandicap: 23, picks: { f3: 3, f4: 1, f5: 4, b3: 13, b4: 10, b5: 16 }, gross: [5,5,4,6,6,6,7,3,5,4,4,6,3,6,6,6,6,5] },
-    { name: "Emmet", courseHandicap: 14, picks: { f3: 3, f4: 2, f5: 4, b3: 13, b4: 14, b5: 16 }, gross: [6,5,3,7,7,6,5,3,5,4,5,5,3,5,6,7,3,6] },
-    { name: "Finn",  courseHandicap: 26, picks: { f3: 3, f4: 9, f5: 4, b3: 13, b4: 15, b5: 16 }, gross: [5,6,6,7,5,4,7,4,7,6,7,5,3,5,5,6,4,7] },
-    { name: "Grady", courseHandicap: 34, picks: { f3: 3, f4: 1, f5: 4, b3: 13, b4: 10, b5: 16 }, gross: [7,6,4,9,7,7,7,5,5,6,7,7,3,8,6,7,3,9] },
-    { name: "Hoyt",  courseHandicap: 20, picks: { f3: 8, f4: 2, f5: 7, b3: 17, b4: 14, b5: 18 }, gross: [7,5,4,8,8,4,8,4,6,5,6,7,4,7,5,5,4,6] },
+    { name: "Alex",  courseHandicap: 18, handicapIndex: 18.0, cart: "1", hitList: "Boyd",
+      picks: { p4f: 2, p4b: 14, p3a: 3, p3b: 8, p5a: 7, p5b: 16 }, gross: [5,5,3,6,5,5,6,3,5,7,5,5,4,4,6,6,3,7] },
+    { name: "Boyd",  courseHandicap: 21, handicapIndex: 21.0, cart: "1", hitList: "Alex",
+      picks: { p4f: 1, p4b: 10, p3a: 3, p3b: 17, p5a: 7, p5b: 18 }, gross: [6,5,4,7,6,5,7,4,5,6,6,5,4,5,7,4,4,6] },
+    { name: "Chip",  courseHandicap: 15, handicapIndex: 15.0, cart: "2", hitList: "Dex",
+      picks: { p4f: 9, p4b: 15, p3a: 8, p3b: 17, p5a: 16, p5b: 18 }, gross: [6,5,4,8,6,5,5,4,5,5,6,3,5,6,6,5,4,6] },
+    { name: "Dex",   courseHandicap: 23, handicapIndex: 23.0, cart: "2", hitList: "Chip",
+      picks: { p4f: 1, p4b: 10, p3a: 3, p3b: 8, p5a: 7, p5b: 16 }, gross: [5,5,4,6,6,6,7,3,5,4,4,6,3,6,6,6,6,5] },
+    { name: "Emmet", courseHandicap: 14, handicapIndex: 14.0, cart: "3", hitList: "Finn",
+      picks: { p4f: 2, p4b: 14, p3a: 3, p3b: 17, p5a: 7, p5b: 16 }, gross: [6,5,3,7,7,6,5,3,5,4,5,5,3,5,6,7,3,6] },
+    { name: "Finn",  courseHandicap: 26, handicapIndex: 26.0, cart: "3", hitList: "Emmet",
+      picks: { p4f: 9, p4b: 15, p3a: 3, p3b: 8, p5a: 7, p5b: 16 }, gross: [5,6,6,7,5,4,7,4,7,6,7,5,3,5,5,6,4,7] },
+    { name: "Grady", courseHandicap: 34, handicapIndex: 34.0, cart: "4", hitList: "Hoyt",
+      picks: { p4f: 1, p4b: 10, p3a: 3, p3b: 8, p5a: 7, p5b: 16 }, gross: [7,6,4,9,7,7,7,5,5,6,7,7,3,8,6,7,3,9] },
+    { name: "Hoyt",  courseHandicap: 20, handicapIndex: 20.0, cart: "4", hitList: "Grady",
+      picks: { p4f: 2, p4b: 14, p3a: 8, p3b: 17, p5a: 7, p5b: 18 }, gross: [7,5,4,8,8,4,8,4,6,5,6,7,4,7,5,5,4,6] },
   ];
 
   const api = {
@@ -1072,10 +1308,12 @@
     courseForTee, courseFor, grossFromNet,
     parseHandicapIndex, formatHandicapIndex,
     PICKED_UP_OVER_PAR, NET_DOUBLE_OVER_PAR, isPickedUp, grossOnHole, netForHole,
-    skinsByGroup, cartSkins, teamSkins, skinStrokes, skinValue, matchOfCards, CARD_MATCH,
+    skinsByGroup, cartSkins, teamSkins, skinStrokes, skinValue, skinsFormat, bestTwo,
+    applySkins, applyHitList, matchOfCards, CARD_MATCH,
     courseHandicap, fullCourseHandicap, FULL_ALLOWANCE,
     resolveCourseHandicap, strokesOnHole, netOnHole, cappedNetByHole,
-    birdiePickHoles, PICK_SLOTS, migratePicks, readPicks, randomPicks,
+    birdiePickHoles, birdiePickCandidates, PICK_SLOTS, LEGACY_SLOT_KEYS,
+    migratePicks, readPicks, randomPicks,
     scorePlayer, scoreField, computeLeaderboard,
     computeFlights, flightOf, flightsInUse, sortFlights,
   };
