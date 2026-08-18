@@ -125,105 +125,120 @@ test("ties are settled inside the flight", () => {
   assert.equal(b[0].cardMatch, undefined, "no tie to break");
 });
 
-/* ---- skins competes within a flight ---- */
+/* ---- skins ignores flights entirely ---- */
 
 /**
- * EIGHT MEN A FLIGHT, because skins is played inside a flight and the field
- * size that decides the format is the flight's own. A twelve-man event split
- * into three flights of four plays no skins at all — which is right: four men
- * are not a field, however many are in the car park.
+ * CLUBHOUSE SKINS IS PLAYED ACROSS THE WHOLE FIELD.
+ *
+ * The club's Saturday league runs its own flighted skins game. That is a
+ * different contest and Clubhouse does not read its flights: settling skins
+ * inside a flight quietly turned a sixteen-man group event into two eight-man
+ * ones, and a twelve-man event split three ways played no skins at all.
  */
+
 function flightOfEight(tag: string, better: (g: (number | null)[]) => void) {
   return Array.from({ length: 8 }, (_, i) =>
     card(tag + (i + 1), { flight: tag, cart: tag + (Math.floor(i / 2) + 1) },
          i === 0 ? better : () => {}));
 }
 
-test("carts only face carts in their own flight", () => {
-  // Cart A1 wins every hole in flight A. Flight B has its own four carts.
+test("carts face every cart in the round, not only their own flight", () => {
+  // TWELVE men, so the field is still in the cart band — sixteen would make it
+  // a team field, which is a different test below.
+  //
+  // Cart A1 wins every hole outright. If flights divided the contest, flight B
+  // would have its own winner; they do not, so B wins nothing at all.
   const field = [
-    ...flightOfEight("A", (g) => { for (let i = 0; i < 18; i++) g[i] = (g[i] as number) - 1; }),
-    ...flightOfEight("B", (g) => { g[0] = 3; }),
+    ...Array.from({ length: 6 }, (_, i) =>
+      card("A" + (i + 1), { flight: "A", cart: "A" + (Math.floor(i / 2) + 1) },
+           i === 0 ? (g) => { for (let k = 0; k < 18; k++) g[k] = (g[k] as number) - 1; } : () => {})),
+    ...Array.from({ length: 6 }, (_, i) =>
+      card("B" + (i + 1), { flight: "B", cart: "B" + (Math.floor(i / 2) + 1) },
+           i === 0 ? (g) => { g[0] = 3; } : () => {})),
   ];
   const board = computeLeaderboard(field, ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
   const by = Object.fromEntries(board.map((r) => [r.name, r]));
 
-  assert.equal(by["A1"].skins, 18, "all eighteen inside flight A");
-  assert.equal(by["A3"].skins, 0);
-  // Flight B's skins are its own — A1's rout does not touch them.
-  assert.equal(by["B1"].skins, 1, "his cart took the 1st in flight B");
-  assert.equal(by["B3"].skins, 0);
+  // Seventeen, not eighteen: B1's birdie on the 1st matched A1's cart exactly,
+  // so that hole was TIED and nobody won it. Under flights it would have been a
+  // skin for B in his own little contest.
+  assert.equal(by["A1"].skins, 17, "everything except the hole he was matched on");
+  assert.equal(by["B1"].skins, 0, "his birdie tied against the whole field, so won nothing");
 });
 
-test("a flight too small for skins plays none, and the others are unaffected", () => {
+test("two flights of four still play skins, because the FIELD is eight", () => {
+  // The case that made this wrong: split into flights nobody reached the
+  // eight-man floor, so a perfectly ordinary group event played no skins.
   const field = [
-    ...flightOfEight("A", (g) => { g[0] = 3; }),
-    card("B1", { flight: "B", cart: "B1" }),
-    card("B2", { flight: "B", cart: "B2" }),
+    ...Array.from({ length: 4 }, (_, i) =>
+      card("A" + (i + 1), { flight: "A", cart: i + 1 }, i === 0 ? (g) => { g[0] = 3; } : () => {})),
+    ...Array.from({ length: 4 }, (_, i) =>
+      card("B" + (i + 1), { flight: "B", cart: i + 5 })),
   ];
   const board = computeLeaderboard(field, ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
   const by = Object.fromEntries(board.map((r) => [r.name, r]));
-  assert.equal(by["A1"].contests.skins!.live, true, "flight A is eight and plays");
-  assert.equal(by["B1"].contests.skins!.live, false);
-  assert.match(by["B1"].contests.skins!.detail, /no skins under 8/);
+  assert.equal(by["A1"].contests.skins!.live, true, "eight men is eight men");
+  assert.equal(by["A1"].skins, 1);
 });
 
-test("a skin is worth what the FLIGHT won, not what the whole field won", () => {
-  const config = DEFAULT_CONTESTS.skins!;
-  // Flight A's cart takes all eighteen; flight B ties every hole and wins none.
-  // The pot is divided inside each flight, so A's eighteen are worth the whole
-  // pot between them and B's men are paid nothing at all.
+test("sixteen men in two flights is a TEAM field, not two cart fields", () => {
+  const field = [...flightOfEight("A", () => {}), ...flightOfEight("B", () => {})];
+  field.forEach((c, i) => { (c as any).team = "T" + (Math.floor(i / 4) + 1); });
+  const board = computeLeaderboard(field, ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
+  // Sixteen in the field, so teams — even though each flight is only eight.
+  assert.ok(board.some((r) => /for team T/.test(r.contests.skins!.detail)));
+});
+
+test("the pot is one pot for the round, not one per flight", () => {
   const field = [
-    ...flightOfEight("A", (g) => { for (let i = 0; i < 18; i++) g[i] = (g[i] as number) - 1; }),
-    ...flightOfEight("B", () => {}),
+    ...Array.from({ length: 6 }, (_, i) =>
+      card("A" + (i + 1), { flight: "A", cart: "A" + (Math.floor(i / 2) + 1) },
+           i === 0 ? (g) => { for (let k = 0; k < 18; k++) g[k] = (g[k] as number) - 1; } : () => {})),
+    ...Array.from({ length: 6 }, (_, i) =>
+      card("B" + (i + 1), { flight: "B", cart: "B" + (Math.floor(i / 2) + 1) })),
   ];
   const board = computeLeaderboard(field, ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
   const a1 = board.find((r) => r.name === "A1")!;
-  assert.equal(a1.contests.skins!.strokes, skinStrokes(18, config, 18));
-  assert.equal(skinStrokes(18, config, 18), -4, "the whole pot, and no more");
-
-  // Flight B tied all eighteen, so nobody there won anything.
-  const b1 = board.find((r) => r.name === "B1")!;
-  assert.equal(b1.contests.skins!.strokes, 0);
+  assert.equal(a1.contests.skins!.strokes, -4, "the whole pot, and no more");
 });
 
-test("a flight with one group skips skins while the others play", () => {
-  const oneGroup = Array.from({ length: 8 }, (_, i) =>
-    card("C" + (i + 1), { flight: "C", cart: "C1" }));
-  const field = [...flightOfEight("A", (g) => { g[0] = 3; }), ...oneGroup];
-  const board = computeLeaderboard(field, ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
-  const by = Object.fromEntries(board.map((r) => [r.name, r]));
-  assert.equal(by["A1"].contests.skins!.live, true);
-  assert.equal(by["C1"].contests.skins!.live, false);
-  assert.match(by["C1"].contests.skins!.detail, /only one group out/);
-});
+test("A CART NUMBER IS NOW FIELD-WIDE — the same number in two flights is one cart", () => {
+  // The consequence of dropping flights from skins, and the one that can bite
+  // on a Saturday: cart 1 in flight A and cart 1 in flight B used to be two
+  // separate groups. They are ONE group now, and are paid as one.
+  //
+  // Cart numbers written out rather than computed, because the whole point is
+  // which men share one.
+  const carts: Record<string, number> = {
+    A1: 1, A2: 2, A3: 3, A4: 4, A5: 5, A6: 6,
+    B1: 1, B2: 2, B3: 3, B4: 4, B5: 5, B6: 6,      // cart 1 exists in BOTH
+  };
+  const field = Object.keys(carts).map((name) =>
+    card(name, { flight: name[0], cart: carts[name] },
+         name === "A1" ? (g) => { g[0] = 3; } : () => {}));
 
-test("a cart number may repeat across flights without joining them", () => {
-  // Cart 1 exists in both flights and they must not be pooled.
-  const field = [
-    ...flightOfEight("A", (g) => { g[0] = 3; }),
-    ...flightOfEight("B", (g) => { g[0] = 3; }),
-  ].map((c, i) => ({ ...c, cart: (i % 4) + 1 }));   // carts 1–4 in BOTH flights
   const board = computeLeaderboard(field, ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
   const by = Object.fromEntries(board.map((r) => [r.name, r]));
-  assert.equal(by["A1"].skins, 1, "cart 1 of flight A took the 1st");
-  assert.equal(by["B1"].skins, 1, "and so did cart 1 of flight B, separately");
+
+  // A1 birdied the 1st. B1 shares his cart number and is in the other flight,
+  // and is paid the same skin for it.
+  assert.equal(by["A1"].skins, 1);
+  assert.equal(by["B1"].skins, 1, "one cart number is one cart, whatever flight its men are in");
   assert.equal(by["A2"].skins, 0);
 });
 
-test("men in one cart may be in different flights", () => {
-  // Nothing about a cart implies a flight, so this must simply work.
+test("the placings are still divided by flight", () => {
+  // Flights were only ever for this, and they still do it.
   const field = [
-    ...flightOfEight("A", (g) => { g[0] = 3; }),
-    ...flightOfEight("B", () => {}),
-  ].map((c) => ({ ...c, cart: c.name.endsWith("1") ? 1 : c.cart }));
+    card("A1", { flight: "A" }, (g) => { g[3] = (g[3] as number) - 1; }),
+    card("A2", { flight: "A" }),
+    card("B1", { flight: "B" }),
+  ];
   const board = computeLeaderboard(field, ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
-  assert.equal(board.length, 16, "everyone scored");
   const by = Object.fromEntries(board.map((r) => [r.name, r]));
-  assert.equal(by["A1"].flight, "A");
-  assert.equal(by["B1"].flight, "B");
-  assert.equal(by["A1"].skins, 1, "cart 1 in flight A won the 1st");
-  assert.equal(by["B1"].skins, 0, "cart 1 in flight B is a different cart");
+  assert.equal(by["A1"].rank, 1);
+  assert.equal(by["A2"].rank, 2);
+  assert.equal(by["B1"].rank, 1, "and B is placed from one in its own right");
 });
 
 /* ---- an unflighted field behaves exactly as before ---- */

@@ -1020,10 +1020,30 @@
     const results = cards.map((c) => scorePlayer(c, course, contests));
     results.forEach((r, i) => { r.flight = flightOf(cards[i]); });
 
-    // Everything that measures a man against other men happens inside his
-    // flight: Skins, the placings, and the card match that separates a tie.
-    // The six individual contests are untouched by it — they are graded against
-    // fixed thresholds, so a man's score never depends on who he is drawn with.
+    /**
+     * SKINS AND THE HIT LIST ARE PLAYED ACROSS THE WHOLE FIELD. Flights do not
+     * divide them.
+     *
+     * The club's Saturday league runs its own flighted skins game. That is a
+     * DIFFERENT CONTEST from this one and Clubhouse has no business reading its
+     * flights: settling Clubhouse Skins inside a flight quietly turned a
+     * sixteen-man group event into two eight-man ones, and a twelve-man event
+     * split three ways played no skins at all.
+     *
+     * So the field size that picks the format is the FIELD's — under 8 none,
+     * 8 to 15 carts, 16 and up teams. And a man may name anyone in the round on
+     * his Hit List, which is what the picking screen already offers him: it
+     * ranges over every index in the field, and an engine that then refused a
+     * cross-flight opponent would be disagreeing with the screen that suggested
+     * him.
+     *
+     * Flights still divide the PLACINGS, and the card match that separates a
+     * tie, which is all they were ever for here. They may come back for club
+     * events; the code stays.
+     */
+    applyHitList(cards, results, contests);
+    applySkins(cards, results, course, contests);
+
     const byFlight = new Map();
     cards.forEach((card, i) => {
       const f = flightOf(card);
@@ -1035,10 +1055,6 @@
     const placed = [];
     for (const flight of sortFlights([...byFlight.keys()])) {
       const group = byFlight.get(flight);
-      // Carts only face carts in the same flight, and the cap is set by how
-      // many carts are out in THIS flight, not across the whole field.
-      applyHitList(group.cards, group.results, contests);
-      applySkins(group.cards, group.results, course, contests);
       placeField(group.results);
       placed.push.apply(placed, group.results);
     }
