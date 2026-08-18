@@ -2031,6 +2031,10 @@ function renderSkins(){
   const format = E.skinsFormat(inFlight.length, config);
   const word = format === "team" ? "team" : "group";
   const Word = format === "team" ? "Team" : "Group";
+  /* A man who types "Team 1" into the team field should not be shown
+     "Team Team 1". Prefix only when the name does not already say it. */
+  const named = (id) => new RegExp("^" + word + "\\b", "i").test(String(id).trim())
+    ? String(id).trim() : Word + " " + id;
 
   if(format == null){
     sub.textContent = inFlight.length + " players — too few for skins";
@@ -2069,7 +2073,7 @@ function renderSkins(){
         Skins is ${word} against ${word}, and a ${word} on its own wins every hole by
         default. Give the men a second ${word} on the <b>Setup</b> tab and the skins
         will run.</div>` +
-      `<div class="contest"><div class="cname"><div class="cn">${Word} ${esc(groups[0])}</div>` +
+      `<div class="contest"><div class="cname"><div class="cn">${esc(named(groups[0]))}</div>` +
       `<div class="cd">${esc(byGroup.get(groups[0]).join(" & "))}</div></div>` +
       `<div class="pvt" style="text-align:right"><div class="cd">not playing for skins</div></div></div>`;
     return;
@@ -2096,7 +2100,7 @@ function renderSkins(){
     const n = won(id);
     const strokes = E.skinStrokes(n, config, skinsWon);
     return `<div class="contest"><div class="cname">` +
-      `<div class="cn">${Word} ${esc(id)}</div>` +
+      `<div class="cn">${esc(named(id))}</div>` +
       `<div class="cd">${esc(byGroup.get(id).join(" & "))}</div></div>` +
       `<div class="pvt" style="text-align:right;white-space:nowrap">` +
         `<div class="cn">${n} skin${n===1?"":"s"}</div>` +
@@ -2119,13 +2123,13 @@ function renderSkins(){
     const par = E.ABERDEEN_TEE_IV.par[h.hole - 1];
     const best = h.wonBy != null ? h.scores.get(h.wonBy) : null;
     const right = h.wonBy != null
-      ? `<span class="cn">${Word} ${esc(h.wonBy)}</span>`
+      ? `<span class="cn">${esc(named(h.wonBy))}</span>`
       : (h.scores.size === 0
           ? `<span class="cd">not played</span>`
           : `<span class="cd">tied — nobody wins it</span>`);
     return `<div class="prev"><div class="pv">` +
         `<div class="pvn">Hole ${h.hole}<span class="cd" style="font-weight:700"> · par ${par}</span></div>` +
-        `<div class="pvd">${best == null ? "&nbsp;" : "won on " + best + " (best two balls)"}</div>` +
+        `<div class="pvd">${best == null ? "&nbsp;" : "two balls added: " + best}</div>` +
       `</div><div class="pvt">${right}</div></div>`;
   }).join("");
 

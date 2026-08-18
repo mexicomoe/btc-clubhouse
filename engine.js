@@ -1229,7 +1229,12 @@
       r.contests.skins = {
         strokes, live: true,
         detail: count + " skin" + (count === 1 ? "" : "s") + " for " +
-                (format === "team" ? "team " : "group ") + groupOf(card),
+                // "team Team 2" reads badly, and a man who called his team
+                // "Team 2" on Setup is not doing anything wrong.
+                (new RegExp("^" + (format === "team" ? "team" : "group") + "\\b", "i")
+                   .test(String(groupOf(card)).trim())
+                  ? String(groupOf(card)).trim()
+                  : (format === "team" ? "team " : "group ") + groupOf(card)),
       };
       r.skins = count;
       r.strokesEarned = toTenth(r.strokesEarned + strokes);
