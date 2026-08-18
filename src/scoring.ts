@@ -263,6 +263,10 @@ export const CARD_MATCH: CardMatchSegment[] = E.CARD_MATCH;
 
 export const scorePlayer: (card: PlayerCard, course?: CourseSource, contests?: ContestConfig) => PlayerResult = E.scorePlayer;
 export const scoreField: (cards: PlayerCard[], course?: CourseSource, contests?: ContestConfig) => PlayerResult[] = E.scoreField;
+/** The `want` players nearest an index. A short field returns everybody. */
+export const nearestByIndex: <T extends { index: number | null }>(
+  mine: number | null, others: T[], want?: number) => T[] = E.nearestByIndex;
+
 export const computeLeaderboard: (players?: PlayerCard[], course?: CourseSource, contests?: ContestConfig) => PlayerResult[] = E.computeLeaderboard;
 
 /** One leaderboard per flight, in reading order. */

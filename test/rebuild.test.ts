@@ -12,7 +12,7 @@ import assert from "node:assert/strict";
 
 import { ABERDEEN_TEE_IV, DEFAULT_CONTESTS } from "../src/courseConfig.ts";
 import {
-  scorePlayer, computeLeaderboard, birdiePickHoles, PICK_SLOTS, readPicks,
+  scorePlayer, computeLeaderboard, birdiePickHoles, PICK_SLOTS, readPicks, nearestByIndex,
 } from "../src/scoring.ts";
 import { skinsByGroup, skinValue, skinStrokes, skinsFormat, bestTwo } from "../src/skins.ts";
 
@@ -353,4 +353,59 @@ test("a short card takes no place, however the numbers fall", () => {
   assert.equal(short.rank, null);
   assert.equal(short.eligible, false);
   assert.equal(rows.find((r) => r.name === "Full")!.rank, 1);
+});
+
+/* ---- who a man may name ---- */
+
+test("a short field offers EVERYBODY, not a padded or truncated list", () => {
+  // Friday is eight men, so there are seven others — and seven is what he is
+  // offered. The list is capped at eight, never padded up to it.
+  const others = [8.2, 11.6, 14.0, 15.1, 18.7, 21.3, 24.8].map((index) => ({ index }));
+  for (const mine of [5, 15.1, 30]) {
+    const got = nearestByIndex(mine, others, 8);
+    assert.equal(got.length, 7, "at index " + mine);
+  }
+});
+
+test("the man at each end of the field still gets a full list", () => {
+  // Taken entirely from the one side that has anyone on it, rather than the
+  // four-a-side the rule aims for.
+  const others = Array.from({ length: 15 }, (_, i) => ({ index: 10 + i }));
+  assert.equal(nearestByIndex(5, others, 8).length, 8, "lowest man");
+  assert.equal(nearestByIndex(40, others, 8).length, 8, "highest man");
+  assert.deepEqual(nearestByIndex(5, others, 8).map((o) => o.index),
+    [10, 11, 12, 13, 14, 15, 16, 17], "the eight nearest above him");
+});
+
+test("in the middle of a full field it is four below and four above", () => {
+  const others = [5, 7, 9, 11, 13, 15, 17, 19, 21].map((index) => ({ index }));
+  const got = nearestByIndex(12, others, 8).map((o) => o.index);
+  // Four below (11, 9, 7, 5) and four above (13, 15, 17, 19). Nine others, so
+  // one is left out — and it is 21, the furthest man on the side that HAS five,
+  // not the furthest man overall.
+  assert.deepEqual(got, [5, 7, 9, 11, 13, 15, 17, 19]);
+  assert.equal(got.includes(21), false);
+});
+
+test("the list comes back in index order, best player first", () => {
+  const others = [22, 4, 13, 9].map((index) => ({ index }));
+  assert.deepEqual(nearestByIndex(12, others, 8).map((o) => o.index), [4, 9, 13, 22]);
+});
+
+test("a man with no index has nobody to be near", () => {
+  assert.deepEqual(nearestByIndex(null, [{ index: 10 }], 8), []);
+});
+
+test("players without an index are not offered", () => {
+  const others = [{ index: 10 }, { index: null }, { index: 14 }];
+  assert.deepEqual(nearestByIndex(12, others as any, 8).map((o) => o.index), [10, 14]);
+});
+
+/* ---- an eight-man Friday ---- */
+
+test("eight players plays CART skins, and a twosome's best two is both balls", () => {
+  const cfg = DEFAULT_CONTESTS.skins!;
+  assert.equal(skinsFormat(8, cfg), "cart");
+  assert.equal(bestTwo([4, 5]), 9, "a twosome puts up both its balls");
+  assert.equal(bestTwo([4]), 8, "and a man alone counts his twice");
 });

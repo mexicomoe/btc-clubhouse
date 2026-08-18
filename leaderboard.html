@@ -1657,23 +1657,11 @@ function showPicksBox(){
  * only sets up a wasted choice.
  */
 function nearestEight(player){
-  const mine = player.index;
-  if(mine == null) return [];
+  // The rule lives in the engine so it can be tested; this only decides WHO is
+  // eligible to be named — a man needs an index and a tee, and a man who did
+  // not finish is off every list because the pick would be void anyway.
   const others = state.players.filter(p => p.id !== player.id && p.index != null && isReady(p));
-  const below = others.filter(p => p.index < mine).sort((a,b) => b.index - a.index);
-  const above = others.filter(p => p.index >= mine).sort((a,b) => a.index - b.index);
-  const take = [];
-  // Four each way, then top the list back up from whichever side has more left.
-  while(take.length < 8 && (below.length || above.length)){
-    const wantBelow = take.filter(p => p.index < mine).length < 4 && below.length;
-    const wantAbove = take.filter(p => p.index >= mine).length < 4 && above.length;
-    if(wantBelow) take.push(below.shift());
-    else if(wantAbove) take.push(above.shift());
-    else if(below.length) take.push(below.shift());
-    else take.push(above.shift());
-  }
-  // Shown in index order, best player first, so the choice reads as a ladder.
-  return take.sort((a,b) => a.index - b.index);
+  return E.nearestByIndex(player.index, others, 8);
 }
 
 /** How the two indexes compare, in the words the card will use. */

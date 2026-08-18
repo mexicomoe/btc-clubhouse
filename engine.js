@@ -1244,6 +1244,38 @@
     return table;
   }
 
+  /**
+   * The `want` players nearest a man's own index — half below and half above
+   * where the field allows it, and the nearest either way where it does not.
+   *
+   * A SHORT FIELD GETS EVERYBODY. Eight men means seven others, and seven is
+   * what he is offered: the list is capped at `want`, never padded to it, and
+   * never truncated to the four-a-side it aims for. The man at the very top of
+   * the field and the man at the very bottom get a full list too, taken
+   * entirely from the one side that has anyone on it.
+   *
+   * `others` is [{ index }, ...] with the man himself already removed. Returned
+   * in INDEX ORDER, best player first, so the choice reads as a ladder.
+   */
+  function nearestByIndex(mine, others, want) {
+    const n = want == null ? 8 : want;
+    if (mine == null) return [];
+    const usable = others.filter((o) => o && o.index != null);
+    const below = usable.filter((o) => o.index < mine).sort((a, b) => b.index - a.index);
+    const above = usable.filter((o) => o.index >= mine).sort((a, b) => a.index - b.index);
+    const half = Math.floor(n / 2);
+    const take = [];
+    while (take.length < n && (below.length || above.length)) {
+      const wantBelow = take.filter((o) => o.index < mine).length < half && below.length;
+      const wantAbove = take.filter((o) => o.index >= mine).length < half && above.length;
+      if (wantBelow) take.push(below.shift());
+      else if (wantAbove) take.push(above.shift());
+      else if (below.length) take.push(below.shift());
+      else take.push(above.shift());
+    }
+    return take.sort((a, b) => a.index - b.index);
+  }
+
   /** Kept under its old name — the app and the tests both call it. */
   function applyCartSkins(cards, results, course, contests) {
     return applySkins(cards, results, course, contests);
@@ -1336,7 +1368,7 @@
     parseHandicapIndex, formatHandicapIndex,
     PICKED_UP_OVER_PAR, NET_DOUBLE_OVER_PAR, isPickedUp, grossOnHole, netForHole,
     skinsByGroup, cartSkins, teamSkins, skinStrokes, skinValue, skinsFormat, bestTwo,
-    applySkins, applyHitList, matchOfCards, CARD_MATCH,
+    applySkins, applyHitList, nearestByIndex, matchOfCards, CARD_MATCH,
     courseHandicap, fullCourseHandicap, FULL_ALLOWANCE,
     resolveCourseHandicap, strokesOnHole, netOnHole, cappedNetByHole,
     birdiePickHoles, birdiePickCandidates, PICK_SLOTS, LEGACY_SLOT_KEYS,
