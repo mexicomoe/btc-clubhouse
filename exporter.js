@@ -49,8 +49,11 @@
                   "Front par 4 pick", "Back par 4 pick",
                   "Par 3 pick 1", "Par 3 pick 2",
                   "Par 5 pick 1", "Par 5 pick 2",
-                  // Who he named on his Hit List, by name, as he named him.
-                  "Hit List",
+                  // Who he NAMED, spelled as he named him. Not to be confused
+                  // with the "Hit List" column further right, which is what the
+                  // pick paid — two columns of the same name in one sheet is a
+                  // trap for whoever sorts on it six months from now.
+                  "Hit List pick",
                   "Course handicap"];
     // Gross per hole, then the capped net per hole beside it. The net columns
     // are what the contests are actually graded on, so anything reading this

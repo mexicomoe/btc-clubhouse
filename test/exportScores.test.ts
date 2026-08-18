@@ -22,10 +22,12 @@ const PAR = ABERDEEN_TEE_IV.par;
 
 const PLAYERS = [
   { id: "p1", name: "Ridgeway, Ken", ghin: "1234567", index: 19.4, tee: "IV", gender: "M",
-    cart: 1, flight: "A", f3: 3, f4: 2, f5: 4, b3: 13, b4: 14, b5: 16 },
+    cart: 1, flight: "A", hitList: "Sal Merrick",
+    p4f: 2, p4b: 14, p3a: 3, p3b: 8, p5a: 7, p5b: 16 },
   // No GHIN: the club does not have one for every man.
   { id: "p2", name: "Merrick, Sal", index: 22.7, tee: "I", gender: "F",
-    cart: 2, flight: "A", f3: 8, f4: 9, f5: 7, b3: 17, b4: 15, b5: 18 },
+    cart: 2, flight: "A", hitList: "Ken Ridgeway",
+    p4f: 9, p4b: 15, p3a: 8, p3b: 17, p5a: 16, p5b: 18 },
 ];
 const EVENT = { name: "Friday", date: "2026-08-07", format: "Individual net",
                 players: PLAYERS, allowancePercent: 100, skinsOn: true };
@@ -38,7 +40,8 @@ function board() {
   const cards: PlayerCard[] = PLAYERS.map((p) => ({
     name: canonicalName(p.name), handicapIndex: p.index, tee: p.tee, gender: p.gender as "M" | "F",
     cart: p.cart, flight: p.flight, gross: HOLES[p.id],
-    picks: { f3: p.f3, f4: p.f4, f5: p.f5, b3: p.b3, b4: p.b4, b5: p.b5 },
+    picks: { p4f: p.p4f, p4b: p.p4b, p3a: p.p3a, p3b: p.p3b, p5a: p.p5a, p5b: p.p5b },
+    hitList: p.hitList,
   }));
   return computeLeaderboard(cards, undefined, DEFAULT_CONTESTS);
 }
@@ -79,27 +82,32 @@ test("the columns are the ones the brief asks for, in order", () => {
   const head = headerRow();
   // The event's own columns lead, and repeat on every row, so several rounds
   // can be piled into one sheet and still be told apart.
-  assert.deepEqual(head.slice(0, 18), [
+  assert.deepEqual(head.slice(0, 19), [
     "Event", "Date", "Format",
     "Name", "Name as entered", "GHIN",
     "Handicap index", "Tee", "Gender", "Group", "Flight",
-    "Front pick", "Back pick",
-    "Front par 3 pick", "Front par 5 pick", "Back par 3 pick", "Back par 5 pick",
+    "Front par 4 pick", "Back par 4 pick",
+    "Par 3 pick 1", "Par 3 pick 2", "Par 5 pick 1", "Par 5 pick 2",
+    "Hit List pick",
     "Course handicap",
   ]);
-  assert.deepEqual(head.slice(18, 36), Array.from({ length: 18 }, (_, i) => "H" + (i + 1)));
-  assert.deepEqual(head.slice(36, 54), Array.from({ length: 18 }, (_, i) => "N" + (i + 1)));
-  assert.deepEqual(head.slice(54, 56), ["Net", "Gross"]);
-  // Go Long and Get Shorty are switched off but their columns STAY — the
-  // archive workbook already holds rounds under them. The two new contests are
-  // appended after Skins, so only "Final" moves.
-  assert.deepEqual(head.slice(56, 65), [
-    "Watch the Birdie", "Agony Alley", "Damage Control",
-    "Go Long", "Get Shorty", "Bounce Back", "Skins",
-    "Easy Street", "Triple Threat",
+  assert.deepEqual(head.slice(19, 37), Array.from({ length: 18 }, (_, i) => "H" + (i + 1)));
+  assert.deepEqual(head.slice(37, 55), Array.from({ length: 18 }, (_, i) => "N" + (i + 1)));
+  assert.deepEqual(head.slice(55, 57), ["Net", "Gross"]);
+  // A FRESH WORKBOOK at the changeover. The zero base makes every past round
+  // incomparable, so the archive is kept as it stands and this file starts
+  // clean — which means the switched-off contests no longer need blank columns
+  // holding their place.
+  assert.deepEqual(head.slice(57), [
+    "Watch the Birdie", "Six Pack", "Agony Alley", "Easy Street",
+    "Triple Threat", "Hit List", "Skins",
+    "Final",
   ]);
-  assert.equal(head[65], "Final");
-  assert.equal(head.length, 66);
+
+  // Two columns of the same name in one sheet is a trap for whoever sorts on it
+  // six months from now: "Hit List pick" is who he named, "Hit List" what it paid.
+  assert.deepEqual(head.filter((c, i) => head.indexOf(c) !== i), [],
+    "no column name appears twice");
 });
 
 test("the event is stamped on every row", () => {
@@ -128,7 +136,10 @@ test("a row for every player, and a header", () => {
   assert.equal(r[0][0], "Event");
   assert.deepEqual(r.slice(1).map((x) => cell(x, "Name as entered")),
     ["Ridgeway, Ken", "Merrick, Sal"]);
-  for (const row of r) assert.equal(row.length, 66, "every row is the full width");
+  // Measured against the header rather than a number typed in here, so a column
+  // added or dropped cannot leave the rows and the heading disagreeing silently.
+  const width = headerRow().length;
+  for (const row of r) assert.equal(row.length, width, "every row is the full width");
 });
 
 /* ---- what is in it ---- */
@@ -140,15 +151,15 @@ test("the setup fields come out as they were entered", () => {
   assert.equal(cell(ken, "Gender"), "M");
   assert.equal(cell(ken, "Group"), "1");
   assert.equal(cell(ken, "Flight"), "A");
-  // "Front pick" and "Back pick" keep their places and their meaning — the par
-  // 4 on each nine. The four new slots are appended after them, never inserted.
-  assert.equal(cell(ken, "Front pick"), "2");
-  assert.equal(cell(ken, "Back pick"), "14");
-  assert.equal(cell(ken, "Front par 3 pick"), "3");
-  assert.equal(cell(ken, "Front par 5 pick"), "4");
-  assert.equal(cell(ken, "Back par 3 pick"), "13");
-  assert.equal(cell(ken, "Back par 5 pick"), "16");
-  assert.equal(cell(ken, "Back pick"), "14");
+  // The six picks, in slot order: a par 4 on each nine, then two par 3s and
+  // two par 5s floating across the whole course.
+  assert.equal(cell(ken, "Front par 4 pick"), "2");
+  assert.equal(cell(ken, "Back par 4 pick"), "14");
+  assert.equal(cell(ken, "Par 3 pick 1"), "3");
+  assert.equal(cell(ken, "Par 3 pick 2"), "8");
+  assert.equal(cell(ken, "Par 5 pick 1"), "7");
+  assert.equal(cell(ken, "Par 5 pick 2"), "16");
+  assert.equal(cell(ken, "Hit List pick"), "Sal Merrick");
 });
 
 test("the scoring columns come from the leaderboard, not recomputed", () => {
@@ -161,9 +172,15 @@ test("the scoring columns come from the leaderboard, not recomputed", () => {
   assert.equal(cell(ken, "Final"), String(r.final), "the final is the one that was placed");
   assert.equal(cell(ken, "Watch the Birdie"), String(r.contests.watchTheBirdie!.strokes));
   assert.equal(cell(ken, "Agony Alley"), String(r.contests.agonyAlley!.strokes));
-  // Switched-off contests keep their columns and write a blank cell.
-  assert.equal(cell(ken, "Bounce Back"), "", "Bounce Back is not in the game");
-  assert.equal(cell(ken, "Damage Control"), "", "nor is Damage Control");
+  assert.equal(cell(ken, "Six Pack"), String(r.contests.sixPack!.strokes));
+  assert.equal(cell(ken, "Hit List"), String(r.contests.hitList!.strokes));
+  // The switched-off contests have no columns at all now — a fresh workbook
+  // does not need blanks holding places for contests nobody plays.
+  const head = headerRow();
+  assert.equal(head.includes("Bounce Back"), false);
+  assert.equal(head.includes("Damage Control"), false);
+  assert.equal(head.includes("Go Long"), false);
+  assert.equal(head.includes("Get Shorty"), false);
 });
 
 test("the hole columns carry the card, not the scoring device", () => {
@@ -195,7 +212,7 @@ test("a player with no index is still in the export", () => {
   assert.equal(cell(stray, "Handicap index"), "", "no index");
   assert.equal(cell(stray, "Course handicap"), "", "and so no course handicap");
   assert.equal(cell(stray, "Final"), "", "and no final");
-  assert.equal(stray.length, 66, "still the full width");
+  assert.equal(stray.length, headerRow().length, "still the full width");
 });
 
 /* ---- escaping ---- */
@@ -215,8 +232,12 @@ test("a name with a comma survives the round trip", () => {
   // rather than an edge case.
   const line = csv().trim().split("\r\n")[1];
   assert.ok(line.includes('"Ridgeway, Ken"'), "quoted, so the comma is not a column break");
-  assert.equal(line.split(",").length, 67, "split naively it comes apart...");
-  assert.equal(parseCsvLine(line).length, 66, "...but read properly it is one field");
+  // One field too many when split naively, because the quoted name holds a
+  // comma. Derived from the header so a column change cannot silently make this
+  // pass for the wrong reason.
+  const width = headerRow().length;
+  assert.equal(line.split(",").length, width + 1, "split naively it comes apart...");
+  assert.equal(parseCsvLine(line).length, width, "...but read properly it is one field");
   assert.equal(cell(parseCsvLine(line), "Name as entered"), "Ridgeway, Ken",
     "and the comma is still in the name");
 });
@@ -487,7 +508,7 @@ function bigEvent(n: number) {
     const id = "p" + (i + 1);
     players.push({ id, name: "Ridgeway, Robert " + i, ghin: "12345" + i + "7",
       index: 19.4 + i, tee: "IV", gender: "M", cart: 1 + Math.floor(i / 2),
-      flight: "A", f3: 3, f4: 2, f5: 4, b3: 13, b4: 14, b5: 16 });
+      flight: "A", p4f: 2, p4b: 14, p3a: 3, p3b: 8, p5a: 7, p5b: 16 });
     scores[id] = PAR.map((p, h) => (h === 3 ? "X" : h === 17 ? null : p + (i % 3 ? 1 : 0)));
   }
   return { name: "Friday Medal", date: "2026-08-07", format: "Individual net",
