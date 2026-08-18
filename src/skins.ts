@@ -74,7 +74,14 @@ export const cartSkins: (entries: CartEntry[], course?: CourseConfig) => SkinsRe
 export const teamSkins: (entries: TeamEntry[], course?: CourseConfig) => SkinsResult = E.teamSkins;
 
 /** What a count of skins is worth in strokes, in a field of this many groups. */
-export const skinStrokes: (count: number, config: SkinsConfig, groupCount: number) => number = E.skinStrokes;
+export const skinStrokes: (count: number, config: SkinsConfig, skinsWon: number) => number = E.skinStrokes;
 
 /** What ONE skin is worth in a field of this many groups — `fairShare × groups / 18`. */
-export const skinValue: (config: SkinsConfig, groupCount: number) => number = E.skinValue;
+export const skinValue: (config: SkinsConfig, skinsWon: number) => number = E.skinValue;
+
+/** Which format a field of this size plays: null, "cart" or "team". */
+export const skinsFormat: (playerCount: number, config: SkinsConfig | null) =>
+  "cart" | "team" | null = E.skinsFormat;
+
+/** A group's score on a hole: its best two net balls, a lone ball counted twice. */
+export const bestTwo: (played: number[]) => number | null = E.bestTwo;
