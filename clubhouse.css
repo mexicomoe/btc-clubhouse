@@ -127,6 +127,25 @@
   .equation .op { font-size: 26px; font-weight: 800; }
   .equation .fin { font-size: 44px; font-weight: 800; }
 
+  /* The total, and the tap that explains it.
+     A whole-width button rather than a number with a link beside it: this is
+     read on a phone in sunlight by men in their seventies and eighties, and the
+     thing to tap should be the thing they are looking at. Tap only — a hover
+     state would never fire on a phone and would be a lie on a desktop. */
+  .total {
+    display: block; width: 100%; text-align: left; font: inherit; cursor: pointer;
+    padding: 16px 14px; margin: 0 0 4px;
+    background: var(--paper); color: var(--ink);
+    border: 0; border-bottom: 3px solid var(--ink);
+  }
+  .total .lab { display: block; font-size: 18px; font-weight: 700; }
+  .total .fin { display: block; font-size: 56px; font-weight: 800; line-height: 1.05;
+                font-variant-numeric: tabular-nums; }
+  .total .hint { display: block; font-size: 18px; font-weight: 700; text-decoration: underline; }
+  .total:active { background: var(--ink); color: var(--paper); }
+  .totalWhy { padding: 4px 14px 14px; border-bottom: 3px solid var(--ink); }
+  .totalWhy p { font-size: 18px; font-weight: 600; line-height: 1.45; margin: 10px 0; }
+
   .section-label {
     padding: 14px 20px 6px; font-size: 20px; font-weight: 800;
     border-top: 3px solid var(--ink); text-transform: uppercase; letter-spacing: .4px;

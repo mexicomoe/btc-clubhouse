@@ -656,6 +656,11 @@ function cardOf(p){
     allowancePercent: state.allowancePercent,
     tee: p.tee, gender: p.gender,
     cart: p.cart,
+    // Team Skins groups by this instead of the cart, at 16 players and up.
+    team: (p.team || "").trim(),
+    // The man he named on his Hit List, by the name shown on the board — which
+    // is what `applyHitList` matches on, so the two must be the same string.
+    hitList: (p.hitList || "").trim(),
     // Placings and Skins are settled inside a flight; the six contests ignore it.
     flight: (p.flight || "").trim(),
     gross: scoresFor(p),
@@ -970,10 +975,6 @@ function showPlayer(name){
   // re-scoring this card on its own would silently drop it.
   const r = boardResults.find(x => x.name === name) || E.scorePlayer(card, undefined, E.DEFAULT_CONTESTS);
   const course = E.courseFor(card);
-  const off = -r.strokesEarned;                    // positive = strokes taken off the net
-  // When maxContestStrokes bites, the contest lines below add up to more than
-  // this. Say so, or a man who checks the arithmetic finds it wrong.
-  const uncapped = -r.strokesEarnedUncapped;
   // "as played" marks a handicap that came off the card rather than from the
   // index, so a figure that disagrees with the setup screen explains itself.
   const asPlayed = card.courseHandicap != null ? " as played" : "";
@@ -992,14 +993,37 @@ function showPlayer(name){
 
   if(r.net == null){
     html += `<div class="note">No card imported for this player yet.</div>`;
+  } else if(r.holesPlayed !== HOLES){
+    // Eighteen holes or you are not scored. Say which and why, once, plainly.
+    html += `<div class="note warn"><b>Not scored — ${r.holesPlayed} of 18 holes.</b><br>
+      A Clubhouse round is eighteen holes. His card is here and his net is
+      ${r.net}, but he takes no final, no place, no skins, and he is off
+      everyone's Hit List.</div>`;
   } else {
+    /* THE TOTAL, AND TAP TO SEE HOW IT WAS BUILT.
+       The old line read "Net − Strokes off = Final", which was the whole of the
+       old scoring in one row. On a zero base there is no equation left: the
+       final IS what the contests came to. So the number stands on its own, and
+       the arithmetic behind it is a tap away rather than always on screen —
+       tap, never hover, because every man reads this on a phone. */
+    const built = contestsInPlay()
+      .map(k => r.contests[k])
+      .filter(c => c && c.live && c.strokes !== 0)
+      .map(c => fmtStrokes(c.strokes));
     html +=
-      `<div class="equation">` +
-        `<span><span class="lab">Net</span><br><span class="num">${r.net}</span></span>` +
-        `<span class="op">−</span>` +
-        `<span><span class="lab">Strokes off</span><br><span class="num">${off.toFixed(2)}</span></span>` +
-        `<span class="op">=</span>` +
-        `<span><span class="lab">Final</span><br><span class="fin">${fmtFinal(r.final)}</span></span>` +
+      `<button class="total" id="totalBtn" aria-expanded="false">` +
+        `<span class="lab">Strokes under or over par</span>` +
+        `<span class="fin">${fmtFinal(r.final)}</span>` +
+        `<span class="hint">Tap to see how</span>` +
+      `</button>` +
+      `<div class="totalWhy" id="totalWhy" hidden>` +
+        `<p>Everyone starts at <b>0</b>. Each contest moves him up or down from
+          there, and the total is where he finished. <b>Lowest wins</b>, the way
+          strokes under par always have.</p>` +
+        `<p>His came to ${built.length ? built.join(" ") + " = <b>" + fmtFinal(r.final) + "</b>"
+          : "<b>0.0</b> — nothing moved him either way"}.</p>` +
+        `<p>His net was <b>${r.net}</b>${r.gross==null?"":" off a gross of " + r.gross}. It is
+          not part of the total any more — the contests are the whole of it.</p>` +
       `</div>`;
   }
   // The card itself, nine holes to a row. A hole he picked up shows X, never the
@@ -1029,18 +1053,6 @@ function showPlayer(name){
     html += `<div class="note">His Watch the Birdie holes were <b>drawn</b>, not chosen —
       he sent no picks in. Change them on his Setup page and the mark goes.</div>`;
   }
-  // The cap governs the SIX individual contests; Skins is added afterwards and
-  // sits outside it. So the comparison has to be six-against-cap — `off`
-  // includes Skins, and comparing it to the uncapped six made the note fire
-  // whenever Skins paid anything, saying something untrue when it did.
-  const cap = E.DEFAULT_CONTESTS.maxContestStrokes;
-  if(cap != null && uncapped - cap > 0.05){
-    html += `<div class="note">The six individual contests come to
-      <b>${uncapped.toFixed(1)}</b>, over the <b>${cap.toFixed(1)}</b> they may take off between
-      them, so <b>${cap.toFixed(1)}</b> is what counted from them. Skins is outside that
-      limit.</div>`;
-  }
-
   for(const key of contestsInPlay()){
     // All seven, always. A contest the result has nothing for says so rather
     // than vanishing: a missing line looks like a contest that doesn't exist,
@@ -1055,6 +1067,16 @@ function showPlayer(name){
       `<div class="cs ${cls}">${shown}</div></div>`;
   }
   document.getElementById("playerBody").innerHTML = html;
+  const totalBtn = document.getElementById("totalBtn");
+  if(totalBtn){
+    totalBtn.addEventListener("click", () => {
+      const why = document.getElementById("totalWhy");
+      const open = why.hidden;
+      why.hidden = !open;
+      totalBtn.setAttribute("aria-expanded", String(open));
+      totalBtn.querySelector(".hint").textContent = open ? "Tap to hide" : "Tap to see how";
+    });
+  }
   show("player");
   // Fit only after the screen is visible — a display:none box has no measurable width.
   fitName(document.querySelector("#playerBody .detail-head .name"), 36, 18);

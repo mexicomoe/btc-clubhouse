@@ -16,7 +16,17 @@
     return String(s == null ? "" : s).replace(/[&<>"']/g, (c) =>
       ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
   }
-  function fmtFinal(x){ return x==null ? "—" : x.toFixed(1); }  // golf scores: one decimal, no hundredths
+  /**
+   * The final, SIGNED. The base is zero and the measure is strokes under and
+   * over par, so a board reads −4.0, −2.0, +1.0, +3.0 and a bare "4.0" would be
+   * read as a score rather than as three over. Real minus sign, one decimal —
+   * every value in the game is a multiple of a tenth.
+   */
+  function fmtFinal(x){
+    if(x == null) return "—";
+    if(x === 0) return "0.0";
+    return (x < 0 ? "−" : "+") + Math.abs(x).toFixed(1);
+  }
   function fmtStrokes(s){
     if(s===0) return "0.0";
     let str = Math.abs(s).toFixed(2);

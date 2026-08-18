@@ -198,7 +198,7 @@
     }
 
     /* ---- the footer ---- */
-    const said = ["Final = net score less the strokes earned in the contests."];
+    const said = ["Everyone starts at 0. The contests move him from there. Lowest wins."];
     if (round.note) said.unshift(round.note);
     const footLines = said.reduce((acc, line) =>
       acc.concat(wrap(line, textRoom, TYPE.foot, measure)), []);

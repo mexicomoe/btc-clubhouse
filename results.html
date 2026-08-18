@@ -112,7 +112,7 @@ function renderBoard(){
   // than left for someone to work out from the numbers.
   document.getElementById("boardNote").innerHTML =
     `<div class="note">${round.note ? esc(round.note) + "<br>" : ""}` +
-    `Final = net score minus the strokes earned in the contests. ` +
+    `Everyone starts at 0 and the contests move him from there. Lowest wins. ` +
     `Tap a name for the breakdown.<br>` +
     `<b>This is a finished round.</b> It keeps these numbers for good — ` +
     `later rounds and later settings do not change it.</div>`;
@@ -124,16 +124,6 @@ function renderBoard(){
 function showPlayer(name){
   const r = round.players.find((p) => p.name === name);
   if(!r) return;
-  // The strokes off are NET MINUS FINAL, both of which travelled — not a re-sum
-  // of the contest lines. The six individual contests are capped, so when the cap
-  // bites the lines add up to MORE than the round actually took off, and summing
-  // them here would print a number that disagrees with the leaderboard.
-  const lines = Object.values(r.contests).reduce((a, b) => a + b, 0);
-  const off = r.net != null && r.final != null
-    ? Math.round((r.net - r.final) * 10) / 10
-    : Math.round(-lines * 10) / 10;
-  const capped = Math.abs(off + lines) > 0.05;
-
   let html =
     `<header class="band"><div class="title">${esc(r.name)}</div>` +
     `<div class="sub">${esc([round.course || "Aberdeen G&CC", niceDate(round.date)]
@@ -145,14 +135,15 @@ function showPlayer(name){
       `</div>`;
   }
 
-  // The same equation the app shows: net, less what the contests took off.
+  /* THE TOTAL, on its own. There is no equation left to show: the base is zero,
+     so the final IS what the contests came to. The net travels and is worth
+     showing, but it is no longer part of the sum. */
   html += `<div class="equation">` +
     `<div><div class="lab">NET</div><div class="num">${r.net == null ? "–" : r.net}</div></div>` +
-    `<div class="op">−</div>` +
-    `<div><div class="lab">CONTESTS</div><div class="num">${off.toFixed(1)}</div></div>` +
-    `<div class="op">=</div>` +
-    `<div><div class="lab">FINAL</div><div class="fin">${fmtFinal(r.final)}</div></div>` +
-    `</div>`;
+    `<div><div class="lab">UNDER / OVER PAR</div><div class="fin">${fmtFinal(r.final)}</div></div>` +
+    `</div>` +
+    `<div class="chread" style="font-size:18px;font-weight:700">Everyone starts at 0.
+      The contests move him from there. Lowest wins.</div>`;
 
   if(r.gross != null){
     html += `<div class="note">Gross ${r.gross}` +
@@ -161,14 +152,9 @@ function showPlayer(name){
   }
 
   html += `<div class="section-label">The contests</div>`;
-  if(capped){
-    // Otherwise the lines below add up to more than the total above, and a man
-    // who checks the arithmetic — which is exactly the man this is for — finds
-    // it wrong and stops trusting the board.
-    html += `<div class="note">These come to <b>${Math.abs(lines).toFixed(1)}</b>, but there is a
-      limit on what the contests may take off a round, so <b>${off.toFixed(1)}</b> is what
-      counted.</div>`;
-  }
+  // No cap note any more. There is no ceiling on a zero base — a cap here would
+  // be a cap on the score itself — so the lines below always add to the total
+  // above, and there is nothing to reconcile.
   // Only the contests this round actually played, in the round's own order —
   // which contests were live travelled with it, so a round scored before a
   // contest existed does not sprout an empty line for it.
