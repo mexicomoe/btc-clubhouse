@@ -43,7 +43,9 @@ test("all three finish on the same final", () => {
   for (const c of [EVEN, BACK_NINE, LAST_SIX]) {
     const r = scorePlayer(c, ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
     assert.equal(r.net, 72, `${c.name} net`);
-    assert.equal(r.final, 68.9, `${c.name} final — the tie these tests exist to break`);
+    // Base zero, and no picks on these cards: Agony Alley and Easy Street each
+    // pay 1 on a level-par round and nothing else fires.
+    assert.equal(r.final, -2, `${c.name} final — the tie these tests exist to break`);
   }
 });
 
@@ -110,7 +112,10 @@ test("two unfinished cards share rather than being invented apart", () => {
 });
 
 test("different finals are never touched by the card match", () => {
-  const better = card("Better", (g) => { g[9] = 3; });   // a shot better, so a lower final
+  // A shot better on hole 4 — an AGONY ALLEY hole, so it moves a contest.
+  // A birdie elsewhere would not: on a zero base the net does not reach the
+  // final, so a shot saved on a hole no contest looks at changes nothing.
+  const better = card("Better", (g) => { g[3] = ABERDEEN_TEE_IV.par[3] - 1; });
   const board = computeLeaderboard([EVEN, better], undefined, DEFAULT_CONTESTS);
   assert.equal(board[0].name, "Better");
   assert.ok(board[0].final! < board[1].final!, "the final decided it, not the cards");

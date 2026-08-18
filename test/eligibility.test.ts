@@ -34,11 +34,18 @@ test("a walked-in card does not beat a finished one, however low its net", () =>
   const short = card("Walked in", 12);
   const full = card("Finished", 18);
 
-  // The short card's raw numbers really are lower — that is the trap.
+  // THE TRAP CHANGED SHAPE with the zero base, and got worse rather than better.
+  //
+  // It used to be that twelve holes of net total less than eighteen, so a short
+  // card flattered itself on the final. Now a short card scores near NOTHING —
+  // contests that need their holes never fire — so it lands close to 0, and on
+  // a scale whose median is −0.5 that is close to the LEAD. Hence: no final at
+  // all below eighteen holes.
   const shortAlone = scorePlayer(short, ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
   const fullAlone = scorePlayer(full, ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
   assert.ok(shortAlone.net! < fullAlone.net!, "twelve holes total less than eighteen");
-  assert.ok(shortAlone.final! < fullAlone.final!, "and so does the final");
+  assert.equal(shortAlone.final, null, "and he takes no final at all");
+  assert.equal(typeof fullAlone.final, "number");
 
   // The leaderboard places the finished card first regardless.
   const board = computeLeaderboard([short, full], ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
@@ -148,16 +155,18 @@ test("a contest never pays for holes that were not played", () => {
 });
 
 test("an empty card is paid no skins, even from a cart that won them", () => {
+  // Eight men, because skins does not run below that any more. Cart 1 takes the
+  // first; one of its two never teed off.
   const winner = card("Winner", 18, 1);
-  (winner.gross as (number | null)[])[0] = 3;      // cart 1 takes the 1st
+  (winner.gross as (number | null)[])[0] = 3;
   const absent = card("Absent", 0, 1);             // same cart, never teed off
-  const other = card("Other", 18, 2);
+  const rest = [2, 2, 3, 3, 4, 4].map((cart, i) => card("Other" + i, 18, cart));
 
-  const board = computeLeaderboard([winner, absent, other], ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
+  const board = computeLeaderboard([winner, absent, ...rest], ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
   const by = Object.fromEntries(board.map((r) => [r.name, r]));
 
-  assert.equal(by["Winner"].skins, 1, "the cart won a skin");
+  assert.ok((by["Winner"].skins || 0) > 0, "the cart won a skin");
   assert.equal(by["Absent"].contests.skins!.strokes, 0, "but he did not play for it");
   assert.equal(by["Absent"].contests.skins!.live, false);
-  assert.equal(by["Absent"].contests.skins!.detail, "no card");
+  assert.match(by["Absent"].contests.skins!.detail, /no full round/);
 });

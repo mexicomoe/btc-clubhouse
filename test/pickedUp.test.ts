@@ -115,19 +115,24 @@ test("every contest still runs on a card with Xs on it", () => {
   assert.equal(r.contests.tripleThreat.live, true);
 });
 
-// A pick-up shows a gross of par + 4, which clears the par + 3 bar — so without
-// an explicit exclusion Triple Threat would charge a man for picking up, which
-// is the one thing Stableford tells him to do.
-test("a picked-up hole is never a triple", () => {
+// A picked-up hole IS a blow-up now, and counting it needs no special case.
+//
+// It used to be excluded, and had to be: a pick-up shows a gross of par + 4,
+// which cleared the old par + 3 bar, so Triple Threat would have charged a man
+// for doing the one thing Stableford tells him to do. The bar is a NET DOUBLE
+// now — a pick-up caps to exactly that — and a hole a man picked up on was a
+// blow-up by any honest reading. The exclusion went with the rule that needed it.
+test("a picked-up hole is a blow-up, and needs no special case", () => {
   const r = scorePlayer(card("Three Xs", [4, 11, 15]), ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
-  assert.equal(r.contests.tripleThreat.strokes, 0);
-  assert.match(r.contests.tripleThreat.detail, /no triples/);
+  assert.match(r.contests.tripleThreat.detail, /^3 net doubles/);
 
-  // The same three holes actually played to par + 4 DO count.
+  // The same three holes actually played to par + 4 score identically — which
+  // is the point: the card cannot tell, so neither should the contest.
   const played = card("Played them", []);
   for (const h of [4, 11, 15]) played.gross[h - 1] = (PAR[h - 1] as number) + 4;
   const r2 = scorePlayer(played, ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
-  assert.equal(r2.contests.tripleThreat.detail.startsWith("3 triples"), true);
+  assert.equal(r2.contests.tripleThreat.strokes, r.contests.tripleThreat.strokes);
+  assert.equal(r2.contests.tripleThreat.detail, r.contests.tripleThreat.detail);
 });
 
 /* ---- reading it out of a paste ---- */

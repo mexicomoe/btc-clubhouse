@@ -83,8 +83,9 @@ test("course handicap moves with the tee and with the field", () => {
 // offer the same holes to everybody. A man off Tee I and a woman off Tee IX
 // choose from the same list.
 test("the birdie picks are the same holes whichever tee is played", () => {
-  const expected = { f3: [3, 8], f4: [1, 2, 9], f5: [4, 7],
-                     b3: [13, 17], b4: [10, 14, 15], b5: [16, 18] };
+  const expected = { p4f: [1, 2, 9], p4b: [10, 14, 15],
+                     p3a: [3, 8, 17], p3b: [3, 8, 17],
+                     p5a: [7, 16, 18], p5b: [7, 16, 18] };
   for (const id of TEE_IDS) {
     assert.deepEqual(birdiePickHoles(courseForTee(id, "F")), expected, "Tee " + id + ", women");
     assert.deepEqual(birdiePickHoles(courseForTee(id, "M")), expected, "Tee " + id + ", men");

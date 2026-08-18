@@ -145,10 +145,13 @@ test("Bounce Back and Damage Control are switched off, not merely zero", () => {
 });
 
 // Triple Threat is what replaced them, and it is one contest rather than two:
-// the gross triple is the damage, the net par after it is the bounce back.
+// the blow-up is the damage, the net par after it is the bounce back.
+//
+// THE BLOW-UP IS A NET DOUBLE NOW, not a gross triple — off scratch that is a
+// gross double, so this card is worse than it needs to be to trigger it.
 test("Triple Threat covers the same ground in one contest", () => {
-  const c = card((g) => { g[0] = PAR[0] + 3; });      // triple, then a par
+  const c = card((g) => { g[0] = PAR[0] + 2; });      // net double, then a par
   const r = scorePlayer(c, ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
-  assert.equal(r.contests.tripleThreat!.detail, "1 triple, 1 bounce-back");
-  assert.equal(r.contests.tripleThreat!.strokes, -0.4);
+  assert.equal(r.contests.tripleThreat!.detail, "1 net double, 1 bounce-back");
+  assert.equal(r.contests.tripleThreat!.strokes, -0.5);
 });
