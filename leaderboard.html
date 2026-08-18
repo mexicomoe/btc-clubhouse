@@ -44,6 +44,7 @@
     <button class="big solid" id="addBtn">+ Add player</button>
     <button class="big" id="pastePlayersBtn">Paste a list of players</button>
     <button class="big" id="pastePicksBtn">Paste birdie picks</button>
+    <button class="big" id="hitListBtn">Set the Hit List</button>
     <!-- The three pages used to be islands. Land on this one — which is where a
          browser's address-bar autocomplete tends to dump you — and there was no
          way through to the pick sheet at all. -->
@@ -51,6 +52,7 @@
   </div>
   <div id="rosterBox"></div>
   <div id="picksBox"></div>
+  <div id="hitListBox"></div>
 
   <details class="fold" id="foldEvent">
     <summary><span><span class="fname">Event settings</span>
@@ -196,14 +198,28 @@ function blankEvent(name, date){
 function normalisePlayer(p){
   const out = Object.assign({}, p);
   const legal = E.birdiePickHoles(courseOf(out));
-  const old = { f4: out.front, b4: out.back };
+  // Where a slot's holes may have come from, oldest form last. The par 3s and
+  // par 5s used to be split front and back; f3/b3 become the two par 3 slots
+  // and f5/b5 the two par 5s, and the par 4 slots reach all the way back to the
+  // original two-pick `front`/`back` pair.
+  const was = {
+    p4f: [out.f4, out.front],
+    p4b: [out.b4, out.back],
+    p3a: [out.f3], p3b: [out.b3],
+    p5a: [out.f5], p5b: [out.b5],
+  };
   E.PICK_SLOTS.forEach(sl => {
     let v = out[sl.key];
-    if(v == null && old[sl.key] != null) v = old[sl.key];
+    if(v == null) for(const older of (was[sl.key] || [])){ if(older != null){ v = older; break; } }
+    // A pick on a hole since barred is DROPPED, not refused. Holes 4 and 13
+    // were legal under the old slots and are not now; the man shows as missing
+    // that slot, which is true, rather than losing his round to an error.
     out[sl.key] = (v != null && legal[sl.key].indexOf(v) !== -1) ? v : null;
   });
-  delete out.front;
-  delete out.back;
+  ["front","back","f3","f4","f5","b3","b4","b5"].forEach(k => { delete out[k]; });
+  // The man he named, and his team for Team Skins. Both are plain strings.
+  out.hitList = typeof out.hitList === "string" ? out.hitList : "";
+  out.team = typeof out.team === "string" ? out.team : "";
   return out;
 }
 
@@ -540,8 +556,8 @@ function blankPlayer(){
   // way and the organiser changes it only when it is not true.
   return { id: "p" + (state.nextId++), name: "", ghin: "", index: null,
            tee: state.lastTee || "IV", gender: "M",
-           cart: null, flight: "",
-           f3: null, f4: null, f5: null, b3: null, b4: null, b5: null };
+           cart: null, team: "", flight: "", hitList: "",
+           p4f: null, p4b: null, p3a: null, p3b: null, p5a: null, p5b: null };
 }
 /**
  * The thresholds this round is scored on. The only thing the organiser can
@@ -1625,6 +1641,111 @@ function showPicksBox(){
   document.getElementById("picksPaste").focus();
 }
 
+/**
+ * THE HIT LIST — the eight players nearest a man's own index.
+ *
+ * Four above and four below where the field allows it, and the nearest eight
+ * either way when it does not — a man at the very top or bottom of the field
+ * still gets eight names rather than four.
+ *
+ * NOT HIS CART. A threesome gives him two names and one of them is usually the
+ * obvious pick; eight near-equals makes the choice about form rather than about
+ * who he happened to ride with.
+ *
+ * A man with no index has nobody to be near, and a man who has not finished is
+ * off every list — his opponent's pick would be void anyway, so offering him
+ * only sets up a wasted choice.
+ */
+function nearestEight(player){
+  const mine = player.index;
+  if(mine == null) return [];
+  const others = state.players.filter(p => p.id !== player.id && p.index != null && isReady(p));
+  const below = others.filter(p => p.index < mine).sort((a,b) => b.index - a.index);
+  const above = others.filter(p => p.index >= mine).sort((a,b) => a.index - b.index);
+  const take = [];
+  // Four each way, then top the list back up from whichever side has more left.
+  while(take.length < 8 && (below.length || above.length)){
+    const wantBelow = take.filter(p => p.index < mine).length < 4 && below.length;
+    const wantAbove = take.filter(p => p.index >= mine).length < 4 && above.length;
+    if(wantBelow) take.push(below.shift());
+    else if(wantAbove) take.push(above.shift());
+    else if(below.length) take.push(below.shift());
+    else take.push(above.shift());
+  }
+  // Shown in index order, best player first, so the choice reads as a ladder.
+  return take.sort((a,b) => a.index - b.index);
+}
+
+/** How the two indexes compare, in the words the card will use. */
+function hitBand(mine, theirs){
+  const gap = E.DEFAULT_CONTESTS.hitList.equalBand;
+  if(mine == null || theirs == null) return "an equal handicap";
+  if(Math.abs(mine - theirs) <= gap) return "an equal handicap";
+  return theirs < mine ? "a lower handicap" : "a higher handicap";
+}
+
+function showHitListBox(){
+  const box = document.getElementById("hitListBox");
+  const men = readyPlayers();
+  if(men.length < 2){
+    box.innerHTML = `<div class="note warn">The Hit List needs at least two players
+      with an index and a tee.</div>`;
+    return;
+  }
+  box.innerHTML =
+    `<div class="cd" style="padding:0 0 12px;font-size:18px;font-weight:700">
+       Each man backs himself to post the better net score against ONE opponent.
+       He is offered the eight players nearest his own index — beating a better
+       player pays more, so the easy pick is not the best one.</div>` +
+    men.map(p => {
+      const eight = nearestEight(p);
+      const opts = `<option value="">— nobody —</option>` +
+        eight.map(o => `<option value="${esc(displayName(o))}"${
+          displayName(o) === (p.hitList || "") ? " selected" : ""}>${
+          esc(displayName(o))} · ${E.formatHandicapIndex(o.index)} · ${
+          esc(hitBand(p.index, o.index))}</option>`).join("");
+      const stale = p.hitList && !eight.some(o => displayName(o) === p.hitList);
+      return `<div class="field">` +
+        `<label for="hl_${p.id}">${esc(displayName(p))} · ${E.formatHandicapIndex(p.index)}</label>` +
+        `<select id="hl_${p.id}" data-hl="${p.id}">${opts}` +
+        (stale ? `<option value="${esc(p.hitList)}" selected>${esc(p.hitList)} · no longer on his list</option>` : ``) +
+        `</select></div>`;
+    }).join("") +
+    `<div class="pad"><button class="big" id="hitListDone">Done</button></div>`;
+
+  box.querySelectorAll("select[data-hl]").forEach(sel =>
+    sel.addEventListener("change", () => {
+      const man = state.players.find(p => p.id === sel.dataset.hl);
+      if(!man) return;
+      man.hitList = sel.value || "";
+      save(); renderBoard();
+    }));
+  document.getElementById("hitListDone").addEventListener("click", () => {
+    document.getElementById("hitListBox").innerHTML = "";
+  });
+}
+
+/**
+ * Which skins format THIS field is in, or null for none.
+ *
+ * The size decides it, not a switch: under 8 there is not enough of a field to
+ * divide, 8 to 15 is Cart Skins and 16 or more is Team Skins. Counted on men
+ * who could actually finish — a name with no index and no tee is not a player
+ * yet and must not tip the field into a format it cannot play.
+ */
+function skinsFormatNow(){
+  const config = contestConfig().skins;
+  return config ? E.skinsFormat(readyPlayers().length, config) : null;
+}
+
+function teamHint(){
+  const n = readyPlayers().length;
+  const format = skinsFormatNow();
+  if(format === "team") return "This field plays TEAM skins — " + n + " players. Every man needs a team.";
+  if(format === "cart") return "Not used at " + n + " players: this field plays cart skins. Teams start at 16.";
+  return "Not used — a field of " + n + " is too small for skins at all. Teams start at 16.";
+}
+
 /** The slots and their legal holes, as the parser wants them. */
 function pickSlotRules(){
   const legal = E.birdiePickHoles(E.courseForTee(state.lastTee || "IV", "M"));
@@ -1746,10 +1867,16 @@ function drawEdit(){
      <div class="chread">Course handicap <b id="fCh">${ch==null?"–":ch}</b>
        <span id="fChNote" style="font-size:18px"></span></div>
 
-     <div class="field"><label for="fCart">Group</label>
+     <div class="field"><label for="fCart">Cart</label>
       <input type="number" id="fCart" inputmode="numeric" step="1" value="${p.cart==null?"":p.cart}">
       <div class="cd" style="margin-top:10px;font-size:18px;font-weight:700">
-        The men he plays skins with — his cart some weeks, his team others.</div></div>
+        His cart. Skins are played between carts in a field of 8 to 15.</div></div>
+
+     <div class="field"><label for="fTeam">Team</label>
+      <input type="text" id="fTeam" autocomplete="off" inputmode="text"
+        placeholder="${esc(skinsFormatNow() === "team" ? "needed — 16 or more players" : "only used at 16 players or more")}"
+        value="${esc(p.team || "")}">
+      <div class="cd" style="margin-top:10px;font-size:18px;font-weight:700">${esc(teamHint())}</div></div>
 
      <div class="field"><label for="fFlight">Flight</label>
       <input type="text" id="fFlight" list="flightList" autocomplete="off"
@@ -1805,6 +1932,7 @@ function drawEdit(){
     const v = e.target.value.trim();
     editing.cart = /^\d{1,2}$/.test(v) ? Number(v) : null;
   });
+  $("fTeam").addEventListener("input", e => { editing.team = e.target.value.trim(); });
   $("fFlight").addEventListener("input", e => {
     editing.flight = e.target.value;
     document.querySelector("#fFlight").parentElement.querySelector(".cd").textContent = flightHint(editing);
@@ -1898,105 +2026,114 @@ function renderSkins(){
 
   const inFlight = readyPlayers().filter(p =>
     allFlights.length < 2 || (p.flight || "").trim() === state.flight);
-  const entered = inFlight.filter(p => p.cart != null && String(p.cart).trim() !== "");
-  if(entered.length === 0){
-    sub.textContent = "No groups yet";
-    body.innerHTML = `<div class="note">Nobody has a group number yet. Give each man a group on the
-      <b>Setup</b> tab — his cart, or his team — and the skins will run themselves. A man with
-      no group simply doesn't compete for them.</div>`;
+  // THE FIELD SIZE DECIDES THE FORMAT, not a switch: under 8 there are none,
+  // 8 to 15 is cart against cart, 16 or more is team against team.
+  const format = E.skinsFormat(inFlight.length, config);
+  const word = format === "team" ? "team" : "group";
+  const Word = format === "team" ? "Team" : "Group";
+
+  if(format == null){
+    sub.textContent = inFlight.length + " players — too few for skins";
+    body.innerHTML = `<div class="note warn"><b>No skins at ${inFlight.length}
+      player${inFlight.length===1?"":"s"}.</b><br>
+      Skins needs a field of at least ${config.minPlayers}. Below that there is not
+      enough of a field to divide, and the contest is simply not played.</div>`;
     return;
   }
 
-  // Who is in which cart, for the totals.
-  const byCart = new Map();
+  const groupOf = (p) => format === "team" ? (p.team || "").trim() : (p.cart == null ? "" : String(p.cart).trim());
+  const entered = inFlight.filter(p => groupOf(p) !== "");
+  if(entered.length === 0){
+    sub.textContent = "No " + word + "s yet";
+    body.innerHTML = `<div class="note">Nobody has a ${word} yet. Give each man
+      ${format === "team" ? "a team" : "a cart number"} on the <b>Setup</b> tab and the skins
+      will run themselves. A man with no ${word} simply doesn't compete for them.</div>`;
+    return;
+  }
+
+  const byGroup = new Map();
   entered.forEach(p => {
-    const id = String(p.cart);
-    if(!byCart.has(id)) byCart.set(id, []);
-    byCart.get(id).push(displayName(p));
+    const id = groupOf(p);
+    if(!byGroup.has(id)) byGroup.set(id, []);
+    byGroup.get(id).push(displayName(p));
   });
+  const groups = [...byGroup.keys()].sort((a,b) =>
+    (Number(a)||0) - (Number(b)||0) || String(a).localeCompare(String(b)));
 
-  const carts = [...byCart.keys()].sort((a,b) => (Number(a)||0) - (Number(b)||0));
-
-  // One cart has nobody to play against: uncontested it takes all eighteen for
-  // going round on its own. No skins on a round that never divided into two.
-  if(carts.length < 2){
-    sub.textContent = "Only one group out";
+  // One group has nobody to play against: uncontested it takes every hole for
+  // going round on its own.
+  if(groups.length < 2){
+    sub.textContent = "Only one " + word + " out";
     body.innerHTML =
-      `<div class="note warn"><b>No skins today — only one group out.</b><br>
-        Skins is group against group, and a group on its own wins every hole by
-        default. Give the men a second group number on the <b>Setup</b> tab and
-        the skins will run.</div>` +
-      `<div class="contest"><div class="cname"><div class="cn">Group ${esc(carts[0])}</div>` +
-      `<div class="cd">${esc(byCart.get(carts[0]).join(" & "))}</div></div>` +
+      `<div class="note warn"><b>No skins today — only one ${word} out.</b><br>
+        Skins is ${word} against ${word}, and a ${word} on its own wins every hole by
+        default. Give the men a second ${word} on the <b>Setup</b> tab and the skins
+        will run.</div>` +
+      `<div class="contest"><div class="cname"><div class="cn">${Word} ${esc(groups[0])}</div>` +
+      `<div class="cd">${esc(byGroup.get(groups[0]).join(" & "))}</div></div>` +
       `<div class="pvt" style="text-align:right"><div class="cd">not playing for skins</div></div></div>`;
     return;
   }
 
   const cards = entered.map(cardOf);
-  const table = E.cartSkins(cards.map(c => ({ card: c, cart: c.cart })), undefined);
-  const won = (id) => table.skins.get(id) || 0;
+  const table = E.skinsByGroup(cards.map(c => ({ card: c, group: format === "team" ? c.team : c.cart })), undefined);
+  const won = (id) => table.skins.get(String(id)) || 0;
+  let skinsWon = 0; table.skins.forEach(n => { skinsWon += n; });
   const played = cards.some(c => c.gross.some(g => g != null));
   sub.textContent = played
-    ? carts.length + " group" + (carts.length===1?"":"s") + " · 18 skins on the round"
+    ? groups.length + " " + word + (groups.length===1?"":"s") + " · " + skinsWon + " skin" +
+      (skinsWon===1?"":"s") + " won"
     : "No scores imported yet";
 
-  // A skin is worth more in a small field and less in a large one, so the value
-  // depends on how many groups are out — pass the count or every total is wrong.
-  const perSkin = E.skinValue(config, carts.length);
+  // The POT is fixed and split by the skins actually won, so the value of one
+  // is not known until the round is over. Shown to the hundredth, because this
+  // is the figure a man checks his own total against.
+  const perSkin = E.skinValue(config, skinsWon);
 
-  let html = `<div class="section-label">Totals by group</div>`;
-  html += carts.slice().sort((a,b) => won(b) - won(a) || (Number(a)||0)-(Number(b)||0)).map(id => {
+  let html = `<div class="section-label">Totals by ${word}</div>`;
+  html += groups.slice().sort((a,b) => won(b) - won(a) ||
+      (Number(a)||0)-(Number(b)||0) || String(a).localeCompare(String(b))).map(id => {
     const n = won(id);
-    const strokes = E.skinStrokes(n, config, carts.length);
+    const strokes = E.skinStrokes(n, config, skinsWon);
     return `<div class="contest"><div class="cname">` +
-      `<div class="cn">Group ${esc(id)}</div>` +
-      `<div class="cd">${esc(byCart.get(id).join(" &amp; ").replace(/&amp;/g, "&"))}</div></div>` +
+      `<div class="cn">${Word} ${esc(id)}</div>` +
+      `<div class="cd">${esc(byGroup.get(id).join(" & "))}</div></div>` +
       `<div class="pvt" style="text-align:right;white-space:nowrap">` +
         `<div class="cn">${n} skin${n===1?"":"s"}</div>` +
         `<div class="cd">${strokes === 0 ? "0.0" : fmtStrokes(strokes)}</div></div></div>`;
   }).join("");
 
-  // Spelled out, because the value moves with the field. A spreadsheet kept
-  // alongside on a fixed figure will disagree, and this is where to see why.
-  const per = (g) => Math.abs(E.skinValue(config, g)).toFixed(2);
-  const cap = config.maxSkinStrokes == null ? null : Math.abs(config.maxSkinStrokes);
-  const capAt = cap == null ? 0 : Math.ceil(cap / Math.abs(perSkin));
-  html += `<div class="note"><b>${per(carts.length)} a skin today —
-    ${carts.length} group${carts.length===1?"":"s"} out.</b><br>
-    ${Math.abs(config.fairShare).toFixed(1)} × ${carts.length} ÷ 18 = ${per(carts.length)} a skin.
-    An even share of the eighteen is worth ${Math.abs(config.fairShare).toFixed(1)}
-    whatever the size of the field, so a skin is worth less in a small field and
-    more in a large one — ${per(2)} over two groups, ${per(4)} over four,
-    ${per(6)} over six, ${per(12)} over twelve.` +
-    (cap == null ? `` : `<br>
-    <b>${cap.toFixed(1)} is the most Skins can take off a card</b>${capAt <= 18
-      ? `, reached at ${capAt} skin${capAt===1?"":"s"} today` : ``}.
-    No one contest may outweigh Agony Alley.`) + `</div>`;
-
-  if(table.carried > 0){
-    html += `<div class="note warn">${table.carried} skin${table.carried===1?"":"s"} still
-      carrying after the 18th. Those vanish — nobody is paid for them.</div>`;
-  }
+  html += `<div class="note"><b>${Math.abs(perSkin).toFixed(2)} a skin today —
+    ${Math.abs(config.pot).toFixed(1)} split ${skinsWon} way${skinsWon===1?"":"s"}.</b><br>
+    The whole contest is worth ${Math.abs(config.pot).toFixed(1)} every week, however the
+    round falls, and it is divided among the skins actually won — so a lean day
+    makes each one worth MORE, not less. Every man in a winning ${word} takes the
+    full amount; it is not shared out between them.<br>
+    This field plays <b>${format === "team" ? "TEAM" : "CART"} skins</b> —
+    ${inFlight.length} players, and ${format === "team"
+      ? "teams are used from " + config.teamFrom + " up"
+      : "carts run from " + config.minPlayers + " to " + (config.teamFrom - 1)}.</div>`;
 
   html += `<div class="section-label">Hole by hole</div>`;
   html += table.holes.map(h => {
     const par = E.ABERDEEN_TEE_IV.par[h.hole - 1];
-    const avg = h.wonBy != null ? h.averages.get(h.wonBy) : null;
+    const best = h.wonBy != null ? h.scores.get(h.wonBy) : null;
     const right = h.wonBy != null
-      ? `<span class="cn">Group ${esc(h.wonBy)}</span>` +
-        (h.pot > 1 ? ` <span class="tag">${h.pot} skins</span>` : ``)
-      : (h.averages.size === 0
+      ? `<span class="cn">${Word} ${esc(h.wonBy)}</span>`
+      : (h.scores.size === 0
           ? `<span class="cd">not played</span>`
-          : `<span class="cd">tied — carries on</span>`);
+          : `<span class="cd">tied — nobody wins it</span>`);
     return `<div class="prev"><div class="pv">` +
         `<div class="pvn">Hole ${h.hole}<span class="cd" style="font-weight:700"> · par ${par}</span></div>` +
-        `<div class="pvd">${avg == null ? "&nbsp;" : "won on " + (Math.round(avg*10)/10)}</div>` +
+        `<div class="pvd">${best == null ? "&nbsp;" : "won on " + best + " (best two balls)"}</div>` +
       `</div><div class="pvt">${right}</div></div>`;
   }).join("");
 
-  html += `<div class="note">A group's score on a hole is the <b>average</b> of its players' net
-    scores, not the total — that is what lets a group of one, or of three against fours,
-    compete fairly with no blind partner. A tied hole carries its skin into the next.</div>`;
+  html += `<div class="note">A ${word}'s score on a hole is its <b>best two net balls</b>,
+    added. Not the average, which handed a threesome a quarter more skins than a
+    foursome — best two means every ${word} puts up exactly two scores whatever its
+    size. A man out on his own counts his ball twice. <b>A tied hole is not won by
+    anybody and nothing carries over.</b></div>`;
 
   body.innerHTML = html;
 }
@@ -2334,6 +2471,7 @@ document.getElementById("addBtn").addEventListener("click", () => {
 });
 document.getElementById("pastePlayersBtn").addEventListener("click", showRosterBox);
 document.getElementById("pastePicksBtn").addEventListener("click", showPicksBox);
+document.getElementById("hitListBtn").addEventListener("click", showHitListBox);
 // Re-fit names when the viewport changes (rotation, split-view, browser resize).
 window.addEventListener("resize", fitBoardNames);
 
