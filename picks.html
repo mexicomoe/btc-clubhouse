@@ -75,7 +75,7 @@
 
 <header>
   <h1>CLUBHOUSE</h1>
-  <p>Pick six holes before you tee off. Net birdie on one takes half a stroke off. Net eagle takes a full stroke.</p>
+  <p>Pick six holes before you tee off. A net birdie on one takes half a stroke off, a net eagle a stroke and a half. Nothing on any of the six costs you half.</p>
 </header>
 
 <main>
@@ -86,7 +86,7 @@
 </main>
 
 <div id="tray"><div class="inner">
-  <p id="summary">Pick one hole in each of the six boxes.</p>
+  <p id="summary">Pick one par 4 on each nine, then two par 3s and two par 5s.</p>
   <a id="sendsms" role="button" aria-disabled="true">Text my picks</a>
   <button id="send" disabled>Copy my picks instead</button>
   <p id="copied"></p>
@@ -114,30 +114,64 @@
 const FORM_POST = "https://docs.google.com/forms/d/e/1FAIpQLSdbtFLO94Gq1RYC2-YJm-pDK1OMuBy8kzdkvY7MvfmOh8Fnuw/formResponse";
 const FORM_FIELD = "entry.1094711796";
 
+/**
+ * The four boxes, and what each one asks for.
+ *
+ * Par 4s are still split front and back. THE PAR 3s AND PAR 5s NOW FLOAT across
+ * the whole course and take TWO picks each, because once Agony Alley (4, 5, 6)
+ * and Easy Street (11, 12, 13) have taken their holes there are only three par
+ * 3s and three par 5s left — and splitting three across two nines leaves a box
+ * with one hole in it, which is not a choice.
+ *
+ * `keys` is the slot the engine files each pick under, and their ORDER is the
+ * order the six numbers are written in the message. That order is the only
+ * thing the parser at the other end has to go on, so it must match the engine's
+ * PICK_SLOTS exactly: front par 4, back par 4, par 3, par 3, par 5, par 5.
+ */
 const SLOTS = [
-  {key:"F3", label:"Front nine \u00b7 par 3", holes:[3,8]},
-  {key:"F4", label:"Front nine \u00b7 par 4", holes:[1,2,9]},
-  {key:"F5", label:"Front nine \u00b7 par 5", holes:[4,7]},
-  {key:"B3", label:"Back nine \u00b7 par 3",  holes:[13,17]},
-  {key:"B4", label:"Back nine \u00b7 par 4",  holes:[10,14,15]},
-  {key:"B5", label:"Back nine \u00b7 par 5",  holes:[16,18]}
+  { label: "Front nine \u00b7 par 4", holes: [1, 2, 9],    pick: 1, keys: ["p4f"] },
+  { label: "Back nine \u00b7 par 4",  holes: [10, 14, 15], pick: 1, keys: ["p4b"] },
+  { label: "Par 3s \u00b7 pick two",  holes: [3, 8, 17],   pick: 2, keys: ["p3a", "p3b"] },
+  { label: "Par 5s \u00b7 pick two",  holes: [7, 16, 18],  pick: 2, keys: ["p5a", "p5b"] }
 ];
-const picked = {};
+const TOTAL_PICKS = SLOTS.reduce((n, s) => n + s.pick, 0);
+
+/** Holes chosen in each box, oldest first, so a third tap knows what to drop. */
+const chosen = SLOTS.map(() => []);
 
 const slotsEl = document.getElementById("slots");
-SLOTS.forEach(s => {
+SLOTS.forEach((s, si) => {
   const sec = document.createElement("section");
   sec.className = "pick";
   const h = document.createElement("h2"); h.textContent = s.label; sec.appendChild(h);
   const row = document.createElement("div"); row.className = "holes";
-  s.holes.forEach(n => {
+
+  const paint = () => {
+    row.querySelectorAll(".hole").forEach((b) => {
+      b.setAttribute("aria-pressed", String(chosen[si].indexOf(Number(b.dataset.hole)) !== -1));
+    });
+  };
+
+  s.holes.forEach((n) => {
     const b = document.createElement("button");
-    b.type = "button"; b.className = "hole"; b.setAttribute("aria-pressed","false");
+    b.type = "button"; b.className = "hole"; b.dataset.hole = String(n);
+    b.setAttribute("aria-pressed", "false");
     b.textContent = "Hole " + n;
     b.addEventListener("click", () => {
-      picked[s.key] = n;
-      row.querySelectorAll(".hole").forEach(o => o.setAttribute("aria-pressed","false"));
-      b.setAttribute("aria-pressed","true");
+      const at = chosen[si].indexOf(n);
+      if (at !== -1) {
+        // Tapping a chosen hole again lets it go. In a pick-one box that would
+        // leave the box empty, which is worse than useless — there he can only
+        // ever change his mind TO another hole, never to nothing.
+        if (s.pick > 1) chosen[si].splice(at, 1);
+      } else {
+        chosen[si].push(n);
+        // One too many: the OLDEST goes, so a man who taps a third hole gets
+        // the third one he asked for rather than being refused. Refusing would
+        // be read as a broken button.
+        while (chosen[si].length > s.pick) chosen[si].shift();
+      }
+      paint();
       refresh();
     });
     row.appendChild(b);
@@ -145,6 +179,19 @@ SLOTS.forEach(s => {
   sec.appendChild(row);
   slotsEl.appendChild(sec);
 });
+
+/** Every pick in slot order, lowest hole first inside a two-pick box. */
+function picksInOrder(){
+  const out = [];
+  SLOTS.forEach((s, si) => {
+    // Sorted, so the same two holes always write the same message however they
+    // were tapped — the message is the record, and it should not depend on the
+    // order a man's finger happened to move.
+    const holes = chosen[si].slice().sort((a, b) => a - b);
+    for (let k = 0; k < s.pick; k++) out.push(holes[k] == null ? null : holes[k]);
+  });
+  return out;
+}
 
 const who = document.getElementById("who");
 const tray = document.getElementById("tray");
@@ -155,7 +202,7 @@ const copied = document.getElementById("copied");
 
 function line(){
   const name = who.value.trim() || "(no name)";
-  return name + " — " + SLOTS.map(s => picked[s.key]).join(", ");
+  return name + " — " + picksInOrder().join(", ");
 }
 
 /**
@@ -181,13 +228,13 @@ function smsHref(text){
 }
 
 function refresh(){
-  const n = SLOTS.filter(s => picked[s.key]).length;
+  const n = picksInOrder().filter(h => h != null).length;
   const named = who.value.trim().length > 0;
   let ready = false;
-  if (n < 6) {
-    summary.textContent = n + " of 6 picked.";
+  if (n < TOTAL_PICKS) {
+    summary.textContent = n + " of " + TOTAL_PICKS + " picked.";
   } else if (!named) {
-    summary.textContent = "All six picked. Add your name above.";
+    summary.textContent = "All " + TOTAL_PICKS + " picked. Add your name above.";
   } else {
     summary.textContent = line();
     ready = true;
