@@ -28,37 +28,41 @@ interface Reference {
   courseHandicap: number;
   gross: number;
   net: number;
-  strokesOff: number;
   final: number;
 }
 
 /** The same mechanical rotation as section 9 — see the note there. */
 function picks(i: number): BirdiePicks {
   const legal = birdiePickHoles(ABERDEEN_TEE_IV);
-  return Object.fromEntries(
-    PICK_SLOTS.map((s) => [s.key, legal[s.key][i % legal[s.key].length]])) as BirdiePicks;
+  // Stepped around what is taken: the two par 3 slots are handed the identical
+  // three holes and so are the par 5s.
+  const taken: number[] = [];
+  const out: Record<string, number> = {};
+  for (const s of PICK_SLOTS) {
+    const free = legal[s.key].filter((h) => !taken.includes(h));
+    out[s.key] = free[i % free.length];
+    taken.push(out[s.key]);
+  }
+  return out as BirdiePicks;
 }
 
-// name | course hcp | picks | 18 gross | expected: gross, net, off, final
+// name | course hcp | picks | 18 gross | expected: gross, net, final
 const REFERENCE: Reference[] = [
-  ref("Dex",   23, picks(0), [5,5,4,6,6,6,7,3,5,4,4,6,3,6,6,6,6,5], 93, 70, 6.70, 63.30),
-  ref("Alex",  18, picks(1), [5,5,3,6,5,5,6,3,5,7,5,5,4,4,6,6,3,7], 90, 72, 4.30, 67.70),
-  ref("Finn",  26, picks(2), [5,6,6,7,5,4,7,4,7,6,7,5,3,5,5,6,4,7], 99, 73, 6.60, 66.40),
-  ref("Boyd",  21, picks(3), [6,5,4,7,6,5,7,4,5,6,6,5,4,5,7,4,4,6], 96, 75, 3.50, 71.50),
-  ref("Emmet", 14, picks(4), [6,5,3,7,7,6,5,3,5,4,5,5,3,5,6,7,3,6], 91, 77, -2.80, 79.80),
-  ref("Chip",  15, picks(5), [6,5,4,8,6,5,5,4,5,5,6,3,5,6,6,5,4,6], 94, 79, -1.20, 80.20),
-  ref("Grady", 34, picks(6), [7,6,4,9,7,7,7,5,5,6,7,7,3,8,6,7,3,9], 113,79, -1.20, 80.20),
-  ref("Hoyt",  20, picks(7), [7,5,4,8,8,4,8,4,6,5,6,7,4,7,5,5,4,6], 103,82, 2.30, 79.70),
+  ref("Dex",   23, picks(0), [5,5,4,6,6,6,7,3,5,4,4,6,3,6,6,6,6,5], 93, 70, -2.5),
+  ref("Alex",  18, picks(1), [5,5,3,6,5,5,6,3,5,7,5,5,4,4,6,6,3,7], 90, 72, -2.0),
+  ref("Finn",  26, picks(2), [5,6,6,7,5,4,7,4,7,6,7,5,3,5,5,6,4,7], 99, 73, -4.0),
+  ref("Boyd",  21, picks(3), [6,5,4,7,6,5,7,4,5,6,6,5,4,5,7,4,4,6], 96, 75, -2.0),
+  ref("Emmet", 14, picks(4), [6,5,3,7,7,6,5,3,5,4,5,5,3,5,6,7,3,6], 91, 77, 2.0),
+  ref("Chip",  15, picks(5), [6,5,4,8,6,5,5,4,5,5,6,3,5,6,6,5,4,6], 94, 79, 4.5),
+  ref("Grady", 34, picks(6), [7,6,4,9,7,7,7,5,5,6,7,7,3,8,6,7,3,9], 113,79, 6.0),
+  ref("Hoyt",  20, picks(7), [7,5,4,8,8,4,8,4,6,5,6,7,4,7,5,5,4,6], 103,82, 2.5),
 ];
 
 function ref(
   name: string, courseHandicap: number, picks: BirdiePicks, gross: number[],
-  grossTotal: number, net: number, strokesOff: number, final: number,
+  grossTotal: number, net: number, final: number,
 ): Reference {
-  return {
-    card: { name, courseHandicap, picks, gross },
-    courseHandicap, gross: grossTotal, net, strokesOff, final,
-  };
+  return { card: { name, courseHandicap, picks, gross }, courseHandicap, gross: grossTotal, net, final };
 }
 
 for (const r of REFERENCE) {
@@ -67,11 +71,11 @@ for (const r of REFERENCE) {
     assert.equal(result.courseHandicap, r.courseHandicap, "course handicap");
     assert.equal(result.gross, r.gross, "gross total");
     assert.equal(result.net, r.net, "capped net");
-    // "+ 0" turns a negative zero back into zero: negating a strokesEarned of 0
-    // gives -0, and strict equality says -0 is not 0. Grady earns exactly
-    // nothing — eight triples and four answers cancel — so this is live.
-    assert.equal(-result.strokesEarned + 0, r.strokesOff, "strokes off");
     assert.equal(result.final, r.final, "FINAL");
+    // ON A ZERO BASE THESE ARE THE SAME NUMBER. The contests no longer come off
+    // a net total, so what a man earned IS what he finished on. They used to
+    // differ by his whole net score, which is why it is worth pinning.
+    assert.equal(result.strokesEarned, result.final, "earned is the final");
   });
 }
 
@@ -101,14 +105,28 @@ const CARTS: CartEntry[] = [
   { cart: 4, card: REFERENCE.find((r) => r.card.name === "Hoyt")!.card },
 ];
 
-test("section 11 · Cart Skins reproduces 6, 9, 1, 2", () => {
-  const { skins, carried } = cartSkins(CARTS, ABERDEEN_TEE_IV);
-  assert.equal(skins.get("1"), 6, "Cart 1");
-  assert.equal(skins.get("2"), 9, "Cart 2");
+// RE-BASELINED. Under the old group-average rule these four carts produced
+// 6, 9, 1, 2 and won all eighteen holes between them. On best two balls they
+// produce 5, 3, 1, 1 — TEN won and EIGHT tied.
+//
+// Eight tied out of eighteen is the sharpest illustration in the suite of what
+// changed. Averaging fewer balls produced more extreme group scores, so two
+// groups almost never landed level; best two balls has every group put up the
+// same number of scores, and on a par-72 course with handicaps 14 to 34 they
+// land level very often indeed. A tied hole is won by nobody and nothing
+// carries, so nearly half the round pays out to no one — and the fixed pot
+// makes each of the ten survivors worth proportionally more.
+test("section 11 · Cart Skins on best two balls reproduces 5, 3, 1, 1", () => {
+  const { skins, holes, carried } = cartSkins(CARTS, ABERDEEN_TEE_IV);
+  assert.equal(skins.get("1"), 5, "Cart 1");
+  assert.equal(skins.get("2"), 3, "Cart 2");
   assert.equal(skins.get("3"), 1, "Cart 3");
-  assert.equal(skins.get("4"), 2, "Cart 4");
-  const total = [...skins.values()].reduce((a, b) => a + b, 0);
-  assert.equal(total + carried, 18, "eighteen skins accounted for");
+  assert.equal(skins.get("4"), 1, "Cart 4");
+  const won = [...skins.values()].reduce((a, b) => a + b, 0);
+  assert.equal(won, 10);
+  assert.equal(holes.filter((h) => h.wonBy == null).length, 8, "eight holes tied");
+  assert.equal(won + holes.filter((h) => h.wonBy == null).length, 18,
+    "every hole is won or tied, and none carries");
   assert.equal(carried, 0);
 });
 
@@ -130,9 +148,12 @@ test("Team Skins on two teams of four", () => {
     card: r.card,
     team: A.includes(r.card.name) ? "A" : "B",
   }));
-  const { skins, carried } = teamSkins(teams, ABERDEEN_TEE_IV);
-  assert.equal(skins.get("A"), 13, "Team A");
-  assert.equal(skins.get("B"), 5, "Team B");
-  assert.equal(skins.get("A")! + skins.get("B")! + carried, 18, "eighteen accounted for");
+  const { skins, holes, carried } = teamSkins(teams, ABERDEEN_TEE_IV);
+  assert.equal(skins.get("A"), 10, "Team A");
+  assert.equal(skins.get("B"), 4, "Team B");
+  // Fewer than eighteen won, and that is the change working: four holes were
+  // level on best two balls, and a level hole is won by nobody.
+  assert.equal(skins.get("A")! + skins.get("B")!, 14);
+  assert.equal(holes.filter((h) => h.wonBy == null).length, 4);
   assert.equal(carried, 0);
 });

@@ -44,15 +44,29 @@ function field(n: number) {
     courseHandicap: 8 + (i % 20),
     cart: 1 + Math.floor(i / 4),
     gross: PAR.map((p, h) => p + ((h * 7 + i * 5) % 5 === 0 ? -1 : (h + i) % 3 === 0 ? 0 : 1)),
-    picks: Object.fromEntries(PICK_SLOTS.map((s) =>
-      [s.key, LEGAL[s.key][i % LEGAL[s.key].length]])),
+    // Stepped around what is taken: the two par 3 slots are handed the
+    // identical three holes and so are the par 5s, so walking every slot by
+    // the same index nominates one hole twice.
+    picks: (() => {
+      const taken: number[] = [];
+      const set: Record<string, number> = {};
+      for (const s of PICK_SLOTS) {
+        const free = LEGAL[s.key].filter((h) => !taken.includes(h));
+        set[s.key] = free[i % free.length];
+        taken.push(set[s.key]);
+      }
+      return set;
+    })(),
   } as PlayerCard));
   return computeLeaderboard(cards, undefined, DEFAULT_CONTESTS);
 }
 
 const HEADING = { course: "Aberdeen Golf & Country Club", date: "2026-08-14", tee: "IV", note: "" };
+/** The contests actually scored this round — not every slot the format reserves. */
+const LIVE = ["watchTheBirdie", "sixPack", "agonyAlley", "easyStreet",
+              "tripleThreat", "hitList", "skins"];
 const link = (n: number, note = "") =>
-  resultsLink(BASE, { ...HEADING, note }, field(n), RESULT_CONTESTS);
+  resultsLink(BASE, { ...HEADING, note }, field(n), LIVE);
 
 /* ---- it fits ---- */
 
@@ -73,9 +87,19 @@ test("a full 24-man field fits — the app's own maximum", () => {
 });
 
 test("the ceiling is where it is claimed to be", () => {
-  // Worst case: every contest paying, so no value is a short "0".
+  // TWO CEILINGS, and they are different numbers for a good reason.
+  //
+  // A REAL round of 24 — the app's own maximum — fits, and that is the one that
+  // matters: it is asserted just above at about 1,800 characters.
+  //
+  // The figure below is the PATHOLOGICAL case: every contest paying a non-zero
+  // value on every man, so nothing compresses to a short "0". Adding Six Pack
+  // and the Hit List cost it three men, from 23 down to 20. Nothing is lost
+  // when it bites — a round too big is REFUSED rather than truncated, which
+  // the test below pins — so the consequence of the worst case is a message
+  // saying so, not a broken board.
   const at14 = maxPlayersThatFit(BASE, 14);
-  assert.ok(at14 >= 23, `only ${at14} players fit at a 14-character name`);
+  assert.ok(at14 >= 20, `only ${at14} players fit at a 14-character name`);
   // A longer average name costs players, and it should cost them gradually.
   assert.ok(maxPlayersThatFit(BASE, 19) < at14, "longer names must fit fewer men");
 });

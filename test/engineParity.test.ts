@@ -18,10 +18,20 @@ import { computeLeaderboard } from "../src/scoring.ts";
 const E = (globalThis as { ClubhouseEngine: any }).ClubhouseEngine;
 const html = readFileSync(new URL("../leaderboard.html", import.meta.url), "utf8");
 
-// The section-11 finals, with Watch the Birdie in place of Call Your Number.
+/**
+ * The seed round's finals, ON THE ZERO BASE — strokes under and over par, not
+ * net scores in the sixties and seventies. This is the board the app opens on,
+ * so it is also what an organiser sees before he has entered anything of his
+ * own, and it should look like a real Saturday: a spread of about ten strokes
+ * with the median a shade under level.
+ *
+ * Boyd and Alex are LEVEL at -3.70 and are separated by the card match, which
+ * on this scale is the normal case rather than the exception — every value in
+ * the game is a half or a tenth across roughly a ten-stroke range.
+ */
 const EXPECTED: Record<string, string> = {
-  Dex: "63.30", Finn: "66.40", Alex: "67.70", Boyd: "71.50",
-  Hoyt: "79.70", Emmet: "79.80", Chip: "80.20", Grady: "80.20",
+  Finn: "-5.50", Dex: "-4.80", Boyd: "-3.70", Alex: "-3.70",
+  Hoyt: "0.10", Emmet: "2.10", Chip: "3.80", Grady: "4.50",
 };
 
 test("engine.js reproduces the section 11 leaderboard", () => {
