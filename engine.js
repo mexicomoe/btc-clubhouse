@@ -1148,7 +1148,13 @@
     // part in his group's best two, because a card that stops at the twelfth
     // would otherwise win holes 1-12 for his group and then abandon it.
     const complete = (i) => results[i].holesPlayed === HOLES;
-    const format = skinsFormat(cards.filter((c, i) => complete(i)).length, config);
+
+    // THE FORMAT IS SET BY THE FIELD THAT TEED OFF, not by who came back.
+    // Counted on finishers, one man walking in off an eight-man field took the
+    // count to seven and cancelled skins for everybody — a contest decided
+    // retrospectively by somebody else's bad back. The club knows whether it is
+    // playing carts or teams before anyone hits a ball, and so does this.
+    const format = skinsFormat(cards.length, config);
 
     const groupOf = (c) => (format === "team" ? c.team : c.cart);
     const has = (c) => groupOf(c) != null && String(groupOf(c)).trim() !== "";

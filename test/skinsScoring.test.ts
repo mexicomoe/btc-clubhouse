@@ -1,24 +1,25 @@
 /**
  * Skins scoring into FINAL — what a skin is worth, and to whom.
  *
- * Skins is the one contest that cannot be settled on a single card: it needs the
- * whole field, group against group. So it is added by `computeLeaderboard`
- * rather than by `scorePlayer`, and it sits outside `maxContestStrokes`, which
- * governs the six individual contests.
+ * Skins cannot be settled on a single card: it needs the whole field, group
+ * against group. So it is added by `computeLeaderboard` rather than by
+ * `scorePlayer`.
  *
- * A "group" is whatever the round is played in — carts of two some weeks, teams
- * of four others. The engine does not care which; only the membership changes.
+ * A FIXED POT, divided among however many skins were actually won. The whole
+ * contest is worth 4.0 every week whatever the round does, so a lean day makes
+ * each skin worth MORE, not less. That replaced a per-skin value that scaled
+ * with the field and a ceiling on top of it, which existed only to stop Skins
+ * outgrowing the other contests in a big field — a fixed pot cannot.
  *
- * A skin is worth `fairShare × groups / 18`: −0.13 over two groups, −0.27 over
- * four, −0.40 over six, −0.80 over twelve. That is the value at which an even
- * share of the eighteen comes to 1.2 whatever the size of the field. The total
- * is capped at 3.8, because the winning group's haul does
- * NOT shrink as the field grows — six or seven skins over four groups, six or
- * seven over twelve — so without a ceiling Skins would outgrow every other
- * contest in a large field.
+ * Every player in a winning group takes the FULL per-skin amount; it is not
+ * divided between them.
  *
- * The hole-by-hole engine (averaging, carryovers, the group of one) is covered
- * in cartSkins.test.ts. This is about what the skins are then worth.
+ * THE FIELD SIZE DECIDES THE FORMAT: none under 8, cart against cart from 8 to
+ * 15, team against team from 16.
+ *
+ * The hole-by-hole engine — best two balls, the lone ball counted twice, the
+ * tied hole nobody wins — is covered in cartSkins.test.ts. This is about what
+ * the skins are then worth.
  */
 
 import { test } from "node:test";
@@ -26,303 +27,198 @@ import assert from "node:assert/strict";
 
 import { ABERDEEN_TEE_IV, DEFAULT_CONTESTS } from "../src/courseConfig.ts";
 import { computeLeaderboard, type PlayerCard } from "../src/scoring.ts";
-import { cartSkins, skinStrokes, skinValue } from "../src/skins.ts";
+import { cartSkins, skinStrokes, skinValue, skinsFormat } from "../src/skins.ts";
 
 const PAR = ABERDEEN_TEE_IV.par;
+const CFG = DEFAULT_CONTESTS.skins!;
+const SIX = { p4f: 2, p4b: 14, p3a: 3, p3b: 8, p5a: 7, p5b: 16 };
 
 function card(name: string, cart: number | null, edit: (g: (number | null)[]) => void = () => {}): PlayerCard {
   const gross = PAR.slice() as (number | null)[];
   edit(gross);
-  return { name, courseHandicap: 0, gross, cart: cart == null ? undefined : cart };
+  return { name, courseHandicap: 0, gross, picks: { ...SIX },
+           cart: cart == null ? undefined : cart } as PlayerCard;
 }
+
+/** A field of `n` men in carts of two — enough to clear the 8-player floor. */
+function field(n: number, edit: (i: number, g: (number | null)[]) => void = () => {}) {
+  return Array.from({ length: n }, (_, i) =>
+    card("P" + (i + 1), Math.floor(i / 2) + 1, (g) => edit(i, g)));
+}
+const board = (cards: PlayerCard[]) =>
+  computeLeaderboard(cards, ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
 
 /* ---- what a skin is worth ---- */
 
-// A skin is worth `fairShare × groups / 18` — the value at which an even share
-// of the eighteen comes to the fair share at EVERY field size. So a skin is
-// worth less in a small field, where a group's share of the eighteen is large,
-// and more in a big one.
-test("a skin is worth what makes an even share come to the fair share", () => {
-  const config = DEFAULT_CONTESTS.skins!;
-  assert.equal(config.fairShare, -1.2);
-
-  const per = (g: number) => Number(skinValue(config, g).toFixed(2));
-  assert.equal(per(2), -0.13, "two groups");
-  assert.equal(per(4), -0.27, "four groups");
-  assert.equal(per(6), -0.4, "six groups");
-  assert.equal(per(12), -0.8, "twelve groups");
+test("the pot is fixed and split by the skins actually won", () => {
+  assert.equal(CFG.pot, -4);
+  assert.equal(skinValue(CFG, 1), -4, "one skin takes the lot");
+  assert.equal(skinValue(CFG, 2), -2);
+  assert.equal(skinValue(CFG, 4), -1);
+  assert.equal(skinValue(CFG, 8), -0.5);
+  assert.equal(skinValue(CFG, 11), -0.36, "the brief's typical round");
+  assert.equal(skinValue(CFG, 16), -0.25);
 });
 
-// This is the property the value exists to have, and the reason it is not
-// `fairShare / groups`: that made a fair share worth 5.4 over two groups and
-// 0.10 over twelve, which is the opposite of flat.
-test("an even share of the eighteen is worth the same in any field", () => {
-  const config = DEFAULT_CONTESTS.skins!;
-  for (const groups of [2, 3, 6, 9, 18]) {
-    const share = 18 / groups;              // a whole number for each of these
-    const paid = Math.abs(share * skinValue(config, groups));
-    assert.ok(Math.abs(paid - 1.2) < 0.05,
-      `${groups} groups: an even share of ${share} paid ${paid.toFixed(2)}, not 1.2`);
-  }
+test("a lean round makes each skin worth MORE", () => {
+  // Which is the whole point of a fixed pot, and the opposite of the old model.
+  assert.ok(Math.abs(skinValue(CFG, 7)) > Math.abs(skinValue(CFG, 11)));
+  assert.equal(skinValue(CFG, 7), -0.57, "the brief's lean round");
 });
 
 test("a skin is worth to the hundredth exactly what the tab prints", () => {
-  // The figure on the Skins tab is the one that must multiply up. An unrounded
-  // 0.1333 would print as 0.13 and pay as though it were not.
-  const config = DEFAULT_CONTESTS.skins!;
-  for (let groups = 1; groups <= 18; groups++) {
-    const v = skinValue(config, groups);
-    assert.equal(Math.round(v * 100) / 100, v, `${groups} groups`);
-  }
+  // The Skins tab prints this figure and a man checks his own total against it.
+  // Rounded at the hundredth, not left long, or five skins will not add up.
+  assert.equal(skinValue(CFG, 3), -1.33);
+  assert.equal(skinValue(CFG, 6), -0.67);
+  assert.equal(skinValue(CFG, 15), -0.27);
 });
 
-test("winning more pays more, right up to the ceiling", () => {
-  const config = DEFAULT_CONTESTS.skins!;
-  for (const groups of [2, 4, 6, 8, 12]) {
-    let last = 0;
-    for (let n = 1; n <= 18; n++) {
-      const v = skinStrokes(n, config, groups);
-      assert.ok(v <= last, `${groups} groups: ${n} skins is worth at least ${n - 1}`);
-      last = v;
-    }
-    assert.ok(skinStrokes(18, config, groups) < skinStrokes(1, config, groups),
-      `${groups} groups: a rout still beats a single skin`);
-  }
+test("no skins won is worth nothing rather than dividing by zero", () => {
+  assert.equal(skinValue(CFG, 0), 0);
+  assert.equal(skinStrokes(0, CFG, 0), 0);
 });
 
-// At the field sizes this club plays the cap is slack — over four groups it
-// sits past a rout of every hole, so nothing a group can actually do is held
-// back. It exists for the large field, where the winner's haul does not shrink
-// but the value of each skin keeps climbing.
-test("the ceiling is 3.8", () => {
-  const config = DEFAULT_CONTESTS.skins!;
-  assert.equal(config.maxSkinStrokes, -3.8);
-
-  assert.equal(skinStrokes(18, config, 4), -3.8, "a four-group rout reaches it");
-  assert.ok(skinStrokes(13, config, 4) > -3.8, "but thirteen skins does not");
-  assert.equal(skinStrokes(18, config, 12), -3.8, "and a big field cannot pass it");
-  assert.equal(skinStrokes(5, config, 12), -3.8, "which at twelve groups is soon reached");
-});
-
-test("the same haul is worth more in a bigger field, until the ceiling", () => {
-  const config = DEFAULT_CONTESTS.skins!;
-  assert.ok(skinStrokes(4, config, 2) > skinStrokes(4, config, 4));
-  assert.ok(skinStrokes(4, config, 4) > skinStrokes(4, config, 8));
-});
-
-test("every total is a clean tenth, at every field size", () => {
-  const config = DEFAULT_CONTESTS.skins!;
-  for (let groups = 1; groups <= 12; groups++) {
-    for (let n = 0; n <= 18; n++) {
-      const v = skinStrokes(n, config, groups);
-      assert.equal(Math.round(v * 10) / 10, v, `${n} skins over ${groups} groups`);
-    }
+test("winning every skin is worth the whole pot, however many there were", () => {
+  for (const won of [1, 5, 12, 18]) {
+    assert.equal(Math.abs(skinStrokes(won, CFG, won) + 4) < 0.15, true,
+      won + " skins: " + skinStrokes(won, CFG, won));
   }
 });
 
 test("nought skins is nought, never a negative nought", () => {
-  const config = DEFAULT_CONTESTS.skins!;
-  for (const groups of [1, 2, 4, 8]) assert.equal(skinStrokes(0, config, groups), 0);
+  const s = skinStrokes(0, CFG, 11);
+  assert.equal(s, 0);
+  assert.equal(Object.is(s, -0), false);
+});
+
+test("every total is a clean tenth", () => {
+  for (let won = 1; won <= 18; won++) {
+    for (let mine = 0; mine <= won; mine++) {
+      const s = skinStrokes(mine, CFG, won);
+      assert.equal(Math.round(s * 10) / 10, s, mine + "/" + won);
+    }
+  }
+});
+
+/* ---- the format follows the field ---- */
+
+test("the field size decides the format, not a switch", () => {
+  assert.equal(skinsFormat(0, CFG), null);
+  assert.equal(skinsFormat(7, CFG), null);
+  assert.equal(skinsFormat(8, CFG), "cart");
+  assert.equal(skinsFormat(15, CFG), "cart");
+  assert.equal(skinsFormat(16, CFG), "team");
+});
+
+test("a field under eight plays no skins at all", () => {
+  const rows = board(field(6));
+  for (const r of rows) {
+    assert.equal(r.contests.skins!.live, false);
+    assert.equal(r.contests.skins!.strokes, 0);
+    assert.match(r.contests.skins!.detail, /no skins under 8/);
+  }
+});
+
+test("eight men is enough, and it is carts", () => {
+  const rows = board(field(8, (i, g) => { if (i === 0) g[0] = PAR[0] - 2; }));
+  assert.ok(rows.some((r) => r.contests.skins!.live), "skins ran");
+});
+
+test("sixteen men is teams, and a field with no teams pays nobody", () => {
+  // Everyone has a cart and nobody has a team. At sixteen the contest asks for
+  // teams, so it must say so rather than quietly falling back to carts.
+  const rows = board(field(16));
+  for (const r of rows) {
+    assert.equal(r.contests.skins!.live, false);
+    assert.match(r.contests.skins!.detail, /no teams entered/);
+  }
+});
+
+test("sixteen men in teams play team skins", () => {
+  const cards = field(16, (i, g) => { if (i < 2) g[0] = PAR[0] - 2; });
+  cards.forEach((c, i) => { (c as any).team = "T" + (Math.floor(i / 4) + 1); });
+  const rows = board(cards);
+  assert.ok(rows.some((r) => r.contests.skins!.live));
+  assert.match(rows.find((r) => r.contests.skins!.live)!.contests.skins!.detail, /for team T/);
 });
 
 /* ---- into the final ---- */
 
-test("skins are added to the final and shown as a contest", () => {
-  // Cart 1 wins every hole outright; cart 2 wins none.
-  const strong = card("Strong", 1, (g) => { for (let i = 0; i < 18; i++) g[i] = (g[i] as number) - 1; });
-  const weak = card("Weak", 2, (g) => { for (let i = 0; i < 18; i++) g[i] = (g[i] as number) + 1; });
-  const board = computeLeaderboard([strong, weak], ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
-  const by = Object.fromEntries(board.map((r) => [r.name, r]));
+test("skins is shown as a contest and moves the final by exactly its worth", () => {
+  // Cart 1 alone birdies the first, so it wins one hole and nobody else wins
+  // any: one skin won in the whole round, worth the entire pot.
+  const cards = field(8, (i, g) => { if (i === 0) g[0] = PAR[0] - 2; });
+  const rows = board(cards);
+  const winner = rows.find((r) => r.name === "P1")!;
+  const loser = rows.find((r) => r.name === "P5")!;
 
-  assert.equal(by["Strong"].skins, 18, "all eighteen");
-  // Two groups, so a skin is worth −0.13 and eighteen of them −2.3 — inside the
-  // ceiling, because in a small field each skin is worth little.
-  assert.equal(by["Strong"].contests.skins!.strokes, -2.3);
-  assert.equal(by["Strong"].contests.skins!.live, true);
-  assert.match(by["Strong"].contests.skins!.detail, /18 skins for group 1/);
+  assert.equal(winner.contests.skins!.live, true);
+  assert.match(winner.contests.skins!.detail, /skin.* for group 1/);
+  assert.equal(loser.contests.skins!.strokes, 0);
 
-  assert.equal(by["Weak"].skins, 0);
-  assert.equal(by["Weak"].contests.skins!.strokes, 0);
-
-  // The final carries it: net + every contest including skins.
-  for (const r of board) {
-    const earned = Object.values(r.contests).reduce((a, c) => a + c.strokes, 0);
-    assert.ok(Math.abs(r.strokesEarned - earned) < 1e-9, `${r.name} strokes add up`);
-    assert.equal(r.final, Math.round((r.net! + r.strokesEarned) * 100) / 100, `${r.name} final`);
-  }
+  // The base is ZERO, so the final IS the contest total — skins included.
+  const sum = (r: typeof winner) =>
+    Math.round(Object.values(r.contests).reduce((n, c) => n + (c as any).strokes, 0) * 10) / 10;
+  assert.equal(winner.final, sum(winner));
+  assert.equal(loser.final, sum(loser));
 });
 
-test("skins moves the final by exactly what it is worth", () => {
-  const one = card("One", 1, (g) => { g[0] = 3; });   // wins the 1st, nothing else
-  const two = card("Two", 2);
-  const withSkins = computeLeaderboard([one, two], ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
-  const without = computeLeaderboard([one, two], ABERDEEN_TEE_IV, { ...DEFAULT_CONTESTS, skins: null });
-
-  const a = withSkins.find((r) => r.name === "One")!;
-  const b = without.find((r) => r.name === "One")!;
-  assert.equal(a.contests.skins!.strokes, skinStrokes(a.skins!, DEFAULT_CONTESTS.skins!, 2));
-  assert.equal(Math.round((b.final! - a.final!) * 10) / 10, -a.contests.skins!.strokes,
-    "the difference is the skins and nothing else");
+test("both men in a winning cart take the full amount, not half each", () => {
+  const cards = field(8, (i, g) => { if (i === 0) g[0] = PAR[0] - 2; });
+  const rows = board(cards);
+  const a = rows.find((r) => r.name === "P1")!.contests.skins!.strokes;
+  const b = rows.find((r) => r.name === "P2")!.contests.skins!.strokes;
+  assert.equal(a, b);
+  assert.ok(a < 0, "and it is worth something");
 });
 
-/* ---- a real field, at two, four and six carts ---- */
-
-/**
- * Build a field of `carts` carts, two men each, where cart 1 wins every hole
- * outright and the rest win nothing — the most lopsided round there is, so the
- * ceiling can be read straight off the winner where it bites at all.
- */
-function field(carts: number): PlayerCard[] {
-  const players: PlayerCard[] = [];
-  for (let c = 1; c <= carts; c++) {
-    for (let seat = 0; seat < 2; seat++) {
-      players.push(card(`Cart ${c} seat ${seat}`, c, (g) => {
-        // Cart 1 goes round in one under par a hole; everyone else in one over.
-        for (let i = 0; i < 18; i++) g[i] = (g[i] as number) + (c === 1 ? -1 : 1);
-      }));
-    }
-  }
-  return players;
-}
-
-// Two groups is inside the ceiling; four and six are held at it. A rout of every
-// hole is the only thing that reaches it over four groups.
-for (const [carts, eighteen, capped] of
-     [[2, -2.3, false], [4, -3.8, true], [6, -3.8, true]] as const) {
-  test(`a ${carts}-group rout pays ${eighteen}${capped ? ", held at the ceiling" : ""}`, () => {
-    const board = computeLeaderboard(field(carts), ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
-    const winners = board.filter((r) => r.skins === 18);
-    const losers = board.filter((r) => r.skins === 0);
-
-    assert.equal(winners.length, 2, "both men in the winning cart");
-    assert.equal(losers.length, (carts - 1) * 2, "everyone else");
-
-    for (const r of winners) {
-      assert.equal(r.contests.skins!.strokes, eighteen);
-      assert.match(r.contests.skins!.detail, /18 skins for group 1/);
-    }
-    for (const r of losers) assert.equal(r.contests.skins!.strokes, 0);
-    // Eighteen times what one skin is worth here, unless the ceiling took over.
-    const uncapped = Math.round(18 * skinValue(DEFAULT_CONTESTS.skins!, carts) * 10) / 10;
-    if (capped) assert.ok(uncapped < eighteen, "the ceiling is what is being read");
-    else assert.equal(eighteen, uncapped);
-  });
-}
-
-test("a two-group field is decided rather than levelled", () => {
-  // Cart 1 takes the odd holes, cart 2 the even ones, so the skins split 9–9...
-  const even = [
-    card("One A", 1, (g) => { for (let i = 0; i < 18; i += 2) g[i] = (g[i] as number) - 1; }),
-    card("Two A", 2, (g) => { for (let i = 1; i < 18; i += 2) g[i] = (g[i] as number) - 1; }),
-  ];
-  const level = computeLeaderboard(even, ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
-  assert.deepEqual(level.map((r) => r.skins).sort(), [9, 9], "nine skins each");
-  // Nine of eighteen over two groups is an even share, so each is paid the
-  // 1.2 the fair share is worth — the property the value is built to have.
-  assert.ok(level.every((r) => r.contests.skins!.strokes === -1.2), "and both paid the same");
-
-  // ...but tilt it and the contest separates them, which a fixed −1.5 could not.
-  const tilted = [
-    card("One B", 1, (g) => { for (let i = 0; i < 18; i += 2) g[i] = (g[i] as number) - 2; }),
-    card("Two B", 2, (g) => { for (let i = 5; i < 18; i += 2) g[i] = (g[i] as number) - 1; }),
-  ];
-  const board = computeLeaderboard(tilted, ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
-  const strokes = board.map((r) => r.contests.skins!.strokes);
-  assert.notEqual(strokes[0], strokes[1], "the two carts are paid differently");
-});
-
-/* ---- the edges ---- */
+/* ---- who is in it ---- */
 
 test("a player with no cart scores zero from skins rather than breaking", () => {
-  const carted = card("Carted", 1, (g) => { g[0] = 3; });
-  const stray = card("No cart", null);
-  const other = card("Other", 2);
-  const board = computeLeaderboard([carted, stray, other], ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
-  const by = Object.fromEntries(board.map((r) => [r.name, r]));
-
-  assert.equal(by["No cart"].contests.skins!.strokes, 0);
-  assert.equal(by["No cart"].contests.skins!.live, false, "shown as not competing");
-  assert.equal(by["No cart"].contests.skins!.detail, "no group");
-  assert.ok(by["No cart"].final != null, "and the round still scores");
-  // The carts that did enter are unaffected by him.
-  assert.equal(by["Carted"].skins, 1);
+  const cards = field(8);
+  (cards[7] as any).cart = undefined;
+  const rows = board(cards);
+  const out = rows.find((r) => r.name === "P8")!;
+  assert.equal(out.contests.skins!.strokes, 0);
+  assert.equal(out.contests.skins!.live, false);
+  assert.match(out.contests.skins!.detail, /no group/);
 });
 
-// One cart is nobody to play against: uncontested it wins all eighteen holes by
-// default and would be paid the cap for going round on its own.
 test("one cart out means no skins at all", () => {
-  const a = card("A", 1, (g) => { g[0] = 3; });
-  const b = card("B", 1);
-  const board = computeLeaderboard([a, b], ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
-
-  for (const r of board) {
-    assert.equal(r.contests.skins!.strokes, 0, `${r.name} is paid nothing`);
-    assert.equal(r.contests.skins!.live, false, "and it is shown as not running");
-    assert.equal(r.contests.skins!.detail, "only one group out");
-    assert.equal(r.skins, undefined, "no skin count to report");
+  // Uncontested it would win every hole by default for going round on its own.
+  const cards = field(8).map((c) => { (c as any).cart = 1; return c; });
+  const rows = board(cards);
+  for (const r of rows) {
+    assert.equal(r.contests.skins!.live, false);
+    assert.match(r.contests.skins!.detail, /only one group out/);
   }
-  // The rest of the round is untouched.
-  assert.ok(board.every((r) => r.final != null));
 });
 
-test("a second cart is all it takes for skins to run", () => {
-  const a = card("A", 1, (g) => { g[0] = 3; });
-  const alone = computeLeaderboard([a, card("B", 1)], ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
-  const paired = computeLeaderboard([a, card("B", 2)], ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
-
-  assert.equal(alone.find((r) => r.name === "A")!.contests.skins!.live, false);
-  assert.equal(paired.find((r) => r.name === "A")!.contests.skins!.live, true);
-  assert.equal(paired.find((r) => r.name === "A")!.skins, 1, "and the hole is won");
-});
-
-test("one cart among uncarted players still pays nobody", () => {
-  // The trap: carted men would take the cap while the rest took nothing.
-  const board = computeLeaderboard(
-    [card("Carted", 1, (g) => { g[0] = 3; }), card("Loose", null)],
-    ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
-  const by = Object.fromEntries(board.map((r) => [r.name, r]));
-  assert.equal(by["Carted"].contests.skins!.strokes, 0, "no free cap for the only cart");
-  assert.equal(by["Carted"].contests.skins!.detail, "only one group out");
-  assert.equal(by["Loose"].contests.skins!.strokes, 0);
-  assert.equal(by["Loose"].contests.skins!.detail, "no group");
-});
-
-test("nobody in a cart at all leaves the round scoring as before", () => {
-  const a = card("A", null), b = card("B", null);
-  const board = computeLeaderboard([a, b], ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
-  for (const r of board) {
-    assert.equal(r.contests.skins, undefined, "no skins line at all");
-    assert.ok(r.final != null);
-  }
+test("a man who did not finish takes no skins, even from a cart that won them", () => {
+  // His card would otherwise win holes for his group and then abandon it.
+  const cards = field(8, (i, g) => { if (i === 0) g[0] = PAR[0] - 2; });
+  (cards[1] as any).gross = PAR.map((p, h) => (h < 9 ? p : null));
+  const rows = board(cards);
+  const short = rows.find((r) => r.name === "P2")!;
+  assert.equal(short.contests.skins!.strokes, 0);
+  assert.match(short.contests.skins!.detail, /no full round/);
+  assert.equal(short.final, null, "and he is not scored at all");
 });
 
 test("skins switched off scores nothing and reads no cart", () => {
-  const one = card("One", 1, (g) => { g[0] = 3; });
-  const two = card("Two", 2);
-  const board = computeLeaderboard([one, two], ABERDEEN_TEE_IV, { ...DEFAULT_CONTESTS, skins: null });
-  for (const r of board) assert.equal(r.contests.skins, undefined);
+  const rows = computeLeaderboard(field(8), ABERDEEN_TEE_IV,
+    { ...DEFAULT_CONTESTS, skins: null } as any);
+  for (const r of rows) assert.equal(r.contests.skins, undefined);
 });
 
-test("skins still carrying after the 18th simply vanish", () => {
-  // Two identical carts: every hole ties, so the pot carries all the way out.
-  const a = card("A", 1), b = card("B", 2);
-  const table = cartSkins([{ card: a, cart: 1 }, { card: b, cart: 2 }], ABERDEEN_TEE_IV);
-  assert.equal(table.skins.get("1"), 0);
-  assert.equal(table.skins.get("2"), 0);
-  assert.equal(table.carried, 18, "all eighteen carried off the end");
+/* ---- the table itself ---- */
 
-  // And nobody is paid for them.
-  const board = computeLeaderboard([a, b], ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
-  for (const r of board) assert.equal(r.contests.skins!.strokes, 0);
-});
-
-test("a one-man cart is legal and needs no blind partner", () => {
-  const solo = card("Solo", 1, (g) => { g[0] = 3; });
-  const pairA = card("Pair A", 2);
-  const pairB = card("Pair B", 2);
-  const board = computeLeaderboard([solo, pairA, pairB], ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
-  const by = Object.fromEntries(board.map((r) => [r.name, r]));
-  assert.equal(by["Solo"].skins, 1, "the one-man cart competes and wins its hole");
-  // Both men in a cart are paid the cart's skins, not a share of them.
-  assert.equal(by["Pair A"].skins, by["Pair B"].skins);
+test("the table reports what it settled, for the tab to print", () => {
+  const cards = field(8, (i, g) => { if (i === 0) g[0] = PAR[0] - 2; });
+  const t = cartSkins(cards.map((c) => ({ card: c, cart: (c as any).cart })), ABERDEEN_TEE_IV);
+  let won = 0; t.skins.forEach((n) => { won += n; });
+  const tied = t.holes.filter((h) => h.wonBy == null).length;
+  assert.equal(won + tied, 18, "every hole is won or tied, and none carries");
+  assert.equal(t.carried, 0);
 });

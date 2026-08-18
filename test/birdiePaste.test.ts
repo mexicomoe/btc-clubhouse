@@ -1,7 +1,7 @@
 /**
  * Watch the Birdie picks, sent in by text.
  *
- *     Ridgeway, Ken — 8, 2, 4, 13, 14, 16
+ *     Ridgeway, Ken — 2, 14, 3, 8, 7, 16
  *
  * Six bare numbers, always in slot order: front par 3, front par 4, front par 5,
  * back par 3, back par 4, back par 5. There is nothing in the line to say which
@@ -33,8 +33,19 @@ const read = (text: string, names: string[] = FIELD) =>
 /* ---- a good block ---- */
 
 test("a pasted block of eight players is all eight matched", () => {
-  const block = FIELD.map((n, i) =>
-    `${n} — ${PICK_SLOTS.map((s) => LEGAL[s.key][i % LEGAL[s.key].length]).join(", ")}`).join("\n");
+  // Stepped so no two slots land on the same hole. The par 3 slots are handed
+  // the IDENTICAL three holes and so are the par 5s, so walking both by the
+  // same index nominates one hole twice and the line is refused as a duplicate.
+  const block = FIELD.map((n, i) => {
+    const taken: number[] = [];
+    const six = PICK_SLOTS.map((s) => {
+      const free = LEGAL[s.key].filter((h) => !taken.includes(h));
+      const hole = free[i % free.length];
+      taken.push(hole);
+      return hole;
+    });
+    return `${n} — ${six.join(", ")}`;
+  }).join("\n");
   const { rows, ignored } = read(block);
 
   assert.equal(rows.length, 8);
@@ -43,19 +54,19 @@ test("a pasted block of eight players is all eight matched", () => {
     "nothing wrong with any of them");
   assert.deepEqual(rows.map((r) => r.index), [0, 1, 2, 3, 4, 5, 6, 7],
     "each matched to his own man, in roster order");
-  assert.deepEqual(rows[0].picks, { f3: 3, f4: 1, f5: 4, b3: 13, b4: 10, b5: 16 });
+  assert.deepEqual(rows[0].picks, { p4f: 1, p4b: 10, p3a: 3, p3b: 8, p5a: 7, p5b: 16 });
 });
 
 test("the six numbers land in slot order", () => {
-  const { rows } = read("Abe Whitfield — 8, 2, 4, 13, 14, 16");
-  assert.deepEqual(rows[0].picks, { f3: 8, f4: 2, f5: 4, b3: 13, b4: 14, b5: 16 });
+  const { rows } = read("Abe Whitfield — 2, 14, 3, 8, 7, 16");
+  assert.deepEqual(rows[0].picks, { p4f: 2, p4b: 14, p3a: 3, p3b: 8, p5a: 7, p5b: 16 });
 });
 
 /* ---- how the line may be written ---- */
 
 test("em dash, en dash, hyphen, colon and tab all separate the name", () => {
   for (const sep of [" — ", " – ", " - ", ": ", "\t"]) {
-    const { rows } = read("Abe Whitfield" + sep + "8, 2, 4, 13, 14, 16");
+    const { rows } = read("Abe Whitfield" + sep + "2, 14, 3, 8, 7, 16");
     assert.deepEqual(rows[0].problems, [], JSON.stringify(sep));
     assert.equal(rows[0].index, 0, JSON.stringify(sep));
   }
@@ -64,29 +75,29 @@ test("em dash, en dash, hyphen, colon and tab all separate the name", () => {
 // A phone turns a typed hyphen into an en dash on its own, but it does not touch
 // one inside a word — so a hyphenated name must not be cut in half.
 test("a hyphen inside a name is not a separator", () => {
-  const { rows } = read("Jean-Paul Marchetti — 8, 2, 4, 13, 14, 16", ["Jean-Paul Marchetti"]);
+  const { rows } = read("Jean-Paul Marchetti — 2, 14, 3, 8, 7, 16", ["Jean-Paul Marchetti"]);
   assert.equal(rows[0].name, "Jean-Paul Marchetti");
   assert.deepEqual(rows[0].problems, []);
 });
 
 test("no separator at all still reads — the first number is the boundary", () => {
-  const { rows } = read("Abe Whitfield 8 2 4 13 14 16");
+  const { rows } = read("Abe Whitfield 2 14 3 8 7 16");
   assert.equal(rows[0].index, 0);
-  assert.deepEqual(rows[0].picks, { f3: 8, f4: 2, f5: 4, b3: 13, b4: 14, b5: 16 });
+  assert.deepEqual(rows[0].picks, { p4f: 2, p4b: 14, p3a: 3, p3b: 8, p5a: 7, p5b: 16 });
 });
 
 test("spaces, commas or both between the numbers", () => {
-  for (const line of ["Abe Whitfield — 8,2,4,13,14,16",
-                      "Abe Whitfield — 8 2 4 13 14 16",
-                      "Abe Whitfield —  8 , 2,  4 , 13 ,14, 16 "]) {
+  for (const line of ["Abe Whitfield — 2,14,3,8,7,16",
+                      "Abe Whitfield — 2 14 3 8 7 16",
+                      "Abe Whitfield —  2 , 14,  3 , 8 ,7, 16 "]) {
     const { rows } = read(line);
-    assert.deepEqual(rows[0].picks, { f3: 8, f4: 2, f5: 4, b3: 13, b4: 14, b5: 16 }, line);
+    assert.deepEqual(rows[0].picks, { p4f: 2, p4b: 14, p3a: 3, p3b: 8, p5a: 7, p5b: 16 }, line);
   }
 });
 
 test("blank lines and a heading row are ignored, not refused", () => {
   const { rows, ignored } = read(
-    "Name — picks\n\nAbe Whitfield — 8, 2, 4, 13, 14, 16\n   \n");
+    "Name — picks\n\nAbe Whitfield — 2, 14, 3, 8, 7, 16\n   \n");
   assert.equal(rows.length, 1, "one real line");
   assert.equal(ignored, 4, "the heading, and three empty ones");
 });
@@ -94,27 +105,27 @@ test("blank lines and a heading row are ignored, not refused", () => {
 /* ---- names ---- */
 
 test("a misspelled name is flagged, not guessed", () => {
-  const { rows } = read("Abe Whitfeld — 8, 2, 4, 13, 14, 16");
+  const { rows } = read("Abe Whitfeld — 2, 14, 3, 8, 7, 16");
   assert.equal(rows[0].index, -1, "nobody is picked");
   assert.deepEqual(rows[0].problems, ["no player of that name on the list"]);
   assert.equal(rows[0].name, "Abe Whitfeld", "and the line is shown back as typed");
 });
 
 test("a name nobody sent in is flagged too", () => {
-  const { rows } = read("Ned Copeland — 8, 2, 4, 13, 14, 16");
+  const { rows } = read("Ned Copeland — 2, 14, 3, 8, 7, 16");
   assert.equal(rows[0].index, -1);
   assert.match(rows[0].problems[0], /no player of that name/);
 });
 
 test("Last, First is turned round and matched", () => {
-  const { rows } = read("Whitfield, Abe — 8, 2, 4, 13, 14, 16");
+  const { rows } = read("Whitfield, Abe — 2, 14, 3, 8, 7, 16");
   assert.equal(rows[0].index, 0);
   assert.equal(rows[0].how, "reversed");
   assert.deepEqual(rows[0].problems, []);
 });
 
 test("first name and last initial is enough, when written that way", () => {
-  const { rows } = read("Abe W. — 8, 2, 4, 13, 14, 16");
+  const { rows } = read("Abe W. — 2, 14, 3, 8, 7, 16");
   assert.equal(rows[0].index, 0);
   assert.equal(rows[0].how, "initial");
 });
@@ -124,14 +135,14 @@ test("first name and last initial is enough, when written that way", () => {
 // typo into a silent write to the wrong man's card.
 test("a full surname spelled wrong is not rescued by its initial", () => {
   for (const wrong of ["Abe Whitfeld", "Abe Witfield", "Abe Whitfields"]) {
-    const { rows } = read(wrong + " — 8, 2, 4, 13, 14, 16");
+    const { rows } = read(wrong + " — 2, 14, 3, 8, 7, 16");
     assert.equal(rows[0].index, -1, wrong);
     assert.deepEqual(rows[0].problems, ["no player of that name on the list"], wrong);
   }
 });
 
 test("a name two men could answer to is refused, not guessed between", () => {
-  const { rows } = read("Abe W — 8, 2, 4, 13, 14, 16",
+  const { rows } = read("Abe W — 2, 14, 3, 8, 7, 16",
     ["Abe Whitfield", "Abe Wingate"]);
   assert.equal(rows[0].index, -1);
   assert.match(rows[0].problems[0], /more than one player could be meant/);
@@ -149,15 +160,19 @@ test("a bad name and bad picks are both reported", () => {
 /* ---- picks that are not allowed ---- */
 
 test("a pick outside the legal table is named", () => {
-  const { rows } = read("Abe Whitfield — 8, 5, 4, 13, 14, 16");
+  const { rows } = read("Abe Whitfield — 5, 14, 3, 8, 7, 16");
   assert.deepEqual(rows[0].problems, ["hole 5 is not a legal front par 4 — 1, 2, 9"]);
 });
 
 test("every barred hole is refused, and says what was allowed", () => {
+  // All six barred holes, each in a slot its par would otherwise fit.
   for (const [line, want] of [
-    ["Abe Whitfield — 8, 6, 4, 13, 14, 16", /hole 6 is not a legal front par 4 — 1, 2, 9/],
-    ["Abe Whitfield — 8, 2, 4, 13, 11, 16", /hole 11 is not a legal back par 4 — 10, 14, 15/],
-    ["Abe Whitfield — 8, 2, 4, 13, 12, 16", /hole 12 is not a legal back par 4 — 10, 14, 15/],
+    ["Abe Whitfield — 6, 14, 3, 8, 7, 16", /hole 6 is not a legal front par 4 — 1, 2, 9/],
+    ["Abe Whitfield — 5, 14, 3, 8, 7, 16", /hole 5 is not a legal front par 4 — 1, 2, 9/],
+    ["Abe Whitfield — 2, 11, 3, 8, 7, 16", /hole 11 is not a legal back par 4 — 10, 14, 15/],
+    ["Abe Whitfield — 2, 12, 3, 8, 7, 16", /hole 12 is not a legal back par 4 — 10, 14, 15/],
+    ["Abe Whitfield — 2, 14, 13, 8, 7, 16", /hole 13 is not a legal first par 3 — 3, 8, 17/],
+    ["Abe Whitfield — 2, 14, 3, 8, 4, 16", /hole 4 is not a legal first par 5 — 7, 16, 18/],
   ] as [string, RegExp][]) {
     const { rows } = read(line);
     assert.match(rows[0].problems[0], want, line);
@@ -165,25 +180,36 @@ test("every barred hole is refused, and says what was allowed", () => {
 });
 
 test("a hole in the wrong slot is refused even though it is legal elsewhere", () => {
-  // Hole 13 is a legal BACK par 3, but the first number is the front one.
-  const { rows } = read("Abe Whitfield — 13, 2, 4, 17, 14, 16");
-  assert.match(rows[0].problems[0], /hole 13 is not a legal front par 3 — 3, 8/);
+  // Hole 10 is a legal BACK par 4, but the first number is the front one.
+  const { rows } = read("Abe Whitfield — 10, 14, 3, 8, 7, 16");
+  assert.match(rows[0].problems[0], /hole 10 is not a legal front par 4 — 1, 2, 9/);
 });
 
-test("two picks in the same slot are rejected", () => {
-  // Two numbers for the front par 3, which pushes everything along by one.
-  const { rows } = read("Abe Whitfield — 3, 8, 2, 4, 13, 14, 16");
+test("a par 5 in a par 3 slot is refused", () => {
+  const { rows } = read("Abe Whitfield — 2, 14, 7, 8, 16, 18");
+  assert.match(rows[0].problems[0], /hole 7 is not a legal first par 3 — 3, 8, 17/);
+});
+
+test("a seventh number is rejected rather than half-applied", () => {
+  const { rows } = read("Abe Whitfield — 2, 14, 3, 8, 7, 16, 18");
   assert.deepEqual(rows[0].problems, ["expected 6 numbers, found 7"]);
   assert.deepEqual(rows[0].picks, {}, "and nothing is taken from the line");
 });
 
-// Every hole belongs to exactly one slot, so the same hole twice is ALSO illegal
-// for one of them. It is reported as the duplicate it is, because that is what
-// the man typed.
+// This USED to be belt and braces: every hole fell in exactly one slot, so the
+// same hole twice was ALSO illegal for one of them and either check caught it.
+// The two par 3 slots are handed the identical three holes now, so hole 8 is
+// perfectly legal in both — and this check is the ONLY thing standing between a
+// man and being paid twice for one birdie.
 test("the same hole nominated twice is called a duplicate", () => {
-  const { rows } = read("Abe Whitfield — 8, 8, 4, 13, 14, 16");
+  const { rows } = read("Abe Whitfield — 2, 14, 8, 8, 7, 16");
   assert.deepEqual(rows[0].problems,
-    ["hole 8 is nominated twice, as front par 3 and front par 4"]);
+    ["hole 8 is nominated twice, as first par 3 and second par 3"]);
+});
+
+test("a duplicate across two par 5 slots is caught the same way", () => {
+  const { rows } = read("Abe Whitfield — 2, 14, 3, 8, 16, 16");
+  assert.match(rows[0].problems[0], /hole 16 is nominated twice/);
 });
 
 test("too few numbers is refused rather than half-applied", () => {
@@ -202,10 +228,10 @@ test("a hole number off the course is refused", () => {
 test("the good lines survive alongside the bad ones", () => {
   const { rows, ignored } = read([
     "Picks for Friday",
-    "Abe Whitfield — 8, 2, 4, 13, 14, 16",
-    "Whitfeld, Ben — 3, 1, 7, 17, 10, 18",
-    "Cy Ashford — 3, 9, 4, 13, 15",
-    "Dan Pemberton: 8 1 7 17 10 18",
+    "Abe Whitfield — 2, 14, 3, 8, 7, 16",
+    "Whitfeld, Ben — 1, 10, 3, 8, 7, 18",
+    "Cy Ashford — 9, 15, 3, 8, 7",
+    "Dan Pemberton: 1 10 8 17 7 18",
     "",
   ].join("\n"));
 
