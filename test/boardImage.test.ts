@@ -125,7 +125,13 @@ test("an off-default note rides on the picture too", () => {
 });
 
 test("the footer says what a final is", () => {
-  assert.ok(texts(plan()).some((x) => /Final = net score less/.test(x)));
+  // Joined, because the footer WRAPS — it is prose at the 18-point floor and it
+  // does not fit the picture's width on one line. Asserting against a single
+  // draw op only passed while the sentence happened to be short enough, which
+  // is a test that breaks on rewording rather than on meaning.
+  const joined = texts(plan()).join(" ");
+  assert.match(joined, /Everyone starts at 0/);
+  assert.match(joined, /Lowest wins/);
 });
 
 /* ---- legibility, which is the whole point of the product ---- */

@@ -1,8 +1,19 @@
 /**
  * Cart Skins milestone: the 19 December field split into carts
- * 1, 1, 2, 2, 3, 3, 4, 4 in the order Ike, Eli, Cy, Ben, Hal, Abe, Gus, Dan
- * must produce skins 4, 5, 2, 7 — eighteen in total, all accounted for.
+ * 1, 1, 2, 2, 3, 3, 4, 4 in the order Ike, Eli, Cy, Ben, Hal, Abe, Gus, Dan.
  *
+ * RE-BASELINED on 15 August. Under the old group-AVERAGE rule these same cards
+ * produced 4, 5, 2, 7 and all eighteen skins were won. Under best two balls
+ * they produce 3, 4, 1, 4 and only twelve are won — six holes are tied and,
+ * with no carryover, those six are simply not won by anybody.
+ *
+ * That is not a regression, it is the change working. Averaging fewer balls
+ * produces more extreme scores, which is exactly why it handed small groups
+ * more skins than large ones and why it almost never tied. Best two balls means
+ * every group puts up the same number of scores, so groups land level far more
+ * often — and a level hole is a hole nobody won.
+ *
+ * The figures below were recomputed from the same real cards, not guessed.
  * Gross hole-by-hole is from `Hole by Hole Excel Export -- Spreadsheet Composer.xlsx`.
  */
 
@@ -11,7 +22,8 @@ import assert from "node:assert/strict";
 
 import { ABERDEEN_TEE_IV } from "../src/courseConfig.ts";
 import type { PlayerCard } from "../src/scoring.ts";
-import { cartSkins, type CartEntry } from "../src/skins.ts";
+import { cartSkins, skinValue, type CartEntry } from "../src/skins.ts";
+import { DEFAULT_CONTESTS } from "../src/courseConfig.ts";
 
 function card(name: string, handicapIndex: number, gross: number[]): PlayerCard {
   return { name, handicapIndex, gross }; // skins read only net-per-hole; no picks needed
@@ -29,25 +41,52 @@ const FIELD: CartEntry[] = [
   { cart: 4, card: card("Dan Pemberton",   26.4, [6,5,3,9,5,6,6,2,4,7,5,3,5,4,7,7,4,7]) },
 ];
 
-test("Cart Skins reproduces 4, 5, 2, 7", () => {
-  const { skins, carried } = cartSkins(FIELD, ABERDEEN_TEE_IV);
+test("Cart Skins on best two balls reproduces 3, 4, 1, 4", () => {
+  const { skins, holes, carried } = cartSkins(FIELD, ABERDEEN_TEE_IV);
 
-  assert.equal(skins.get("1"), 4, "Cart 1");
-  assert.equal(skins.get("2"), 5, "Cart 2");
-  assert.equal(skins.get("3"), 2, "Cart 3");
-  assert.equal(skins.get("4"), 7, "Cart 4");
+  assert.equal(skins.get("1"), 3, "Cart 1");
+  assert.equal(skins.get("2"), 4, "Cart 2");
+  assert.equal(skins.get("3"), 1, "Cart 3");
+  assert.equal(skins.get("4"), 4, "Cart 4");
 
-  const total = [...skins.values()].reduce((a, b) => a + b, 0);
-  assert.equal(total + carried, 18, "all eighteen skins accounted for");
-  assert.equal(carried, 0, "no skin left carrying at the end");
+  const won = [...skins.values()].reduce((a, b) => a + b, 0);
+  assert.equal(won, 12, "twelve won");
+  assert.equal(holes.filter((h) => h.wonBy == null).length, 6, "and six tied");
+  assert.equal(won + holes.filter((h) => h.wonBy == null).length, 18);
 });
 
-test("a one-man cart is legal and competes on its own average", () => {
-  // Drop Dan: cart 4 becomes Gus alone. It must still score every hole and the
-  // eighteen skins must still all be accounted for.
+test("a tied hole is not won and nothing carries", () => {
+  const { holes, carried } = cartSkins(FIELD, ABERDEEN_TEE_IV);
+  assert.equal(carried, 0, "there is no such thing as a carry any more");
+  assert.deepEqual(holes.filter((h) => h.wonBy == null).map((h) => h.hole),
+    [1, 8, 10, 11, 13, 16]);
+});
+
+test("the pot is worth the same however many skins fall", () => {
+  // Twelve skins here, so a skin is 4.0 ÷ 12. A leaner round makes each worth
+  // MORE, which is the point of a fixed pot.
+  const { skins } = cartSkins(FIELD, ABERDEEN_TEE_IV);
+  let won = 0; skins.forEach((n) => { won += n; });
+  assert.equal(skinValue(DEFAULT_CONTESTS.skins!, won), -0.33);
+});
+
+test("a one-man cart is legal and counts its ball twice", () => {
+  // Drop Dan: cart 4 becomes Gus alone. Every hole is still scored and every
+  // hole is still either won or tied — but the total won is NOT eighteen, and
+  // asserting that it was is what this test used to get wrong. A tied hole is
+  // won by nobody and nothing carries, so won + tied = 18 is the real invariant.
   const solo = FIELD.filter((e) => e.card.name !== "Dan Pemberton");
-  const { skins, carried } = cartSkins(solo, ABERDEEN_TEE_IV);
-  const total = [...skins.values()].reduce((a, b) => a + b, 0);
-  assert.equal(total + carried, 18, "still eighteen skins");
+  const { skins, holes, carried } = cartSkins(solo, ABERDEEN_TEE_IV);
+  const won = [...skins.values()].reduce((a, b) => a + b, 0);
+  assert.equal(won + holes.filter((h) => h.wonBy == null).length, 18);
+  assert.equal(carried, 0);
   assert.ok(skins.has("4"), "the one-man cart still competes");
+});
+
+test("counting the lone ball twice is what keeps him competitive", () => {
+  // Left with one ball against everyone else's two he took 0.22x a fair share —
+  // he was not playing the same contest. Doubling it puts him back at 1.06x.
+  const solo = FIELD.filter((e) => e.card.name !== "Dan Pemberton");
+  const { skins } = cartSkins(solo, ABERDEEN_TEE_IV);
+  assert.ok((skins.get("4") || 0) > 0, "Gus alone still wins holes");
 });
