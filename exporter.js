@@ -184,7 +184,7 @@
       date: e.date || "",
       format: e.format || "",
       allowancePercent: e.allowancePercent,
-      skinsOn: e.skinsOn !== false,
+      skinsOn: !(e.contests && "skins" in e.contests && e.contests.skins == null),
       players: (e.players || []).map((p) => [
         p.id, p.name, p.ghin, p.index, p.tee, p.gender, p.cart, p.flight,
         p.p4f, p.p4b, p.p3a, p.p3b, p.p5a, p.p5b, p.hitList,
@@ -325,7 +325,15 @@
       e.date || "",
       e.format || "",
       typeof e.allowancePercent === "number" ? e.allowancePercent : 100,
-      e.skinsOn === false ? 0 : 1,
+      // Skins is switched under the rules now, like every other contest. The
+      // flag is still WRITTEN so a phone on the older app reads the round the
+      // way it was meant, and still READ so a code from that app arrives right.
+      //
+      // Either source counts: an event object still in the old shape — one
+      // handed straight in rather than through the app's own migration — must
+      // not quietly lose the fact that Skins was switched off.
+      ((e.contests && "skins" in e.contests && e.contests.skins == null) ||
+       e.skinsOn === false) ? 0 : 1,
       players,
       // THE RULES TRAVEL WITH THE ROUND. Appended past the end, so a code
       // written by an older app still reads and simply carries no rules — which
@@ -368,8 +376,11 @@
       date: typeof payload[2] === "string" ? payload[2] : "",
       format: typeof payload[3] === "string" ? payload[3] : "",
       allowancePercent: typeof payload[4] === "number" ? payload[4] : 100,
-      skinsOn: payload[5] !== 0,
-      contests: payload[7] && typeof payload[7] === "object" ? payload[7] : null,
+      contests: (() => {
+        const c = payload[7] && typeof payload[7] === "object" ? Object.assign({}, payload[7]) : null;
+        if (payload[5] === 0 && !(c && "skins" in c)) return Object.assign({}, c || {}, { skins: null });
+        return c;
+      })(),
       players, scores, handicaps,
     };
   }

@@ -297,7 +297,7 @@ test("anything the file carries counts as a change", () => {
     { ...settled, date: "2026-08-09" },
     { ...settled, format: "Scramble" },
     { ...settled, allowancePercent: 85 },
-    { ...settled, skinsOn: false },
+    { ...settled, contests: { skins: null } },
     { ...settled, handicaps: { p1: 28 } },
     { ...settled, players: [{ ...PLAYERS[0], ghin: "9999999" }, PLAYERS[1]] },
     { ...settled, players: [{ ...PLAYERS[0], index: 20.1 }, PLAYERS[1]] },
@@ -415,7 +415,10 @@ test("what comes back is what went in", () => {
   assert.equal(e.date, "2026-08-07");
   assert.equal(e.format, "Individual net");
   assert.equal(e.allowancePercent, 85, "the allowance travels");
-  assert.equal(e.skinsOn, false, "and the skins switch");
+  // Skins is switched under the rules now, with every other contest, rather
+  // than by a flag of its own. A round that had it OFF arrives with the rule
+  // saying so — which is the same fact, in the one place it now lives.
+  assert.equal(e.contests!.skins, null, "and Skins is still off");
   // The packed form always writes a GHIN field, so a player who had none comes
   // back with an empty one rather than none at all. Everything else is his.
   assert.deepEqual(e.players, PLAYERS.map((p) => ({ ghin: "", ...p })),

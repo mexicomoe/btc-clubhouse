@@ -195,7 +195,7 @@ function blankEvent(name, date){
     date: date || todayISO(),
     format: DEFAULT_FORMAT,
     nextId: 1, players: [], scores: {}, handicaps: {},
-    skinsOn: true, autoPicks: false, allowancePercent: 100, flight: "", lastTee: "IV", tab: "setup",
+    autoPicks: false, allowancePercent: 100, flight: "", lastTee: "IV", tab: "setup",
     // Null means the defaults. A diff, never a copy — see mergeContests.
     contests: null,
     exportedAt: null, exportedSignature: null,
@@ -251,8 +251,14 @@ function normaliseEvent(e, fallbackName){
     players: (Array.isArray(e.players) ? e.players : []).map(normalisePlayer),
     scores: e.scores || {},
     handicaps: e.handicaps || {},
-    contests: e.contests && typeof e.contests === "object" ? e.contests : null,
-    skinsOn: e.skinsOn !== false,            // on unless it was switched off
+    // A round stored while Skins had its own flag: carry the OFF across into
+    // the rules, where the switch lives now. On is the default and needs
+    // nothing said. The old flag is not written again.
+    contests: (() => {
+      const c = e.contests && typeof e.contests === "object" ? Object.assign({}, e.contests) : null;
+      if(e.skinsOn === false && !(c && "skins" in c)) return Object.assign({}, c || {}, { skins: null });
+      return c;
+    })(),
     // Off unless it was deliberately switched on — a drawn pick is not a
     // chosen one, so it never happens by default.
     autoPicks: e.autoPicks === true,
@@ -329,7 +335,7 @@ function openEvent(id){
   save();
   buildTabs();                      // the Skins tab follows this event's switch
   renderBoard(); renderSetup(); renderImport();
-  if(state.skinsOn) renderSkins();
+  if(skinsOn()) renderSkins();
   show("setup");
 }
 
@@ -594,9 +600,19 @@ function blankPlayer(){
  * per-round decision the organiser makes on the day, not a rule change.
  */
 function contestConfig(){
-  const merged = E.mergeContests(E.DEFAULT_CONTESTS, state.contests || null);
-  return state.skinsOn ? merged : Object.assign({}, merged, { skins: null });
+  return E.mergeContests(E.DEFAULT_CONTESTS, state.contests || null);
 }
+
+/**
+ * Is Skins in this round at all?
+ *
+ * DERIVED, not stored. It used to be its own flag with its own switch on Setup,
+ * which meant one contest had two switches in two places — and at seven in the
+ * morning that is exactly the sort of thing that gets turned off in one place
+ * and looked for in the other. Every contest is switched in Settings now, and
+ * Skins is simply one of them.
+ */
+function skinsOn(){ return contestConfig().skins != null; }
 
 /** True when this round is not being scored on the defaults. */
 function rulesChanged(){ return !!state.contests; }
@@ -739,7 +755,7 @@ const TAB_LABELS = [["board","Leaders"],["setup","Setup"],["skins","Skins"],["im
 function show(id){
   // Skins off takes its tab away, so there is nowhere to land — including a
   // stored tab from before it was switched off.
-  if(id === "skins" && !state.skinsOn) id = "board";
+  if(id === "skins" && !skinsOn()) id = "board";
   SCREENS.forEach(s => document.getElementById(s).classList.toggle("on", s === id));
   if(id === "board" || id === "setup" || id === "skins" || id === "import"){
     state.tab = id; save();
@@ -760,7 +776,7 @@ function show(id){
  * there it has something to say.
  */
 function activeTabs(){
-  return TAB_LABELS.filter(([id]) => id !== "skins" || state.skinsOn);
+  return TAB_LABELS.filter(([id]) => id !== "skins" || skinsOn());
 }
 
 function buildTabs(){
@@ -896,7 +912,7 @@ function shareRound(){
   const tees = [...new Set(readyPlayers().map(p => p.tee).filter(Boolean))];
   const notes = [];
   if(state.allowancePercent !== 100) notes.push(state.allowancePercent + "% handicap allowance");
-  if(!state.skinsOn) notes.push("skins not played");
+  if(!skinsOn()) notes.push("skins not played");
   // A round on changed values must not arrive looking ordinary. It rides in the
   // note, which the shared view already prints at the top of the board — no new
   // field in the payload, and so no cost to the field size the link fits.
@@ -1156,7 +1172,7 @@ function missingFrom(p){
   if(!(p.name && p.name.trim())) gone.push("name");
   if(p.index == null || !isFinite(p.index)) gone.push("handicap index");
   if(!p.tee) gone.push("tee");
-  if(state.skinsOn && (p.cart == null || String(p.cart).trim() === "")) gone.push("group");
+  if(skinsOn() && (p.cart == null || String(p.cart).trim() === "")) gone.push("group");
   const picked = E.PICK_SLOTS.filter(sl => p[sl.key] != null).length;
   if(picked < E.PICK_SLOTS.length){
     gone.push(picked === 0 ? "birdie picks"
@@ -1274,7 +1290,7 @@ function drawFoldSubs(){
   document.getElementById("foldEventSub").textContent =
     [state.format || DEFAULT_FORMAT,
      state.allowancePercent + "%",
-     state.skinsOn ? (carts.size < 2 ? "skins on, one group" : "skins on") : "skins off",
+     skinsOn() ? (carts.size < 2 ? "skins on, one group" : "skins on") : "skins off",
     ].join(" · ");
   document.getElementById("foldMoveSub").textContent = exportNote(state);
   const v = window.ClubhouseVersion;
@@ -1431,7 +1447,7 @@ function drawAllowance(){
     state.allowancePercent = Number(e.target.value);
     save();
     renderSetup(); renderBoard();
-    if(state.skinsOn) renderSkins();
+    if(skinsOn()) renderSkins();
   });
 }
 
@@ -1440,32 +1456,30 @@ function drawAllowance(){
  * groups won't divide sensibly and he'll want to skip skins altogether — a
  * round with only one cart skips itself, but this covers the rest.
  */
+/**
+ * Where the Skins switch used to be.
+ *
+ * It lives in Settings now, with every other contest's. What stays here is the
+ * one thing Setup knows and Settings does not: how many groups are actually
+ * out, which decides whether skins can run at all today whatever the rules say.
+ */
 function drawSkinsSwitch(){
   const carts = new Set(readyPlayers()
     .filter(p => p.cart != null && String(p.cart).trim() !== "")
     .map(p => String(p.cart)));
-  const note = !state.skinsOn ? "Nobody is scored for skins this round."
-    : carts.size < 2 ? "Only one group out, so no skins today whatever this says."
-    : carts.size + " groups out, playing for 18 skins.";
+  const n = readyPlayers().length;
+  const cfg = contestConfig().skins;
+  const note = !cfg ? "Switched off for this round, under The rules."
+    : n < cfg.minPlayers ? n + " players — too few for skins, which start at " + cfg.minPlayers + "."
+    : carts.size < 2 ? "Only one group out, so no skins today whatever the rules say."
+    : carts.size + " groups out, playing " +
+      (n >= cfg.teamFrom ? "team" : "cart") + " skins.";
 
   document.getElementById("skinsSwitch").innerHTML =
     `<div class="field"><span class="flab">Skins</span>
-       <div class="seg" id="skinsSeg">
-         <button type="button" data-on="1" aria-pressed="${state.skinsOn}">On</button>
-         <button type="button" data-on="0" aria-pressed="${!state.skinsOn}">Off</button>
-       </div>
-       <div class="cd" style="margin-top:10px;font-size:18px;font-weight:700">${esc(note)}</div>
+       <div class="cd" style="margin-top:4px;font-size:18px;font-weight:700">${esc(note)}<br>
+         Switched on and off under <b>The rules</b>, with every other contest.</div>
      </div>`;
-
-  document.getElementById("skinsSeg").querySelectorAll("button").forEach(b =>
-    b.addEventListener("click", () => {
-      state.skinsOn = b.dataset.on === "1";
-      save();
-      buildTabs();                       // the Skins tab comes and goes with it
-      renderSetup(); renderBoard();
-      if(state.skinsOn) renderSkins();
-      show("setup");                     // stay where the switch is
-    }));
 }
 
 /**
@@ -2015,9 +2029,13 @@ function saveSettings(){
   // Stored as a DIFF, so a round on the defaults carries nothing at all.
   state.contests = E.diffContests(E.DEFAULT_CONTESTS, draft);
   save();
+  // The Skins tab comes and goes with the rule, and the tabs are built once at
+  // load — the switch that used to do this lived on Setup and rebuilt them
+  // itself, so moving it here without this left the tab a reload behind.
+  buildTabs();
   // RESCORED FROM THE SCORES ALREADY STORED. No card is ever re-entered.
   renderBoard();
-  if(state.skinsOn) renderSkins();
+  if(skinsOn()) renderSkins();
   draft = null;
   renderSettings();
   renderSetup();
@@ -2857,7 +2875,7 @@ wireFolds();
 buildTabs();
 renderBoard();
 renderSetup();
-if(state.skinsOn) renderSkins();
+if(skinsOn()) renderSkins();
 renderImport();
 show(state.tab);
 </script>
