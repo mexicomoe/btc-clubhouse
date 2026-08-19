@@ -62,12 +62,13 @@ test("a tied hole is not won and nothing carries", () => {
     [1, 8, 10, 11, 13, 16]);
 });
 
-test("the pot is worth the same however many skins fall", () => {
-  // Twelve skins here, so a skin is 4.0 ÷ 12. A leaner round makes each worth
-  // MORE, which is the point of a fixed pot.
+test("twelve skins fall below the floor, so each pays the floor", () => {
+  // 4.0 ÷ 12 is 0.33, under the 0.4 a skin is never worth less than. So this
+  // round pays out 4.8 rather than 4.0 — a hole won is a hole won.
   const { skins } = cartSkins(FIELD, ABERDEEN_TEE_IV);
   let won = 0; skins.forEach((n) => { won += n; });
-  assert.equal(skinValue(DEFAULT_CONTESTS.skins!, won), -0.33);
+  assert.equal(won, 12);
+  assert.equal(skinValue(DEFAULT_CONTESTS.skins!, won), -0.4);
 });
 
 test("a one-man cart is legal and counts its ball twice", () => {

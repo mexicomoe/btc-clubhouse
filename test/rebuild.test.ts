@@ -233,13 +233,14 @@ test("a tied hole is not won and does not carry", () => {
   assert.ok(t.holes.every((h: any) => h.wonBy == null));
 });
 
-test("the pot divides among the skins actually won", () => {
+test("the pot divides among the skins actually won, down to a floor", () => {
   const cfg = DEFAULT_CONTESTS.skins!;
+  assert.equal(skinValue(cfg, 1), -4, "one skin takes the whole pot");
   assert.equal(skinValue(cfg, 2), -2, "4 split two ways");
-  assert.equal(skinValue(cfg, 15), -0.27, "4 split fifteen ways, to the hundredth");
-  // A whole pot to one group however many it took to win it.
+  assert.equal(skinValue(cfg, 4), -1);
+  assert.equal(skinValue(cfg, 10), -0.4, "the floor, reached exactly at ten");
+  assert.equal(skinValue(cfg, 15), -0.4, "and it does not fall past it");
   assert.equal(skinStrokes(2, cfg, 2), -4);
-  assert.equal(skinStrokes(15, cfg, 15), -4.1, "rounding at the hundredth, then to a tenth");
   assert.equal(skinStrokes(0, cfg, 11), 0);
 });
 
@@ -408,4 +409,57 @@ test("eight players plays CART skins, and a twosome's best two is both balls", (
   assert.equal(skinsFormat(8, cfg), "cart");
   assert.equal(bestTwo([4, 5]), 9, "a twosome puts up both its balls");
   assert.equal(bestTwo([4]), 8, "and a man alone counts his twice");
+});
+
+/* ---- the two things an X can mean ---- */
+
+/**
+ * Golf Genius writes X both for a hole a man PICKED UP on and for a hole he
+ * never played, and the card cannot tell them apart. Three or more on one card
+ * stops the import and asks — that threshold lives in the import screen, which
+ * needs a browser. What is pinned here is that the two answers really do lead
+ * to the two different outcomes, because that is what makes the question worth
+ * asking.
+ */
+
+test("Xs kept as pick-ups are a full round, scored as net doubles", () => {
+  const gross = PAR.map((p, i) => ([4, 9, 11, 16].includes(i + 1) ? "X" : p));
+  const r = score(card({}, { gross }));
+  assert.equal(r.holesPlayed, 18, "a picked-up hole was played");
+  assert.deepEqual(r.pickedUpHoles, [4, 9, 11, 16]);
+  assert.equal(typeof r.final, "number", "and he is scored");
+  // Each capped to par + 2 — the worst the net double cap allows.
+  for (const h of [4, 9, 11, 16]) {
+    assert.equal(r.netByHole[h - 1], PAR[h - 1] + 2, "hole " + h);
+  }
+});
+
+test("Xs blanked as holes he sat out leave a short card, and no score", () => {
+  // This is what the import screen writes when the answer is "he sat them out".
+  const gross = PAR.map((p, i) => ([4, 9, 11, 16].includes(i + 1) ? null : p));
+  const r = score(card({}, { gross }));
+  assert.equal(r.holesPlayed, 14);
+  assert.equal(r.final, null, "eighteen holes or you are not scored");
+  assert.deepEqual(r.pickedUpHoles, [], "nothing was picked up — he was not there");
+});
+
+test("the same four holes, two answers, two different men on the board", () => {
+  const holes = [4, 9, 11, 16];
+  const pickedUp = card({}, { gross: PAR.map((p, i) => (holes.includes(i + 1) ? "X" : p)) });
+  const satOut = card({}, { gross: PAR.map((p, i) => (holes.includes(i + 1) ? null : p)) });
+  const rows = computeLeaderboard([
+    { ...pickedUp, name: "Picked up" }, { ...satOut, name: "Sat out" },
+  ] as any, C, DEFAULT_CONTESTS);
+  const by = Object.fromEntries(rows.map((r) => [r.name, r]));
+  assert.equal(by["Picked up"].rank, 1);
+  assert.equal(by["Sat out"].rank, null);
+  assert.equal(by["Sat out"].eligible, false);
+});
+
+test("one or two Xs are an ordinary card and nothing about them is special", () => {
+  for (const holes of [[7], [7, 12]]) {
+    const r = score(card({}, { gross: PAR.map((p, i) => (holes.includes(i + 1) ? "X" : p)) }));
+    assert.equal(r.holesPlayed, 18);
+    assert.equal(typeof r.final, "number");
+  }
 });

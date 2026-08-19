@@ -242,14 +242,22 @@
      * its size. A man out on his own counts his ball twice, which takes him
      * from 0.22x a fair share to 1.06x.
      *
-     * NO CARRYOVER. A tied hole is simply not won. A FIXED POT of `pot` strokes
-     * is divided among however many skins were won that round, so a typical 11
-     * skins makes one worth about 0.36 and a lean 7 makes it 0.57. Every player
-     * in a winning group takes the full per-skin amount.
+     * NO CARRYOVER. A tied hole is simply not won. A POT of `pot` strokes is
+     * divided among however many skins were won that round, so a lean 7 makes
+     * one worth 0.57. Every player in a winning group takes the full per-skin
+     * amount.
+     *
+     * WITH A FLOOR: a skin is never worth less than `minSkin`. One skin takes
+     * the whole 4.0, four are worth 1.0 each, and at ten the division reaches
+     * the floor and stops there — eleven skins are still 0.4 each, and so are
+     * eighteen. Above ten the pot is therefore NOT fixed: eighteen skins pay
+     * out 7.2 between them rather than 4.0. That is deliberate. A hole won is a
+     * hole won, and on a busy day the men should not each find their skins
+     * quietly worth less than the round before.
      *
      * Jay's league already plays low net best 2 balls, so the format is familiar.
      */
-    skins: { pot: -4, minPlayers: 8, teamFrom: 16 },
+    skins: { pot: -4, minSkin: -0.4, minPlayers: 8, teamFrom: 16 },
   };
 
   /* ---- Reading a handicap index that someone typed in ----
@@ -993,8 +1001,14 @@
   function skinValue(config, skinsWon) {
     if (!config) return 0;
     if (!(skinsWon > 0)) return 0;
-    return Math.round((config.pot / skinsWon) * 100) / 100;
+    const share = config.pot / skinsWon;
+    // The floor bites on the MAGNITUDE — both are negative, and a skin worth
+    // "less" is one nearer zero.
+    const floor = config.minSkin;
+    const value = (floor != null && Math.abs(share) < Math.abs(floor)) ? floor : share;
+    return Math.round(value * 100) / 100;
   }
+
 
   /** What a count of skins is worth, in tenths like every other value. */
   function skinStrokes(count, config, skinsWon) {

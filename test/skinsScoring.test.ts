@@ -50,18 +50,35 @@ const board = (cards: PlayerCard[]) =>
 
 /* ---- what a skin is worth ---- */
 
-test("the pot is fixed and split by the skins actually won", () => {
+test("the pot is split by the skins actually won, down to a floor", () => {
   assert.equal(CFG.pot, -4);
+  assert.equal(CFG.minSkin, -0.4);
   assert.equal(skinValue(CFG, 1), -4, "one skin takes the lot");
   assert.equal(skinValue(CFG, 2), -2);
   assert.equal(skinValue(CFG, 4), -1);
   assert.equal(skinValue(CFG, 8), -0.5);
-  assert.equal(skinValue(CFG, 11), -0.36, "the brief's typical round");
-  assert.equal(skinValue(CFG, 16), -0.25);
+  assert.equal(skinValue(CFG, 10), -0.4, "at ten the division reaches the floor");
+});
+
+test("a skin is never worth less than the floor", () => {
+  // Past ten the division would keep shrinking. It does not.
+  for (const won of [11, 12, 15, 18]) {
+    assert.equal(skinValue(CFG, won), -0.4, won + " skins");
+  }
+});
+
+test("ABOVE THE FLOOR THE POT IS NO LONGER FIXED, and that is deliberate", () => {
+  // Ten skins pay out the 4.0. Eighteen pay out 7.2 between them, because a
+  // hole won is a hole won and the men should not find their skins quietly
+  // worth less than the round before.
+  const paidOut = (won: number) => Math.abs(skinValue(CFG, won)) * won;
+  assert.equal(paidOut(10), 4);
+  assert.equal(Math.round(paidOut(18) * 10) / 10, 7.2);
+  assert.equal(Math.round(paidOut(5) * 10) / 10, 4, "below the floor it is still one pot");
 });
 
 test("a lean round makes each skin worth MORE", () => {
-  // Which is the whole point of a fixed pot, and the opposite of the old model.
+  // Which is the point of a pot, and the opposite of the old per-skin model.
   assert.ok(Math.abs(skinValue(CFG, 7)) > Math.abs(skinValue(CFG, 11)));
   assert.equal(skinValue(CFG, 7), -0.57, "the brief's lean round");
 });
@@ -71,7 +88,7 @@ test("a skin is worth to the hundredth exactly what the tab prints", () => {
   // Rounded at the hundredth, not left long, or five skins will not add up.
   assert.equal(skinValue(CFG, 3), -1.33);
   assert.equal(skinValue(CFG, 6), -0.67);
-  assert.equal(skinValue(CFG, 15), -0.27);
+  assert.equal(skinValue(CFG, 9), -0.44);
 });
 
 test("no skins won is worth nothing rather than dividing by zero", () => {
@@ -79,11 +96,13 @@ test("no skins won is worth nothing rather than dividing by zero", () => {
   assert.equal(skinStrokes(0, CFG, 0), 0);
 });
 
-test("winning every skin is worth the whole pot, however many there were", () => {
-  for (const won of [1, 5, 12, 18]) {
+test("winning every skin is worth the whole pot, up to the floor", () => {
+  for (const won of [1, 5, 10]) {
     assert.equal(Math.abs(skinStrokes(won, CFG, won) + 4) < 0.15, true,
       won + " skins: " + skinStrokes(won, CFG, won));
   }
+  // Past ten it is worth MORE than the pot, by design.
+  assert.equal(skinStrokes(18, CFG, 18), -7.2);
 });
 
 test("nought skins is nought, never a negative nought", () => {

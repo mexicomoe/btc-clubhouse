@@ -143,6 +143,9 @@ function contestsInPlay(){
   return CONTEST_ORDER.filter(k => k === "skins" || E.DEFAULT_CONTESTS[k] != null);
 }
 const MAX_PLAYERS = 24;
+/* Xs on a card at or above this many stop the import and ask. Below it they are
+   taken as pick-ups without comment, which is what they nearly always are. */
+const X_QUERY_FROM = 3;
 const HOLES = 18;
 
 /* ---------- persistence: a locked phone must not lose the round ----------
@@ -2095,16 +2098,29 @@ function renderSkins(){
         `<div class="cd">${strokes === 0 ? "0.0" : fmtStrokes(strokes)}</div></div></div>`;
   }).join("");
 
-  html += `<div class="note"><b>${Math.abs(perSkin).toFixed(2)} a skin today —
-    ${Math.abs(config.pot).toFixed(1)} split ${skinsWon} way${skinsWon===1?"":"s"}.</b><br>
-    The whole contest is worth ${Math.abs(config.pot).toFixed(1)} every week, however the
-    round falls, and it is divided among the skins actually won — so a lean day
-    makes each one worth MORE, not less. Every man in a winning ${word} takes the
-    full amount; it is not shared out between them.<br>
-    This field plays <b>${format === "team" ? "TEAM" : "CART"} skins</b> —
-    ${inFlight.length} players, and ${format === "team"
-      ? "teams are used from " + config.teamFrom + " up"
-      : "carts run from " + config.minPlayers + " to " + (config.teamFrom - 1)}.</div>`;
+  // The floor bites once the division would fall under it — at ten skins here.
+  const floored = config.minSkin != null &&
+    Math.abs(config.pot / skinsWon) < Math.abs(config.minSkin);
+  html += `<div class="note"><b>${Math.abs(perSkin).toFixed(2)} a skin today` +
+    (floored
+      ? ` — the least a skin is ever worth.</b><br>
+         ${skinsWon} skins would divide ${Math.abs(config.pot).toFixed(1)} into
+         ${(Math.abs(config.pot) / skinsWon).toFixed(2)} each, which is under the
+         ${Math.abs(config.minSkin).toFixed(1)} floor, so every skin pays
+         ${Math.abs(config.minSkin).toFixed(1)}. On a day like this the round pays out
+         <b>${(skinsWon * Math.abs(config.minSkin)).toFixed(1)}</b> in all rather than
+         ${Math.abs(config.pot).toFixed(1)} — a hole won is a hole won.`
+      : ` — ${Math.abs(config.pot).toFixed(1)} split ${skinsWon} way${skinsWon===1?"":"s"}.</b><br>
+         The pot is ${Math.abs(config.pot).toFixed(1)} however the round falls, divided
+         among the skins actually won, so a lean day makes each one worth MORE. It never
+         drops below ${Math.abs(config.minSkin).toFixed(1)}, which it would at
+         ${Math.ceil(Math.abs(config.pot) / Math.abs(config.minSkin))} skins or more.`) +
+    `<br>Every man in a winning ${word} takes the full amount; it is not shared out
+     between them.<br>
+     This field plays <b>${format === "team" ? "TEAM" : "CART"} skins</b> —
+     ${inFlight.length} players, and ${format === "team"
+       ? "teams are used from " + config.teamFrom + " up"
+       : "carts run from " + config.minPlayers + " to " + (config.teamFrom - 1)}.</div>`;
 
   html += `<div class="section-label">Hole by hole</div>`;
   html += table.holes.map(h => {
@@ -2216,14 +2232,35 @@ function assess(row, idx, all){
   }
   if(!isReady(player)){ out.problems.push("player needs an index and a tee on Setup"); return out; }
   if(card.holesPlayed === 0){ out.problems.push("no hole scores in this row"); return out; }
+
+  /* THREE OR MORE Xs MUST BE ASKED ABOUT.
+     Golf Genius writes X for two different things and the card cannot tell them
+     apart: a man who PICKED UP on a hole, and a man who SAT OUT holes he never
+     played. Both happen here — men skip holes in the heat.
+     One or two are almost always a genuine pick-up and are never queried. Three
+     or more are a question with two very different answers: score them as net
+     doubles, or treat the card as short and not score him at all. Guessing
+     either way is worse than asking, because both answers are ordinary. */
+  const xs = card.holes.filter(h => E.isPickedUp(h)).length;
+  out.xCount = xs;
+  if(xs >= X_QUERY_FROM && !row.xRule){
+    out.needsXRule = true;
+    out.problems.push(xs + " holes marked X — did he play them?");
+    return out;
+  }
+  out.satOut = row.xRule === "satOut";
   if(mode === "unknown"){
     out.problems.push("can't tell net from gross — choose Net or Gross above");
     return out;
   }
 
   const course = courseOf(player);
+  // He sat those holes out, so they were never played. Blanking them is what
+  // makes the eighteen-hole rule catch the card — an X scored as a net double
+  // would count as a hole played and let a fourteen-hole round onto the board.
+  const holes = out.satOut ? card.holes.map(h => E.isPickedUp(h) ? null : h) : card.holes;
   if(mode === "gross"){
-    out.gross = card.holes.slice();
+    out.gross = holes.slice();
   } else {
     // Golf Genius already took the strokes off. Put them back with the handicap
     // it used — the one printed after the name — so the engine can take them off
@@ -2232,9 +2269,9 @@ function assess(row, idx, all){
     if(ch == null){ out.problems.push("no course handicap in the paste to undo the strokes"); return out; }
     // A picked-up hole has no net to add strokes back to — it carries its X
     // through untouched and the engine fills it in at par + 4.
-    const numeric = card.holes.map(h => E.isPickedUp(h) ? null : h);
+    const numeric = holes.map(h => E.isPickedUp(h) ? null : h);
     const rebuilt = E.grossFromNet(numeric, course, ch);
-    out.gross = card.holes.map((h, i) => E.isPickedUp(h) ? h : rebuilt[i]);
+    out.gross = holes.map((h, i) => E.isPickedUp(h) ? h : rebuilt[i]);
     out.usedHandicap = ch;
   }
 
@@ -2315,8 +2352,18 @@ function drawPreview(){
     const bucket = seen[i].skipped ? setAside : seen[i].problems.length ? needing : ready;
     bucket.push({ row, i });
   });
+  // "Needs a player" was the only thing a row could want. It is not any more —
+  // a card with three or more Xs needs an ANSWER, not a name — so the heading
+  // says whichever it is rather than confidently saying the wrong one.
+  const wantsName = needing.filter(({ i }) => !seen[i].needsXRule).length;
+  const wantsAnswer = needing.length - wantsName;
+  const needLabel = wantsAnswer === 0
+    ? (needing.length === 1 ? "1 needs a player" : needing.length + " need a player")
+    : wantsName === 0
+      ? (wantsAnswer === 1 ? "1 needs an answer" : wantsAnswer + " need an answer")
+      : wantsName + " need a player, " + wantsAnswer + " an answer";
   const groups = [
-    { list: needing, label: needing.length === 1 ? "1 needs a player" : needing.length + " need a player" },
+    { list: needing, label: needLabel },
     { list: ready,   label: ready.length + " ready to import" },
     { list: setAside, label: setAside.length + " not a round · left out" },
   ];
@@ -2332,6 +2379,7 @@ function drawPreview(){
       if(!bad) bits.push(a.mode === "net" ? "net holes" : "gross holes");
       if(row.card.handicap != null) bits.push("hcp " + row.card.handicap);
       if(!bad) bits.push(a.replaces ? "REPLACES his card already in" : "new card");
+      if(!bad && a.xCount > 0 && !a.satOut) bits.push(a.xCount + " picked up");
       const said = HOW_SAID[row.how];
       const detail = bad ? a.problems.join(" · ") : bits.concat(a.warnings).join(" · ");
       return `<div class="prev"><div class="pv">` +
@@ -2349,7 +2397,32 @@ function drawPreview(){
             // in a dropdown. It sets the picker; it does not commit anything.
             (a.suggest ? `<div style="padding-top:10px"><button class="big" ` +
                `data-use="${i}" data-player="${a.suggest.id}">Yes — ${esc(a.suggest.name || "(no name)")}</button></div>` : ``) +
-          `</div>`);
+          `</div>`) +
+        // The X question, with both answers spelled out. Neither is a default:
+        // one scores the card, the other takes him off the board entirely, and
+        // the difference is the man's own account of his round.
+        (a.needsXRule
+          ? `<div class="note warn"><b>${a.xCount} holes on this card are marked X.</b><br>
+               Golf Genius writes X both for a hole a man PICKED UP on and for a hole he
+               never played. Which was it?</div>
+             <div class="pad">
+               <button class="big" data-xrule="played" data-row="${i}">He played them and picked up
+                 — score as net doubles</button>
+               <button class="big" data-xrule="satOut" data-row="${i}">He sat them out
+                 — not a full round, so not scored</button>
+             </div>`
+          : ``) +
+        // An answered card keeps a way back. Both answers are ordinary, the
+        // difference between them is whether the man is scored at all, and an
+        // organiser who taps the wrong one must not have to re-paste the round.
+        (row.xRule
+          ? `<div class="note">${a.satOut
+               ? `He sat out ${a.xCount} holes, so he played ${18 - a.xCount} —
+                  <b>not scored</b>, under the eighteen-hole rule.`
+               : `His ${a.xCount} Xs are pick-ups, scored as net doubles.`}
+               <button class="big" data-xrule="" data-row="${i}"
+                 style="margin-top:10px">Change that answer</button></div>`
+          : ``);
     }).join("");
   }
 
@@ -2397,6 +2470,11 @@ function drawPreview(){
   }
 
   box.innerHTML = html;
+  box.querySelectorAll("button[data-xrule]").forEach(b =>
+    b.addEventListener("click", () => {
+      importPreview.rows[Number(b.dataset.row)].xRule = b.dataset.xrule || null;
+      drawPreview();
+    }));
   box.querySelectorAll("button[data-use]").forEach(b =>
     b.addEventListener("click", () => {
       const row = importPreview.rows[Number(b.dataset.use)];

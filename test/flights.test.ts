@@ -199,7 +199,8 @@ test("the pot is one pot for the round, not one per flight", () => {
   ];
   const board = computeLeaderboard(field, ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
   const a1 = board.find((r) => r.name === "A1")!;
-  assert.equal(a1.contests.skins!.strokes, -4, "the whole pot, and no more");
+  // Eighteen skins at the 0.4 floor — above ten the pot stops being fixed.
+  assert.equal(a1.contests.skins!.strokes, -7.2);
 });
 
 test("A CART NUMBER IS NOW FIELD-WIDE — the same number in two flights is one cart", () => {
