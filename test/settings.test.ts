@@ -140,7 +140,7 @@ test("A PICK ON A HOLE BARRED LATER IS DROPPED, NOT THROWN", () => {
   const r = scorePlayer(c, C, barred);
   assert.equal(r.contests.watchTheBirdie!.live, true);
   // Down to five, and the card SAYS five rather than claiming six.
-  assert.match(r.contests.watchTheBirdie!.detail, /any of his 5/);
+  assert.match(r.contests.watchTheBirdie!.detail, /no net birdies/);
   // And Six Pack cannot be scored on five, so it says so rather than inventing
   // a seventh hole to make the numbers work.
   assert.equal(r.contests.sixPack!.live, false);

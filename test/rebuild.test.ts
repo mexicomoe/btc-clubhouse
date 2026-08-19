@@ -117,7 +117,7 @@ test("a net birdie pays 0.5 and a net eagle 1.5, never both", () => {
 
 test("nothing on any of the six costs half a stroke", () => {
   assert.equal(score(card()).contests.watchTheBirdie!.strokes, 0.5);
-  assert.match(score(card()).contests.watchTheBirdie!.detail, /nothing on any of his 6/);
+  assert.match(score(card()).contests.watchTheBirdie!.detail, /no net birdies/);
   // One birdie clears it entirely — the penalty is not charged alongside.
   assert.equal(score(card({ 2: -1 })).contests.watchTheBirdie!.strokes, -0.5);
 });

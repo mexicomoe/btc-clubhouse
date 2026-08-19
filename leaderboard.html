@@ -1808,6 +1808,36 @@ function teamHint(){
 let draft = null;
 
 /** One editable number. `path` addresses it inside the config. */
+/**
+ * What a rung MEANS, in the words a man would use at the bar.
+ *
+ * A ladder is graded on the first rung the value reaches, so a rung covers
+ * everything from one past the rung above it up to its own figure. The screen
+ * used to print that figure with the words "up to", which made the middle rungs
+ * read as though they overlapped and made the last one read "up to 99" — 99
+ * being a sentinel that means "anything at all", and not a score any man has
+ * ever made on three holes.
+ */
+function rungLabel(key, rungs, i){
+  const prev = i === 0 ? null : rungs[i - 1].threshold;
+  const here = rungs[i].threshold;
+  const last = i === rungs.length - 1;
+
+  if(key === "easyStreet"){
+    // A COUNT of net pars, so the last rung is "all of them" rather than 99.
+    if(last) return "three net pars";
+    return ["none", "one", "two"][here] != null ? ["none", "one", "two"][here]
+      : here + " net pars";
+  }
+  // Agony Alley: a net total across the stretch, low being good.
+  if(i === 0) return here + " or better";
+  if(last) return (prev + 1) + " or worse";
+  return prev + 1 === here ? String(here) : (prev + 1) + " or " + here;
+}
+
+/** A value as it reads on the card, never as a negative nought. */
+function fmtRule(v){ return fmtStrokes(Object.is(v, -0) ? 0 : Number(v)); }
+
 function numField(label, path, value, dflt, opts){
   const o = opts || {};
   const same = Number(value) === Number(dflt);
@@ -1815,7 +1845,7 @@ function numField(label, path, value, dflt, opts){
     `<input id="s_${path}" data-path="${path}" type="number" inputmode="decimal" ` +
       `step="${o.step || 0.1}" value="${value}">` +
     `<div class="cd" style="margin-top:8px;font-size:18px;font-weight:700">` +
-      (same ? `Default` : `Default <b>${dflt}</b> — changed`) +
+      (same ? `was <b>${fmtRule(dflt)}</b>` : `was <b>${fmtRule(dflt)}</b> — changed`) +
     `</div></div>`;
 }
 
@@ -1879,19 +1909,33 @@ function renderSettings(){
                                    ["easyStreet", "Easy Street", "Net pars on 11, 12, 13"]]){
     h += `<div class="section-label">${label}</div>` + sw(key, "In the game");
     if(on(key)){
-      h += `<div class="cd" style="padding:0 14px 10px;font-size:18px;font-weight:700">${unit},
-        graded on the first rung it reaches.</div>`;
-      draft[key].forEach((rung, i) => {
-        h += `<div class="field"><label>Rung ${i + 1}</label>` +
+      h += `<div class="cd" style="padding:0 14px 10px;font-size:18px;font-weight:700">${unit}.</div>`;
+      // BEST RESULT AT THE TOP, both of them. Agony Alley is stored that way
+      // already; Easy Street counts upwards, so it is shown in reverse. Only
+      // the ORDER ON SCREEN turns over — the stored order has to stay as it is,
+      // because the ladder is graded on the first rung the value reaches.
+      const order = draft[key].map((_, i) => i);
+      if(key === "easyStreet") order.reverse();
+      order.forEach(i => {
+        const rung = draft[key][i];
+        const wasRung = D[key] && D[key][i];
+        // THE LAST RUNG HAS NO FIGURE TO EDIT. Its threshold is 99, a sentinel
+        // meaning "anything at all" — not a score, and not a number changing
+        // would do anything useful with. Showing it as an editable box invited
+        // a man to set it to something, which would leave every worse round
+        // falling off the bottom of the ladder unscored.
+        const lastRung = i === draft[key].length - 1;
+        h += `<div class="field"><label>${esc(rungLabel(key, draft[key], i))}</label>` +
           `<div style="display:flex;gap:10px">` +
-            `<input data-ladder="${key}" data-i="${i}" data-f="threshold" type="number" step="1"
-               value="${rung.threshold}" aria-label="up to" style="flex:1">` +
+            (lastRung ? `` :
+              `<input data-ladder="${key}" data-i="${i}" data-f="threshold" type="number" step="1"
+                 value="${rung.threshold}" aria-label="${esc(rungLabel(key, draft[key], i))} — the figure" style="flex:1">`) +
             `<input data-ladder="${key}" data-i="${i}" data-f="strokes" type="number" step="0.1"
-               value="${rung.strokes}" aria-label="pays" style="flex:1">` +
+               value="${rung.strokes}" aria-label="${esc(rungLabel(key, draft[key], i))} — pays" style="flex:1">` +
           `</div>` +
-          `<div class="cd" style="margin-top:8px;font-size:18px;font-weight:700">
-             up to ${rung.threshold} → ${fmtStrokes(rung.strokes)}` +
-             (D[key] && D[key][i] ? ` · default up to ${D[key][i].threshold} → ${fmtStrokes(D[key][i].strokes)}` : ``) +
+          `<div class="cd" style="margin-top:8px;font-size:18px;font-weight:700">` +
+            `pays <b>${fmtRule(rung.strokes)}</b>` +
+            (wasRung ? ` · was <b>${fmtRule(wasRung.strokes)}</b>` : ``) +
           `</div></div>`;
       });
     }

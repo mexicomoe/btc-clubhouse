@@ -814,10 +814,10 @@
       if (paid === 0 && allPlayed && blank !== 0) birdieStrokes += blank;
       watchTheBirdie = {
         strokes: toTenth(birdieStrokes),
-        // Counted, not assumed to be six. A pick on a hole barred after he
-        // chose it is dropped, so a man can arrive here with five.
         detail: paid === 0
-          ? (allPlayed ? "nothing on any of his " + chosen.length : "nothing yet")
+          ? (allPlayed ? "no net birdies" : "nothing yet")
+          // Counted, not assumed to be six. A pick on a hole barred after he
+          // chose it is dropped, so a man can arrive here with five.
           : paid + " of " + chosen.length + " pick" + (chosen.length === 1 ? "" : "s"),
         live: true,
       };
