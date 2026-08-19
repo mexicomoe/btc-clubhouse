@@ -90,10 +90,14 @@ export interface TripleThreatConfig {
    * index: it was measuring the handicap, not the round.
    */
   perTriple: number;
+}
+
+/** Bounce Back — its own contest again, with its own switch. */
+export interface BounceBackConfig {
   /**
-   * What a BOUNCE BACK pays — a net par or better on the very next hole. Named
-   * for the contest it absorbed: Bounce Back used to stand on its own, and the
-   * half of Triple Threat that answers the damage is still called that.
+   * What a net par or better on the hole IMMEDIATELY AFTER a blow-up pays.
+   * Negative — it takes strokes off. The link to the blow-up is the contest:
+   * it fires on the next hole and nowhere else.
    */
   perBounceBack: number;
 }
@@ -137,7 +141,9 @@ export interface ContestConfig {
   agonyAlley: Step[];
   /** Graded on a COUNT of holes at NET par or better — gross measured handicap. */
   easyStreet: Step[];
-  tripleThreat: TripleThreatConfig;
+  tripleThreat: TripleThreatConfig | null;
+  /** Its own contest, its own switch — but it only fires after a blow-up. */
+  bounceBack: BounceBackConfig | null;
   /** Settled field-wide, not in `scorePlayer` — it needs the opponent's card. */
   hitList: HitListConfig | null;
   /** Null switches the contest off — Triple Threat absorbed it. */
@@ -146,8 +152,6 @@ export interface ContestConfig {
   goLong: Step[] | null;
   /** Null switches the contest off — Easy Street replaced both. */
   getShorty: Step[] | null;
-  /** Null switches the contest off — Triple Threat carries the name now. */
-  bounceBack: Step[] | null;
   /** Null means no ceiling. On a zero base a cap would cap the score itself. */
   maxContestStrokes: number | null;
   /** Null switches Skins off; it then scores nothing and no group is read. */

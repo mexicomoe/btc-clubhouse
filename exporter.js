@@ -22,8 +22,10 @@
    * THIS IS A FRESH WORKBOOK. The zero base makes every past round
    * incomparable, so the archive is kept as it stands and this file starts
    * clean — which means the switched-off contests no longer need blank columns
-   * holding their place. Damage Control, Go Long, Get Shorty and the standalone
-   * Bounce Back are simply gone from it.
+   * holding their place. Damage Control, Go Long and Get Shorty are gone from
+   * it. Bounce Back has a column of its own again — it is its own contest with
+   * its own switch, and burying it inside Triple Threat's figure meant a sheet
+   * could not tell a man who never blew up from one who blew up and recovered.
    */
   const CONTEST_COLUMNS = [
     ["watchTheBirdie", "Watch the Birdie"],
@@ -31,6 +33,7 @@
     ["agonyAlley", "Agony Alley"],
     ["easyStreet", "Easy Street"],
     ["tripleThreat", "Triple Threat"],
+    ["bounceBack", "Bounce Back"],
     ["hitList", "Hit List"],
     ["skins", "Skins"],
   ];
@@ -38,7 +41,7 @@
   function headerRow() {
     // The event's own columns lead every row. They repeat, which is the point:
     // several rounds can be piled into one sheet and still be told apart.
-    const cols = ["Event", "Date", "Format",
+    const cols = ["Event", "Date", "Rules", "Format",
                   // Two names. The canonical one is what the scoreboard shows;
                   // the one as entered is what Golf Genius will match on, and
                   // only the organiser's own typing will do for that.
@@ -112,6 +115,10 @@
       const cells = [
         e.name == null ? "" : e.name,
         e.date == null ? "" : e.date,
+        // A round scored on changed values must not sit in a sheet looking like
+        // an ordinary one. Named contests rather than a bare flag, so a column
+        // sort tells whoever reads it WHAT was different.
+        e.contests ? "house: " + Object.keys(e.contests).join(" ") : "default",
         e.format == null ? "" : e.format,
         shown,
         p.name == null ? "" : p.name,        // exactly as it was typed on Setup
@@ -320,6 +327,13 @@
       typeof e.allowancePercent === "number" ? e.allowancePercent : 100,
       e.skinsOn === false ? 0 : 1,
       players,
+      // THE RULES TRAVEL WITH THE ROUND. Appended past the end, so a code
+      // written by an older app still reads and simply carries no rules — which
+      // is exactly right, because it was played on the defaults.
+      //
+      // A DIFF, never a copy: a full config would cost 980 characters here and
+      // a round on the defaults costs nothing at all.
+      e.contests || null,
     ];
     return CODE_PREFIX + toBase64(JSON.stringify(payload));
   }
@@ -355,6 +369,7 @@
       format: typeof payload[3] === "string" ? payload[3] : "",
       allowancePercent: typeof payload[4] === "number" ? payload[4] : 100,
       skinsOn: payload[5] !== 0,
+      contests: payload[7] && typeof payload[7] === "object" ? payload[7] : null,
       players, scores, handicaps,
     };
   }

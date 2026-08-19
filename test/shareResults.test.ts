@@ -64,7 +64,7 @@ function field(n: number) {
 const HEADING = { course: "Aberdeen Golf & Country Club", date: "2026-08-14", tee: "IV", note: "" };
 /** The contests actually scored this round — not every slot the format reserves. */
 const LIVE = ["watchTheBirdie", "sixPack", "agonyAlley", "easyStreet",
-              "tripleThreat", "hitList", "skins"];
+              "tripleThreat", "bounceBack", "hitList", "skins"];
 const link = (n: number, note = "") =>
   resultsLink(BASE, { ...HEADING, note }, field(n), LIVE);
 

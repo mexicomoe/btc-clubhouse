@@ -17,10 +17,20 @@
     <div class="sub" id="boardSub">Aberdeen G&amp;CC</div>
   </header>
   <nav class="tabs" data-tabs></nav>
+  <div id="houseRules"></div>
   <div id="boardFlights"></div>
   <div id="rows"></div>
   <div id="boardEmpty"></div>
   <div id="shareBox"></div>
+</section>
+
+<section id="settings" class="screen">
+  <div class="backbar"><button class="back" id="settingsBack">‹ Setup</button></div>
+  <header class="band">
+    <div class="title">The rules</div>
+    <div class="sub" id="settingsSub">What this round is played under</div>
+  </header>
+  <div id="settingsBody"></div>
 </section>
 
 <section id="player" class="screen">
@@ -45,6 +55,7 @@
     <button class="big" id="pastePlayersBtn">Paste a list of players</button>
     <button class="big" id="pastePicksBtn">Paste birdie picks</button>
     <button class="big" id="hitListBtn">Set the Hit List</button>
+    <button class="big" id="settingsBtn">The rules — every value this round uses</button>
     <!-- The three pages used to be islands. Land on this one — which is where a
          browser's address-bar autocomplete tends to dump you — and there was no
          way through to the pick sheet at all. -->
@@ -140,7 +151,8 @@ const CONTEST_ORDER = ["watchTheBirdie","sixPack","agonyAlley","easyStreet",
  * Setup, not in the code, so "not scored in this round" is exactly right for it.
  */
 function contestsInPlay(){
-  return CONTEST_ORDER.filter(k => k === "skins" || E.DEFAULT_CONTESTS[k] != null);
+  const cfg = contestConfig();
+  return CONTEST_ORDER.filter(k => k === "skins" || cfg[k] != null);
 }
 const MAX_PLAYERS = 24;
 /* Xs on a card at or above this many stop the import and ask. Below it they are
@@ -184,6 +196,8 @@ function blankEvent(name, date){
     format: DEFAULT_FORMAT,
     nextId: 1, players: [], scores: {}, handicaps: {},
     skinsOn: true, autoPicks: false, allowancePercent: 100, flight: "", lastTee: "IV", tab: "setup",
+    // Null means the defaults. A diff, never a copy — see mergeContests.
+    contests: null,
     exportedAt: null, exportedSignature: null,
   };
 }
@@ -237,6 +251,7 @@ function normaliseEvent(e, fallbackName){
     players: (Array.isArray(e.players) ? e.players : []).map(normalisePlayer),
     scores: e.scores || {},
     handicaps: e.handicaps || {},
+    contests: e.contests && typeof e.contests === "object" ? e.contests : null,
     skinsOn: e.skinsOn !== false,            // on unless it was switched off
     // Off unless it was deliberately switched on — a drawn pick is not a
     // chosen one, so it never happens by default.
@@ -567,9 +582,33 @@ function blankPlayer(){
  * change from the app is whether Skins runs — switched off, it scores nothing
  * and no cart number is read.
  */
+/**
+ * THE RULES THIS EVENT IS PLAYED UNDER.
+ *
+ * The defaults, with the event's own changes laid over them. `state.contests`
+ * holds a DIFF and is null on an ordinary round, so "was this played on the
+ * defaults?" is a null check — which is what the board, the shared view and the
+ * CSV all mark on.
+ *
+ * The Skins switch on Setup stays where it was and still wins: it is a
+ * per-round decision the organiser makes on the day, not a rule change.
+ */
 function contestConfig(){
-  return state.skinsOn ? E.DEFAULT_CONTESTS
-                       : Object.assign({}, E.DEFAULT_CONTESTS, { skins: null });
+  const merged = E.mergeContests(E.DEFAULT_CONTESTS, state.contests || null);
+  return state.skinsOn ? merged : Object.assign({}, merged, { skins: null });
+}
+
+/** True when this round is not being scored on the defaults. */
+function rulesChanged(){ return !!state.contests; }
+
+/** A short account of what was changed, for the board and the shared view. */
+function changedRulesNote(){
+  if(!state.contests) return "";
+  const names = Object.keys(state.contests)
+    .map(k => CONTEST_NAMES[k] || k)
+    .filter(Boolean);
+  return names.length <= 3 ? names.join(", ")
+    : names.slice(0, 2).join(", ") + " and " + (names.length - 2) + " more";
 }
 
 function courseOf(p){ return E.courseForTee(p.tee || "IV", p.gender || "M"); }
@@ -693,7 +732,7 @@ function cardOf(p){
 function readyPlayers(){ return state.players.filter(isReady); }
 
 /* ---------- screen routing ---------- */
-const SCREENS = ["board","player","setup","edit","skins","import"];
+const SCREENS = ["board","player","setup","edit","skins","import","settings"];
 // Four tabs across a phone: short labels, so none has to shrink below 18px.
 const TAB_LABELS = [["board","Leaders"],["setup","Setup"],["skins","Skins"],["import","Import"]];
 
@@ -825,6 +864,7 @@ function renderBoard(){
     b.addEventListener("click", ()=>showPlayer(r.name));
     rowsEl.appendChild(b);
   });
+  drawHouseRules();
   drawShare(results);
   fitBoardNames();
 }
@@ -857,6 +897,10 @@ function shareRound(){
   const notes = [];
   if(state.allowancePercent !== 100) notes.push(state.allowancePercent + "% handicap allowance");
   if(!state.skinsOn) notes.push("skins not played");
+  // A round on changed values must not arrive looking ordinary. It rides in the
+  // note, which the shared view already prints at the top of the board — no new
+  // field in the payload, and so no cost to the field size the link fits.
+  if(rulesChanged()) notes.push("HOUSE RULES — not the default values (" + changedRulesNote() + ")");
   return {
     course: "Aberdeen Golf & Country Club",
     date: state.date,
@@ -992,7 +1036,7 @@ function showPlayer(name){
   if(!card) return;
   // Take the leaderboard's own result: Skins is settled across the field, so
   // re-scoring this card on its own would silently drop it.
-  const r = boardResults.find(x => x.name === name) || E.scorePlayer(card, undefined, E.DEFAULT_CONTESTS);
+  const r = boardResults.find(x => x.name === name) || E.scorePlayer(card, undefined, contestConfig());
   const course = E.courseFor(card);
   // "as played" marks a handicap that came off the card rather than from the
   // index, so a figure that disagrees with the setup screen explains itself.
@@ -1664,12 +1708,14 @@ function nearestEight(player){
   // eligible to be named — a man needs an index and a tee, and a man who did
   // not finish is off every list because the pick would be void anyway.
   const others = state.players.filter(p => p.id !== player.id && p.index != null && isReady(p));
-  return E.nearestByIndex(player.index, others, 8);
+  const hl = contestConfig().hitList;
+  return E.nearestByIndex(player.index, others, hl && hl.offers ? hl.offers : 8);
 }
 
 /** How the two indexes compare, in the words the card will use. */
 function hitBand(mine, theirs){
-  const gap = E.DEFAULT_CONTESTS.hitList.equalBand;
+  const hl = contestConfig().hitList;
+  const gap = hl ? hl.equalBand : 1.0;
   if(mine == null || theirs == null) return "an equal handicap";
   if(Math.abs(mine - theirs) <= gap) return "an equal handicap";
   return theirs < mine ? "a lower handicap" : "a higher handicap";
@@ -1735,6 +1781,246 @@ function teamHint(){
   if(format === "team") return "This field plays TEAM skins — " + n + " players. Every man needs a team.";
   if(format === "cart") return "Not used at " + n + " players: this field plays cart skins. Teams start at 16.";
   return "Not used — a field of " + n + " is too small for skins at all. Teams start at 16.";
+}
+
+/* ---------- the Settings screen ----------
+   Every value the round is using, on one screen, with the default beside it.
+   Nothing here is a code change any more.
+
+   Edits are held in `draft` until Save, so a half-typed ladder never reaches
+   the board — and Save checks the whole set before it writes, because a bad
+   rung does not fail at save time, it fails three hours later in front of the
+   men. */
+let draft = null;
+
+/** One editable number. `path` addresses it inside the config. */
+function numField(label, path, value, dflt, opts){
+  const o = opts || {};
+  const same = Number(value) === Number(dflt);
+  return `<div class="field"><label for="s_${path}">${esc(label)}</label>` +
+    `<input id="s_${path}" data-path="${path}" type="number" inputmode="decimal" ` +
+      `step="${o.step || 0.1}" value="${value}">` +
+    `<div class="cd" style="margin-top:8px;font-size:18px;font-weight:700">` +
+      (same ? `Default` : `Default <b>${dflt}</b> — changed`) +
+    `</div></div>`;
+}
+
+function settingsGet(path){
+  return path.split(".").reduce((o, k) => (o == null ? o : o[k]), draft);
+}
+function settingsSet(path, value){
+  const keys = path.split(".");
+  let o = draft;
+  for(let i = 0; i < keys.length - 1; i++){
+    if(o[keys[i]] == null || typeof o[keys[i]] !== "object") o[keys[i]] = {};
+    o = o[keys[i]];
+  }
+  o[keys[keys.length - 1]] = value;
+}
+
+function renderSettings(){
+  if(!draft) draft = JSON.parse(JSON.stringify(contestConfig()));
+  const D = E.DEFAULT_CONTESTS;
+  const on = (key) => draft[key] != null;
+  const sw = (key, label) => `<div class="field"><span class="flab">${esc(label)}</span>` +
+    `<div class="seg" data-onoff="${key}">` +
+      `<button type="button" data-v="1" aria-pressed="${on(key)}">On</button>` +
+      `<button type="button" data-v="0" aria-pressed="${!on(key)}">Off</button>` +
+    `</div></div>`;
+
+  let h = `<div class="note">These are the rules THIS round is played under. They
+    travel with the event — copy it to another device and the rules go too, and a
+    round scored today still scores the same way next year. A new event starts
+    from the defaults.</div>`;
+
+  if(rulesChanged()){
+    h += `<div class="note warn"><b>This round is not on the default rules.</b><br>
+      Changed: ${esc(changedRulesNote())}. Every board, shared link and export
+      says so.</div>`;
+  }
+
+  /* Watch the Birdie */
+  h += `<div class="section-label">Watch the Birdie</div>` + sw("watchTheBirdie", "In the game");
+  if(on("watchTheBirdie")){
+    h += numField("Net birdie", "watchTheBirdie.birdie", draft.watchTheBirdie.birdie, D.watchTheBirdie.birdie) +
+      numField("Net eagle", "watchTheBirdie.eagle", draft.watchTheBirdie.eagle, D.watchTheBirdie.eagle) +
+      numField("Nothing on any of the six", "watchTheBirdie.blank", draft.watchTheBirdie.blank, D.watchTheBirdie.blank) +
+      `<div class="field"><label for="s_barred">Holes that may not be picked</label>` +
+      `<input id="s_barred" data-barred="1" type="text" inputmode="numeric"
+         value="${esc((draft.watchTheBirdie.barred || E.ABERDEEN_TEE_IV.barredPicks).join(", "))}">` +
+      `<div class="cd" style="margin-top:8px;font-size:18px;font-weight:700">
+         Default <b>${E.ABERDEEN_TEE_IV.barredPicks.join(", ")}</b> — Agony Alley's three and
+         Easy Street's three. Every slot must keep at least two holes to choose from.</div></div>`;
+  }
+  h += resetFor("watchTheBirdie");
+
+  /* Six Pack */
+  h += `<div class="section-label">Six Pack</div>` + sw("sixPack", "In the game") +
+    `<div class="note">Nothing to set. It is the six candidate holes a man did NOT
+      pick, scored as raw net strokes against their par of 24 — and the par is
+      forced by the slots rather than chosen, so there is no number here to move.</div>`;
+
+  /* Agony Alley and Easy Street — ladders */
+  for(const [key, label, unit] of [["agonyAlley", "Agony Alley", "Net total on 4, 5, 6"],
+                                   ["easyStreet", "Easy Street", "Net pars on 11, 12, 13"]]){
+    h += `<div class="section-label">${label}</div>` + sw(key, "In the game");
+    if(on(key)){
+      h += `<div class="cd" style="padding:0 14px 10px;font-size:18px;font-weight:700">${unit},
+        graded on the first rung it reaches.</div>`;
+      draft[key].forEach((rung, i) => {
+        h += `<div class="field"><label>Rung ${i + 1}</label>` +
+          `<div style="display:flex;gap:10px">` +
+            `<input data-ladder="${key}" data-i="${i}" data-f="threshold" type="number" step="1"
+               value="${rung.threshold}" aria-label="up to" style="flex:1">` +
+            `<input data-ladder="${key}" data-i="${i}" data-f="strokes" type="number" step="0.1"
+               value="${rung.strokes}" aria-label="pays" style="flex:1">` +
+          `</div>` +
+          `<div class="cd" style="margin-top:8px;font-size:18px;font-weight:700">
+             up to ${rung.threshold} → ${fmtStrokes(rung.strokes)}` +
+             (D[key] && D[key][i] ? ` · default up to ${D[key][i].threshold} → ${fmtStrokes(D[key][i].strokes)}` : ``) +
+          `</div></div>`;
+      });
+    }
+    h += resetFor(key);
+  }
+
+  /* Triple Threat */
+  h += `<div class="section-label">Triple Threat</div>` + sw("tripleThreat", "In the game");
+  if(on("tripleThreat")){
+    h += numField("Each net double bogey", "tripleThreat.perTriple",
+      draft.tripleThreat.perTriple, D.tripleThreat.perTriple);
+  }
+  h += resetFor("tripleThreat");
+
+  /* Bounce Back */
+  h += `<div class="section-label">Bounce Back</div>` + sw("bounceBack", "In the game");
+  if(on("bounceBack")){
+    h += numField("Each net par or better on the hole after a net double",
+      "bounceBack.perBounceBack", draft.bounceBack.perBounceBack, D.bounceBack.perBounceBack);
+  }
+  h += `<div class="note">It fires on the hole <b>immediately after</b> a net double
+    bogey and nowhere else. That link is the contest and is not adjustable — but the
+    two switches are independent, so a round can charge for blow-ups without paying
+    for recoveries, or the other way about.</div>` + resetFor("bounceBack");
+
+  /* Skins */
+  h += `<div class="section-label">Skins</div>` + sw("skins", "In the game");
+  if(on("skins")){
+    h += numField("The pot", "skins.pot", draft.skins.pot, D.skins.pot) +
+      numField("The least a skin is ever worth", "skins.minSkin", draft.skins.minSkin, D.skins.minSkin) +
+      numField("Fewest players for any skins", "skins.minPlayers", draft.skins.minPlayers, D.skins.minPlayers, {step:1}) +
+      numField("Players from which it is teams", "skins.teamFrom", draft.skins.teamFrom, D.skins.teamFrom, {step:1});
+  }
+  h += resetFor("skins");
+
+  /* Hit List */
+  h += `<div class="section-label">Hit List</div>` + sw("hitList", "In the game");
+  if(on("hitList")){
+    h += numField("Indexes this close count as equal", "hitList.equalBand", draft.hitList.equalBand, D.hitList.equalBand) +
+      numField("Names a man is offered", "hitList.offers", draft.hitList.offers, D.hitList.offers, {step:1});
+    for(const band of ["lower", "equal", "higher"]){
+      const said = { lower: "Against a LOWER handicap — a better player",
+                     equal: "Against an EQUAL handicap", higher: "Against a HIGHER handicap" }[band];
+      h += `<div class="cd" style="padding:12px 14px 4px;font-size:18px;font-weight:700">${said}</div>`;
+      for(const res of ["win", "tie", "loss"]){
+        h += numField(res === "win" ? "He wins" : res === "tie" ? "They tie" : "He loses",
+          "hitList." + band + "." + res, draft.hitList[band][res], D.hitList[band][res]);
+      }
+    }
+  }
+  h += resetFor("hitList");
+
+  h += `<div class="pad">` +
+    `<button class="big solid" id="setSave">Save and rescore</button>` +
+    `<button class="big" id="setCancel">Cancel</button>` +
+    `<button class="big danger" id="setResetAll">Reset everything to the defaults</button></div>` +
+    `<div id="setErr"></div>`;
+
+  document.getElementById("settingsBody").innerHTML = h;
+  wireSettings();
+}
+
+function resetFor(key){
+  const changed = state.contests && state.contests[key] !== undefined;
+  return `<div class="pad"><button class="big" data-reset="${key}"${changed?"":" disabled"}>` +
+    (changed ? "Reset " + (CONTEST_NAMES[key] || key) + " to the default" : "On the default") +
+    `</button></div>`;
+}
+
+function wireSettings(){
+  const body = document.getElementById("settingsBody");
+  /* A CLEARED BOX IS NOT A ZERO. Number("") is 0 and Number.isFinite(0) is
+     true, so clearing a field to retype it silently wrote 0 — and a man who
+     then tapped Save without finishing had set the value to nothing. An empty
+     box means "unchanged"; the number that was there stays until a real one
+     replaces it. Same for a box holding only a minus sign, mid-type. */
+  const readNumber = (el) => {
+    const raw = String(el.value).trim();
+    if(raw === "" || raw === "-" || raw === "−") return null;
+    const v = Number(raw.replace("−", "-").replace(",", "."));
+    return Number.isFinite(v) ? v : null;
+  };
+  body.querySelectorAll("input[data-path]").forEach(el =>
+    el.addEventListener("input", () => {
+      const v = readNumber(el);
+      if(v != null) settingsSet(el.dataset.path, v);
+    }));
+  body.querySelectorAll("input[data-ladder]").forEach(el =>
+    el.addEventListener("input", () => {
+      const v = readNumber(el);
+      if(v != null) draft[el.dataset.ladder][Number(el.dataset.i)][el.dataset.f] = v;
+    }));
+  const barred = body.querySelector("input[data-barred]");
+  if(barred) barred.addEventListener("input", () => {
+    const holes = barred.value.split(/[^0-9]+/).filter(Boolean).map(Number);
+    draft.watchTheBirdie.barred = holes;
+  });
+  body.querySelectorAll("[data-onoff]").forEach(seg =>
+    seg.querySelectorAll("button").forEach(b =>
+      b.addEventListener("click", () => {
+        const key = seg.dataset.onoff;
+        // Switching a contest back on restores it from the DEFAULTS, not from
+        // whatever it was before — there is nothing left of it to restore.
+        draft[key] = b.dataset.v === "1"
+          ? JSON.parse(JSON.stringify(E.DEFAULT_CONTESTS[key]))
+          : null;
+        renderSettings();
+      })));
+  body.querySelectorAll("button[data-reset]").forEach(b =>
+    b.addEventListener("click", () => {
+      draft[b.dataset.reset] = JSON.parse(JSON.stringify(E.DEFAULT_CONTESTS[b.dataset.reset]));
+      saveSettings();
+    }));
+  document.getElementById("setResetAll").addEventListener("click", () => {
+    draft = JSON.parse(JSON.stringify(E.DEFAULT_CONTESTS));
+    saveSettings();
+  });
+  document.getElementById("setCancel").addEventListener("click", () => {
+    draft = null; renderSetup(); show("setup");
+  });
+  document.getElementById("settingsSub").textContent = rulesChanged()
+    ? "Changed from the defaults" : "The default rules";
+  document.getElementById("setSave").addEventListener("click", saveSettings);
+}
+
+function saveSettings(){
+  const problems = E.checkContests(draft, E.ABERDEEN_TEE_IV);
+  if(problems.length){
+    document.getElementById("setErr").innerHTML =
+      `<div class="note warn"><b>Not saved — ${problems.length === 1 ? "this is" : "these are"}
+        wrong:</b><br>` + problems.map(esc).join("<br>") + `</div>`;
+    document.getElementById("setErr").scrollIntoView({ block: "nearest" });
+    return;
+  }
+  // Stored as a DIFF, so a round on the defaults carries nothing at all.
+  state.contests = E.diffContests(E.DEFAULT_CONTESTS, draft);
+  save();
+  // RESCORED FROM THE SCORES ALREADY STORED. No card is ever re-entered.
+  renderBoard();
+  if(state.skinsOn) renderSkins();
+  draft = null;
+  renderSettings();
+  renderSetup();
 }
 
 /** The slots and their legal holes, as the parser wants them. */
@@ -1991,6 +2277,21 @@ function removeEditing(){
   editing = null;
   save();
   renderSetup(); show("setup");
+}
+
+/**
+ * A round played on changed rules must never look like an ordinary one. It says
+ * so on the board, in the shared view and in the export — the three places a
+ * number leaves this phone.
+ */
+function drawHouseRules(){
+  const box = document.getElementById("houseRules");
+  if(!box) return;
+  box.innerHTML = rulesChanged()
+    ? `<div class="note warn"><b>House rules — not the default values.</b><br>
+         Changed: ${esc(changedRulesNote())}. Tap <b>The rules</b> on Setup to see
+         every value this round is using.</div>`
+    : "";
 }
 
 /* ---------- skins ---------- */
@@ -2542,6 +2843,12 @@ document.getElementById("addBtn").addEventListener("click", () => {
 document.getElementById("pastePlayersBtn").addEventListener("click", showRosterBox);
 document.getElementById("pastePicksBtn").addEventListener("click", showPicksBox);
 document.getElementById("hitListBtn").addEventListener("click", showHitListBox);
+document.getElementById("settingsBtn").addEventListener("click", () => {
+  draft = null; renderSettings(); show("settings");
+});
+document.getElementById("settingsBack").addEventListener("click", () => {
+  draft = null; renderSetup(); show("setup");
+});
 // Re-fit names when the viewport changes (rotation, split-view, browser resize).
 window.addEventListener("resize", fitBoardNames);
 

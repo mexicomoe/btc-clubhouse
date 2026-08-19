@@ -1,6 +1,10 @@
 /**
- * Triple Threat — a blow-up hole costs 0.5, and answering it on the very next
- * hole pays 1.0.
+ * Triple Threat — a blow-up hole costs 0.5.
+ *
+ * ITS OWN CONTEST AGAIN, with its own switch. The recovery is Bounce Back and
+ * has a file of its own; the two read the same facts about the round and stay
+ * linked in the scoring — a recovery only ever counts on the hole straight
+ * after a blow-up — but they are separate contests everywhere a man looks.
  *
  * A BLOW-UP IS NOW A NET DOUBLE BOGEY, not a gross triple. That is the change
  * of 15 August and it is what this file is mostly about. Gross triples were a
@@ -35,9 +39,10 @@ function card(over: Record<number, number> = {}, opts: {
 const tt = (c: PlayerCard) =>
   scorePlayer(c, ABERDEEN_TEE_IV, DEFAULT_CONTESTS).contests.tripleThreat!;
 
-test("the two rates are one config value each", () => {
-  assert.equal(DEFAULT_CONTESTS.tripleThreat.perTriple, 0.5);
-  assert.equal(DEFAULT_CONTESTS.tripleThreat.perBounceBack, -1.0);
+test("the rate is one config value", () => {
+  assert.equal(DEFAULT_CONTESTS.tripleThreat!.perTriple, 0.5);
+  assert.equal((DEFAULT_CONTESTS.tripleThreat as any).perBounceBack, undefined,
+    "the recovery is Bounce Back's now, not a second value here");
 });
 
 /* ---- what counts as a blow-up ---- */
@@ -46,7 +51,7 @@ test("a net double costs 0.5", () => {
   // On the 18th, so nothing can answer it and the penalty stands alone.
   const r = tt(card({ 18: 2 }));
   assert.equal(r.strokes, 0.5);
-  assert.match(r.detail, /1 net double, 0 bounce-backs/);
+  assert.match(r.detail, /^1 net double$/);
 });
 
 test("a net bogey is not a blow-up", () => {
@@ -75,44 +80,26 @@ test("worse than a net double is still one blow-up", () => {
 
 /* ---- the bounce back ---- */
 
-test("a net par on the next hole pays 1.0", () => {
-  const r = tt(card({ 1: 2 }));
-  assert.equal(r.strokes, -0.5, "0.5 charged, 1.0 paid");
-  assert.match(r.detail, /1 net double, 1 bounce-back/);
-});
-
-test("a net birdie on the next hole answers it too", () => {
-  assert.equal(tt(card({ 1: 2, 2: -1 })).strokes, -0.5);
-});
-
-test("a net bogey on the next hole does not answer it", () => {
-  assert.equal(tt(card({ 1: 2, 2: 1 })).strokes, 0.5);
-});
-
-test("only the very next hole counts", () => {
-  // Blow-up on 1, bogey on 2, par on 3. The par comes too late.
-  assert.equal(tt(card({ 1: 2, 2: 1 })).strokes, 0.5);
+test("the recovery does not change what Triple Threat charges", () => {
+  // Whether he bounced back is Bounce Back's business. The penalty is the same.
+  assert.equal(tt(card({ 1: 2 })).strokes, 0.5, "answered");
+  assert.equal(tt(card({ 1: 2, 2: 1 })).strokes, 0.5, "not answered");
 });
 
 test("a blow-up on the 18th can only cost", () => {
   assert.equal(tt(card({ 18: 2 })).strokes, 0.5);
 });
 
-test("two net doubles running leave the first unanswered", () => {
-  const r = tt(card({ 1: 2, 2: 2 }));
-  assert.equal(r.strokes, 0, "two charged at 0.5, one answered at 1.0");
-  assert.match(r.detail, /2 net doubles, 1 bounce-back/);
+test("every blow-up is charged, however they fall", () => {
+  assert.equal(tt(card({ 1: 2, 2: 2 })).strokes, 1);
+  assert.equal(tt(card({ 1: 2, 2: 2, 3: 2 })).strokes, 1.5);
 });
 
-test("three running leave the first two unanswered", () => {
-  const r = tt(card({ 1: 2, 2: 2, 3: 2 }));
-  assert.equal(r.strokes, 0.5, "1.5 charged, 1.0 paid");
-});
-
-test("a blow-up answered is better than no blow-up at all", () => {
-  // Which is the contest's whole shape: the recovery is worth more than the
-  // damage, so a man who steadies the ship comes out ahead.
-  assert.ok(tt(card({ 1: 2 })).strokes < tt(card()).strokes);
+test("switching Bounce Back off does not change what it charges", () => {
+  const off = scorePlayer(card({ 1: 2 }), ABERDEEN_TEE_IV,
+    { ...DEFAULT_CONTESTS, bounceBack: null } as any);
+  assert.equal(off.contests.tripleThreat!.strokes, 0.5);
+  assert.equal(off.contests.bounceBack, undefined);
 });
 
 /* ---- picked up ---- */
@@ -126,16 +113,14 @@ test("a picked-up hole IS a blow-up", () => {
   assert.equal(r.strokes, 0.5);
 });
 
-test("a picked-up hole can be bounced back off", () => {
-  const r = tt(card({}, { pickedUp: [1] }));
-  assert.equal(r.strokes, -0.5);
+test("a picked-up hole is charged like any other blow-up", () => {
+  assert.equal(tt(card({}, { pickedUp: [1] })).strokes, 0.5);
 });
 
 /* ---- incomplete ---- */
 
-test("an unplayed hole is neither a blow-up nor an answer", () => {
-  const r = tt(card({ 1: 2 }, { unplayed: [2] }));
-  assert.equal(r.strokes, 0.5, "charged, but nothing answered it");
+test("an unplayed hole is not a blow-up", () => {
+  assert.equal(tt(card({}, { unplayed: [2] })).strokes, 0);
 });
 
 test("an empty card scores nothing", () => {
@@ -154,4 +139,11 @@ test("switching it off leaves it off the card entirely", () => {
 test("the total is always a clean tenth", () => {
   const r = tt(card({ 1: 2, 4: 2, 7: 2 }));
   assert.equal(Math.round(r.strokes * 10) / 10, r.strokes);
+});
+
+test("it is switched off on its own, leaving Bounce Back running", () => {
+  const r = scorePlayer(card({ 1: 2 }), ABERDEEN_TEE_IV,
+    { ...DEFAULT_CONTESTS, tripleThreat: null } as any);
+  assert.equal(r.contests.tripleThreat, undefined);
+  assert.equal(r.contests.bounceBack!.strokes, -1, "a recovery still pays");
 });

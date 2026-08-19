@@ -117,7 +117,7 @@ test("a net birdie pays 0.5 and a net eagle 1.5, never both", () => {
 
 test("nothing on any of the six costs half a stroke", () => {
   assert.equal(score(card()).contests.watchTheBirdie!.strokes, 0.5);
-  assert.match(score(card()).contests.watchTheBirdie!.detail, /nothing on any of the six/);
+  assert.match(score(card()).contests.watchTheBirdie!.detail, /nothing on any of his 6/);
   // One birdie clears it entirely — the penalty is not charged alongside.
   assert.equal(score(card({ 2: -1 })).contests.watchTheBirdie!.strokes, -0.5);
 });
@@ -166,12 +166,14 @@ test("off scratch a gross double IS the net double, and counts", () => {
 });
 
 test("Bounce Back pays 1.0, and only off a net double", () => {
-  // Net double on 1, net par on 2 — 0.5 charged, 1.0 paid back.
+  // TWO CONTESTS NOW, each with its own switch — but still the pair they were:
+  // 0.5 charged for the blow-up, 1.0 paid for steadying the ship after it.
   const r = score(card({ 1: 2 }));
-  assert.equal(r.contests.tripleThreat!.strokes, -0.5);
-  assert.match(r.contests.tripleThreat!.detail, /1 net double, 1 bounce-back/);
+  assert.equal(r.contests.tripleThreat!.strokes, 0.5);
+  assert.equal(r.contests.bounceBack!.strokes, -1);
   // A net BOGEY answered by a par pays nothing: there was no blow-up.
   assert.equal(score(card({ 1: 1 })).contests.tripleThreat!.strokes, 0);
+  assert.equal(score(card({ 1: 1 })).contests.bounceBack!.strokes, 0);
 });
 
 test("a blow-up on the 18th can only cost — there is no next hole", () => {
@@ -181,14 +183,14 @@ test("a blow-up on the 18th can only cost — there is no next hole", () => {
 
 test("two net doubles running leave the first unanswered", () => {
   const r = score(card({ 1: 2, 2: 2 }));
-  // Two blow-ups, and only the second is answered (hole 3 is a par).
-  assert.equal(r.contests.tripleThreat!.strokes, 0);
-  assert.match(r.contests.tripleThreat!.detail, /2 net doubles, 1 bounce-back/);
+  assert.equal(r.contests.tripleThreat!.strokes, 1, "both charged");
+  assert.equal(r.contests.bounceBack!.strokes, -1, "only the second is answered");
 });
 
 test("a picked-up hole is a blow-up — it is a net double by definition", () => {
   const r = score(card({}, { gross: PAR.map((p, i) => (i === 0 ? "X" : p)) }));
-  assert.equal(r.contests.tripleThreat!.strokes, -0.5, "counted, and answered on hole 2");
+  assert.equal(r.contests.tripleThreat!.strokes, 0.5, "charged");
+  assert.equal(r.contests.bounceBack!.strokes, -1, "and answered on hole 2");
 });
 
 /* ---- 6 · Skins ---- */

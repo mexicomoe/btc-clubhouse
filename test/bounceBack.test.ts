@@ -1,23 +1,15 @@
 /**
- * Bounce Back — a net bogey or worse, answered by a net birdie or better on the
- * very next hole.
+ * Bounce Back — a net par or better on the hole IMMEDIATELY AFTER a net double
+ * bogey. −1.0 for each one.
  *
- * It used to require a net DOUBLE to recover from, which made the contest
- * punish good play: the fewer net doubles a man made, the fewer chances he was
- * given, and a round without one could not score it at all. Ten of sixty-three
- * real rounds were shut out and the correlation with making net doubles was
- * +0.69 — the opposite of what Damage Control rewards, in the same six-contest
- * set. On those sixty-three rounds the rule below shuts nobody out, 30% clear
- * two or more, and the handicap correlation falls to −0.09.
+ * ITS OWN CONTEST AGAIN, with its own value and its own switch, after a spell
+ * as the second half of Triple Threat. The scoring link is unchanged and always
+ * was the whole of it: a recovery counts on the next hole and nowhere else.
  *
- * The ladder is unchanged: 3 or more −0.9, 2 −0.6, 1 −0.3, none 0.
- *
- * IT IS SWITCHED OFF. Triple Threat replaced it and Damage Control together —
- * the gross triple is the damage and the net par on the next hole is the bounce
- * back, scored as one event rather than two that overlapped. The code stays,
- * because the calibration above was earned on real rounds and the contest may
- * come back, so these tests run it against an explicit config rather than the
- * default. The last test here is the one that checks it is off by default.
+ * The two switches are independent. A blow-up is a fact about the card rather
+ * than about whether it is being charged for, so a recovery pays even in a
+ * round where Triple Threat is switched off — the only reading that lets the
+ * two switches be genuinely separate.
  */
 
 import { test } from "node:test";
@@ -27,131 +19,116 @@ import { ABERDEEN_TEE_IV, DEFAULT_CONTESTS } from "../src/courseConfig.ts";
 import { scorePlayer, type PlayerCard } from "../src/scoring.ts";
 
 const PAR = ABERDEEN_TEE_IV.par;
+const SIX = { p4f: 2, p4b: 14, p3a: 3, p3b: 8, p5a: 7, p5b: 16 };
 
-/** Level par off scratch, so net is gross and every hole reads straight off par. */
-function card(edit: (g: number[]) => void = () => {}): PlayerCard {
-  const gross = PAR.slice();
-  edit(gross);
-  return { name: "x", courseHandicap: 0, gross, picks: { front: 5, back: 14 } };
+function card(over: Record<number, number> = {}, opts: {
+  courseHandicap?: number; unplayed?: number[]; pickedUp?: number[];
+} = {}): PlayerCard {
+  const gross = PAR.map((p, i) => p + (over[i + 1] || 0)) as (number | string | null)[];
+  for (const h of opts.unplayed || []) gross[h - 1] = null;
+  for (const h of opts.pickedUp || []) gross[h - 1] = "X";
+  return { name: "Test", courseHandicap: opts.courseHandicap ?? 0, gross, picks: { ...SIX } } as PlayerCard;
 }
-/** The ladder as it was calibrated, switched back on for these tests only. */
-const WITH_BOUNCE = {
-  ...DEFAULT_CONTESTS,
-  bounceBack: [
-    { threshold: 3, strokes: -0.9 }, { threshold: 2, strokes: -0.6 },
-    { threshold: 1, strokes: -0.3 }, { threshold: 0, strokes: 0 },
-  ],
-};
-const bounces = (c: PlayerCard) =>
-  scorePlayer(c, ABERDEEN_TEE_IV, WITH_BOUNCE).contests.bounceBack!;
+const bb = (c: PlayerCard) =>
+  scorePlayer(c, ABERDEEN_TEE_IV, DEFAULT_CONTESTS).contests.bounceBack!;
 
-/* ---- what counts ---- */
-
-test("a bogey answered by a birdie counts", () => {
-  const r = bounces(card((g) => { g[0] = PAR[0] + 1; g[1] = PAR[1] - 1; }));
-  assert.equal(r.detail, "1 bounce-back");
-  assert.equal(r.strokes, -0.3);
+test("the rate is one config value", () => {
+  assert.equal(DEFAULT_CONTESTS.bounceBack!.perBounceBack, -1.0);
 });
 
-test("worse than a bogey counts too — it is bogey OR WORSE", () => {
-  for (const over of [1, 2, 3]) {
-    const r = bounces(card((g) => { g[0] = PAR[0] + over; g[1] = PAR[1] - 1; }));
-    assert.equal(r.detail, "1 bounce-back", `${over} over answered by a birdie`);
-  }
+/* ---- when it fires ---- */
+
+test("a net par on the hole after a net double pays 1.0", () => {
+  const r = bb(card({ 1: 2 }));
+  assert.equal(r.strokes, -1);
+  assert.match(r.detail, /1 off a net double/);
 });
 
-test("better than a birdie counts too — it is birdie OR BETTER", () => {
-  const r = bounces(card((g) => { g[0] = PAR[0] + 1; g[1] = PAR[1] - 2; }));
-  assert.equal(r.detail, "1 bounce-back", "an eagle answers a bogey");
+test("a net birdie on the next hole answers it too", () => {
+  assert.equal(bb(card({ 1: 2, 2: -1 })).strokes, -1);
 });
 
-test("the ladder pays as it always did", () => {
-  const make = (n: number) => card((g) => {
-    // n bogey-then-birdie pairs, laid out so they never overlap.
-    for (let k = 0; k < n; k++) { g[k * 4] = PAR[k * 4] + 1; g[k * 4 + 1] = PAR[k * 4 + 1] - 1; }
-  });
-  assert.equal(bounces(make(0)).strokes, 0);
-  assert.equal(bounces(make(1)).strokes, -0.3);
-  assert.equal(bounces(make(2)).strokes, -0.6);
-  assert.equal(bounces(make(3)).strokes, -0.9);
-  assert.equal(bounces(make(4)).strokes, -0.9, "and holds at three or more");
+test("a net bogey on the next hole does not answer it", () => {
+  assert.equal(bb(card({ 1: 2, 2: 1 })).strokes, 0);
 });
 
-/* ---- what does not ---- */
+test("only the very next hole counts", () => {
+  // Blow-up on 1, bogey on 2, par on 3. The par comes one hole too late.
+  assert.equal(bb(card({ 1: 2, 2: 1 })).strokes, 0);
+});
 
-test("a par is no longer an answer", () => {
-  // The old rule took any recovery to par or better. A birdie is now the price.
-  const r = bounces(card((g) => { g[0] = PAR[0] + 2; }));      // double, then par
-  assert.equal(r.detail, "0 bounce-backs");
+test("a par with no blow-up before it pays nothing", () => {
+  // Which is the contest: it is a recovery, not a par.
+  assert.equal(bb(card()).strokes, 0);
+  assert.match(bb(card()).detail, /no bounce-backs/);
+});
+
+test("a net bogey is not something to recover from", () => {
+  assert.equal(bb(card({ 1: 1 })).strokes, 0);
+});
+
+test("a blow-up on the 18th has no next hole to recover on", () => {
+  assert.equal(bb(card({ 18: 2 })).strokes, 0);
+});
+
+test("two net doubles running leave the first unanswered", () => {
+  // The second is answered by the par on the 3rd; the first is answered by
+  // another blow-up, which is no answer at all.
+  const r = bb(card({ 1: 2, 2: 2 }));
+  assert.equal(r.strokes, -1);
+});
+
+test("several recoveries each pay", () => {
+  assert.equal(bb(card({ 1: 2, 4: 2, 7: 2 })).strokes, -3);
+});
+
+test("a picked-up hole can be recovered from", () => {
+  // It fills in at par + 4, which caps to a net double — a blow-up by any
+  // reading, and steadying the ship after one is exactly what this pays for.
+  assert.equal(bb(card({}, { pickedUp: [1] })).strokes, -1);
+});
+
+test("an unplayed hole after a blow-up is not a recovery", () => {
+  assert.equal(bb(card({ 1: 2 }, { unplayed: [2] })).strokes, 0);
+});
+
+test("an empty card scores nothing", () => {
+  const r = scorePlayer(
+    { name: "T", courseHandicap: 0, gross: PAR.map(() => null), picks: { ...SIX } } as any,
+    ABERDEEN_TEE_IV, DEFAULT_CONTESTS).contests.bounceBack!;
   assert.equal(r.strokes, 0);
+  assert.equal(r.live, false);
 });
 
-test("the birdie must be on the very next hole", () => {
-  const r = bounces(card((g) => { g[0] = PAR[0] + 1; g[2] = PAR[2] - 1; }));
-  assert.equal(r.detail, "0 bounce-backs", "a hole later is not a bounce back");
+/* ---- the two switches are independent ---- */
+
+test("it pays even when Triple Threat is switched off", () => {
+  // The blow-up still happened. Whether the round charges for it is a separate
+  // question, and this is what makes the two switches genuinely separate.
+  const r = scorePlayer(card({ 1: 2 }), ABERDEEN_TEE_IV,
+    { ...DEFAULT_CONTESTS, tripleThreat: null } as any);
+  assert.equal(r.contests.tripleThreat, undefined);
+  assert.equal(r.contests.bounceBack!.strokes, -1);
 });
 
-test("a birdie before a bogey is not a bounce back", () => {
-  const r = bounces(card((g) => { g[0] = PAR[0] - 1; g[1] = PAR[1] + 1; }));
-  assert.equal(r.detail, "0 bounce-backs", "the order is what makes it one");
+test("switching it off leaves Triple Threat charging as before", () => {
+  const r = scorePlayer(card({ 1: 2 }), ABERDEEN_TEE_IV,
+    { ...DEFAULT_CONTESTS, bounceBack: null } as any);
+  assert.equal(r.contests.bounceBack, undefined);
+  assert.equal(r.contests.tripleThreat!.strokes, 0.5);
 });
 
-test("both holes must have been played", () => {
-  const c = card((g) => { g[0] = PAR[0] + 1; g[1] = PAR[1] - 1; });
-  (c.gross as (number | null)[])[1] = null;                    // the answer never happened
-  assert.equal(bounces(c).detail, "0 bounce-backs");
+test("both off leaves neither on the card", () => {
+  const r = scorePlayer(card({ 1: 2 }), ABERDEEN_TEE_IV,
+    { ...DEFAULT_CONTESTS, tripleThreat: null, bounceBack: null } as any);
+  assert.equal(r.contests.tripleThreat, undefined);
+  assert.equal(r.contests.bounceBack, undefined);
 });
 
-/* ---- the fault this rule was changed to fix ---- */
-
-test("a round with no net doubles can score it", () => {
-  // Under the old rule this card was shut out: nothing to recover FROM. It is
-  // an ordinary good round — bogeys and birdies, not a blemish worse than one.
-  const clean = card((g) => {
-    g[0] = PAR[0] + 1; g[1] = PAR[1] - 1;
-    g[6] = PAR[6] + 1; g[7] = PAR[7] - 1;
-  });
-  const r = scorePlayer(clean, ABERDEEN_TEE_IV,
-    { ...WITH_BOUNCE, damageControl: [
-      { threshold: 0, strokes: -1.2 }, { threshold: 1, strokes: -0.6 },
-      { threshold: 2, strokes: -0.3 }, { threshold: 99, strokes: 0 }] });
-  assert.equal(r.contests.damageControl!.detail, "0 net doubles", "not one all round");
-  assert.equal(r.contests.damageControl!.strokes, -1.2, "and Damage Control pays its best");
-  assert.equal(r.contests.bounceBack!.detail, "2 bounce-backs", "Bounce Back pays too, now");
-  assert.equal(r.contests.bounceBack!.strokes, -0.6);
-});
-
-test("the two contests no longer pull against each other", () => {
-  // The old rule needed a net double, so the man who avoided them — exactly the
-  // man Damage Control rewards — was the man Bounce Back could not pay.
-  const spotless = card((g) => { g[0] = PAR[0] + 1; g[1] = PAR[1] - 1; });
-  const r = scorePlayer(spotless, ABERDEEN_TEE_IV,
-    { ...WITH_BOUNCE, damageControl: [
-      { threshold: 0, strokes: -1.2 }, { threshold: 1, strokes: -0.6 },
-      { threshold: 2, strokes: -0.3 }, { threshold: 99, strokes: 0 }] });
-  assert.ok(r.contests.damageControl!.strokes < 0, "Damage Control pays");
-  assert.ok(r.contests.bounceBack!.strokes < 0, "and so can Bounce Back");
-});
-
-/* ---- but it is not in the game ---- */
-
-test("Bounce Back and Damage Control are switched off, not merely zero", () => {
-  assert.equal(DEFAULT_CONTESTS.bounceBack, null);
-  assert.equal(DEFAULT_CONTESTS.damageControl, null);
-  const r = scorePlayer(card((g) => { g[0] = PAR[0] + 1; g[1] = PAR[1] - 1; }),
-    ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
-  assert.equal(r.contests.bounceBack, undefined, "absent from the card entirely");
-  assert.equal(r.contests.damageControl, undefined);
-});
-
-// Triple Threat is what replaced them, and it is one contest rather than two:
-// the blow-up is the damage, the net par after it is the bounce back.
-//
-// THE BLOW-UP IS A NET DOUBLE NOW, not a gross triple — off scratch that is a
-// gross double, so this card is worse than it needs to be to trigger it.
-test("Triple Threat covers the same ground in one contest", () => {
-  const c = card((g) => { g[0] = PAR[0] + 2; });      // net double, then a par
-  const r = scorePlayer(c, ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
-  assert.equal(r.contests.tripleThreat!.detail, "1 net double, 1 bounce-back");
-  assert.equal(r.contests.tripleThreat!.strokes, -0.5);
+test("together they are the pair they always were", () => {
+  // Charged 0.5, paid 1.0 — a man who steadies the ship comes out ahead, which
+  // is the shape the two were designed with and splitting them did not change.
+  const r = scorePlayer(card({ 1: 2 }), ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
+  const both = r.contests.tripleThreat!.strokes + r.contests.bounceBack!.strokes;
+  assert.equal(Math.round(both * 10) / 10, -0.5);
 });

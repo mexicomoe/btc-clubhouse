@@ -189,7 +189,15 @@
      * A picked-up hole is filled in at par + 4 and so is a net double by
      * definition; that is correct here, it was a blow-up.
      */
-    tripleThreat: { perTriple: 0.5, perBounceBack: -1.0 },
+    tripleThreat: { perTriple: 0.5 },
+    /**
+     * Bounce Back — a net par or better on the hole immediately after a blow-up.
+     *
+     * Its own contest again, with its own switch, after a spell as the second
+     * half of Triple Threat. The scoring link is unchanged and always was the
+     * point of it: it fires on the NEXT hole and nowhere else.
+     */
+    bounceBack: { perBounceBack: -1.0 },
     /**
      * Hit List — before the round each man privately names one opponent from
      * the eight players nearest his own index and backs himself to post the
@@ -210,19 +218,20 @@
      */
     hitList: {
       equalBand: 1.0,
+      /** How many names a man is offered. A short field offers everybody. */
+      offers: 8,
       lower:  { win: -1.1, tie: -0.2, loss: 0.3 },
       equal:  { win: -0.9, tie: 0.1, loss: 0.3 },
       higher: { win: -0.7, tie: 0.1, loss: 0.5 },
     },
     /**
-     * Damage Control, Bounce Back, Go Long and Get Shorty are SWITCHED OFF.
-     * Null is the signal Skins uses: not scored, not shown, not exported.
-     * Triple Threat absorbed the first two; Easy Street replaced the last two.
+     * Damage Control, Go Long and Get Shorty are SWITCHED OFF. Null is the
+     * signal Skins uses: not scored, not shown, not exported. Triple Threat
+     * absorbed Damage Control; Easy Street replaced the other two.
      */
     damageControl: null,
     goLong: null,
     getShorty: null,
-    bounceBack: null,
     /**
      * NO CEILING, and on a zero base there is less for one to do: a man's final
      * IS his contest total, so a cap would be a cap on the score itself.
@@ -456,8 +465,16 @@
    * nominating it twice and being paid twice for one birdie. The duplicate pass
    * in `readPicks` runs first and is now the ONLY thing standing there.
    */
-  function birdiePickHoles(course) {
-    const barred = course.barredPicks || [];
+  function birdiePickHoles(course, contests) {
+    /* THE BARRED LIST IS A GAME RULE WEARING COURSE CLOTHING. It sits on the
+       course because it is the course that says which holes are spoken for —
+       but which contests own which holes is exactly the sort of thing the
+       organiser now adjusts, so a contest value overrides it when there is one.
+       Par and the stroke index stay on the course and stay unreachable: those
+       describe the ground, and changing one would silently rewrite every net
+       score ever stored. */
+    const override = contests && contests.watchTheBirdie && contests.watchTheBirdie.barred;
+    const barred = override || course.barredPicks || [];
     const out = {};
     for (const slot of PICK_SLOTS) {
       out[slot.key] = [];
@@ -478,8 +495,8 @@
    * which at Aberdeen is the twelve left once Agony Alley and Easy Street have
    * taken theirs. Six are nominated and the other six are the Six Pack.
    */
-  function birdiePickCandidates(course) {
-    const legal = birdiePickHoles(course);
+  function birdiePickCandidates(course, contests) {
+    const legal = birdiePickHoles(course, contests);
     const seen = new Set();
     for (const slot of PICK_SLOTS) for (const h of legal[slot.key]) seen.add(h);
     return Array.from(seen).sort((a, b) => a - b);
@@ -499,9 +516,9 @@
    * a man made a choice he never made — it stops an empty contest looking like a
    * bad round, which is a different thing.
    */
-  function randomPicks(course, rng) {
+  function randomPicks(course, rng, contests) {
     const roll = rng || Math.random;
-    const legal = birdiePickHoles(course);
+    const legal = birdiePickHoles(course, contests);
     const picks = {};
     // Drawn WITHOUT REPLACEMENT. The two par 3 slots are offered the identical
     // three holes and so are the two par 5s, so drawing each slot on its own
@@ -558,8 +575,16 @@
    * picks read from the old two-pick form, whose out-of-table holes are dropped
    * rather than thrown on.
    */
-  function readPicks(picks, course, who) {
-    const legal = birdiePickHoles(course);
+  function readPicks(picks, course, who, opts) {
+    /* `drop` is for SCORING, where refusing is the wrong answer.
+       A man picks hole 8, the organiser later bars it, and his round must not
+       stop opening — the whole board threw an error on exactly that, which is
+       the loudest possible way to lose a round. Scoring drops the pick and pays
+       him nothing for that slot, which is true and survivable.
+       Typed entry keeps the strict path: a man writing 8 on a paste today has
+       made a mistake and should be told so, not quietly given five picks. */
+    const drop = !!(opts && opts.drop);
+    const legal = birdiePickHoles(course, opts && opts.contests);
     const out = {};
 
     // Duplicates first. No hole belongs to two slots, so a hole nominated twice
@@ -573,6 +598,7 @@
         const hole = picks[slot.key];
         if (hole == null) continue;
         if (seen.has(hole)) {
+          if (drop) continue;
           throw new Error(who + ": hole " + hole + " is nominated twice, as " +
             seen.get(hole) + " and " + slot.label);
         }
@@ -580,17 +606,153 @@
       }
     }
 
+    const used = new Set();
     for (const slot of PICK_SLOTS) {
       const hole = picks[slot.key];
       if (hole == null) { out[slot.key] = null; continue; }
+      // Under `drop` the duplicate pass above let it through; it must still not
+      // be paid on two slots.
+      if (drop && used.has(hole)) { out[slot.key] = null; continue; }
       if (!legal[slot.key].includes(hole)) {
-        if (picks.legacy) { out[slot.key] = null; continue; }
+        if (picks.legacy || drop) { out[slot.key] = null; continue; }
         throw new Error(who + ": hole " + hole + " is not a legal " + slot.label +
           " — " + legal[slot.key].join(", "));
       }
       out[slot.key] = hole;
+      used.add(hole);
     }
     return out;
+  }
+
+  /* ---- An event's own rules ----
+     THE SETTINGS LIVE IN THE EVENT, not in browser storage. That was the
+     sticking point: browser storage means the laptop and the phone disagree and
+     there is no server to reconcile them. In the event it is free — the event
+     code already carries a round between devices, so the rules go with it, and
+     a round scored in March still scores the same way in August because it
+     carries the rules it was played under.
+
+     What is stored is a DIFF, not a copy. A full config is 735 characters of
+     JSON and would cost 980 in an event code; one changed contest costs 72.
+     A round on the defaults stores nothing at all. */
+
+  /** Is this a plain value to be replaced, rather than merged into? */
+  const isLeaf = (v) => v == null || typeof v !== "object" || Array.isArray(v);
+
+  /**
+   * The defaults with an event's changes laid over them.
+   *
+   * Null in the diff means SWITCHED OFF and is kept as null — it is the signal
+   * the whole engine already uses for a contest that is not in the game.
+   */
+  function mergeContests(base, diff) {
+    if (!diff) return base;
+    const out = Object.assign({}, base);
+    for (const key of Object.keys(diff)) {
+      const v = diff[key];
+      if (isLeaf(v) || isLeaf(base[key])) out[key] = v;
+      else out[key] = mergeContests(base[key], v);
+    }
+    return out;
+  }
+
+  /**
+   * What `full` changes about `base`, and nothing it does not. Returns null when
+   * they agree — so "is this round on the defaults?" is a null check, on every
+   * surface that has to mark it.
+   */
+  function diffContests(base, full) {
+    if (!full) return null;
+    const out = {};
+    for (const key of Object.keys(full)) {
+      const a = base[key], b = full[key];
+      if (isLeaf(a) || isLeaf(b)) {
+        if (JSON.stringify(a) !== JSON.stringify(b)) out[key] = b;
+      } else {
+        const inner = diffContests(a, b);
+        if (inner) out[key] = inner;
+      }
+    }
+    return Object.keys(out).length ? out : null;
+  }
+
+  /**
+   * Check a set of rules before it is saved. Returns a list of plain sentences,
+   * empty when there is nothing wrong.
+   *
+   * Refusing is the whole point: a bad ladder or a bad barred list does not
+   * fail loudly at save time, it fails quietly at scoring time, three hours
+   * later, in front of the men.
+   */
+  function checkContests(full, course) {
+    const problems = [];
+    const c = course || ABERDEEN_TEE_IV;
+
+    /* Barred holes. A slot with one legal hole is not a choice, it is a
+       formality, and a slot with none cannot be filled at all. */
+    const w = full.watchTheBirdie;
+    if (w && w.barred) {
+      for (const h of w.barred) {
+        if (!(Number.isInteger(h) && h >= 1 && h <= HOLES)) {
+          problems.push("Hole " + h + " is not a hole — they run 1 to 18.");
+        }
+      }
+      if (!problems.length) {
+        const legal = birdiePickHoles(c, full);
+        for (const slot of PICK_SLOTS) {
+          const n = legal[slot.key].length;
+          if (n < 2) {
+            problems.push("The " + slot.label + " would have " +
+              (n === 0 ? "no holes" : "only hole " + legal[slot.key][0]) +
+              " left to choose from. Every slot needs at least two.");
+          }
+        }
+      }
+    }
+
+    /* A ladder is graded first-match on `<=`, so its thresholds must climb. Out
+       of order, a rung below an earlier one can never be reached and the values
+       a man was promised are silently unreachable. */
+    for (const [key, label] of [["agonyAlley", "Agony Alley"], ["easyStreet", "Easy Street"],
+                                ["damageControl", "Damage Control"]]) {
+      const ladder = full[key];
+      if (!Array.isArray(ladder)) continue;
+      if (ladder.length === 0) { problems.push(label + " has no rungs at all."); continue; }
+      for (let i = 1; i < ladder.length; i++) {
+        if (!(ladder[i].threshold > ladder[i - 1].threshold)) {
+          problems.push(label + " runs out of order: " + ladder[i - 1].threshold +
+            " is followed by " + ladder[i].threshold + ". Each rung must be higher than the one above it.");
+          break;
+        }
+      }
+      for (const rung of ladder) {
+        if (typeof rung.strokes !== "number" || !Number.isFinite(rung.strokes)) {
+          problems.push(label + " has a rung with no value on it.");
+          break;
+        }
+      }
+    }
+
+    /* Skins. A floor above the pot means one skin is worth less than two, which
+       is the opposite of everything else here. */
+    const sk = full.skins;
+    if (sk) {
+      if (!(sk.minPlayers >= 2)) problems.push("Skins needs at least two players to run.");
+      if (!(sk.teamFrom > sk.minPlayers)) {
+        problems.push("Team skins must start above the field size cart skins starts at — " +
+          sk.teamFrom + " is not above " + sk.minPlayers + ".");
+      }
+      if (sk.minSkin != null && Math.abs(sk.minSkin) > Math.abs(sk.pot)) {
+        problems.push("A skin cannot be worth more on its own (" + Math.abs(sk.minSkin) +
+          ") than the whole pot (" + Math.abs(sk.pot) + ").");
+      }
+    }
+
+    /* Hit List. A band below zero would put nobody in it. */
+    if (full.hitList && !(full.hitList.equalBand >= 0)) {
+      problems.push("The equal-handicap band cannot be negative.");
+    }
+    return problems;
   }
 
   /* ---- Score one card ---- */
@@ -631,7 +793,7 @@
     // takes the contest off the card.
     let watchTheBirdie, sixPack;
     const picks = migratePicks(card.picks);
-    const read = picks == null ? null : readPicks(picks, course, card.name);
+    const read = picks == null ? null : readPicks(picks, course, card.name, { drop: true, contests });
     const chosen = read == null ? []
       : PICK_SLOTS.map((s) => read[s.key]).filter((h) => h != null);
 
@@ -652,8 +814,10 @@
       if (paid === 0 && allPlayed && blank !== 0) birdieStrokes += blank;
       watchTheBirdie = {
         strokes: toTenth(birdieStrokes),
+        // Counted, not assumed to be six. A pick on a hole barred after he
+        // chose it is dropped, so a man can arrive here with five.
         detail: paid === 0
-          ? (allPlayed ? "nothing on any of the six" : "nothing yet")
+          ? (allPlayed ? "nothing on any of his " + chosen.length : "nothing yet")
           : paid + " of " + chosen.length + " pick" + (chosen.length === 1 ? "" : "s"),
         live: true,
       };
@@ -669,7 +833,7 @@
     // Needs the picks, because without them there is no "did not choose". And
     // needs all six played, because a missing hole would silently flatter the
     // total by the whole of its par.
-    const candidates = birdiePickCandidates(course);
+    const candidates = birdiePickCandidates(course, contests);
     const leftovers = candidates.filter((h) => chosen.indexOf(h) === -1);
     if (contests.sixPack == null) {
       sixPack = null;
@@ -729,35 +893,53 @@
         live: true };
     }
 
-    // 5 · Triple Threat — a blow-up costs, answering it on the next hole pays.
+    // 5 · Triple Threat — a blow-up costs.
+    // 6 · Bounce Back — answering one on the very next hole pays.
+    //
+    // TWO CONTESTS, ONE SET OF FACTS. They are separate on the card, in the
+    // export, in the shared view and on the Settings screen, each with its own
+    // value and its own switch — but they read the same two things about the
+    // round, and Bounce Back still only ever fires on the hole STRAIGHT AFTER a
+    // blow-up. Nothing about that link changed when they were pulled apart.
+    //
+    // Either may be switched off without the other. A blow-up is a fact about
+    // the card rather than about whether it is being charged for, so Bounce
+    // Back pays a recovery even in a round where Triple Threat is not in the
+    // game — which is the only reading that lets the switches be independent.
     //
     // A BLOW-UP IS A NET DOUBLE BOGEY, the worst the cap allows. It was a gross
     // triple, which within one tee ran r = +0.43 with handicap index — it was
     // measuring the handicap, not the round. Net doubles run +0.01.
     //
-    // A picked-up hole IS counted, unlike before. It is filled in at par + 4,
-    // which caps to a net double, and a hole a man picked up on was a blow-up
-    // by any reading. Under the old gross-triple rule it had to be excluded to
-    // avoid charging a Stableford player for doing what Stableford asks.
-    let tripleThreat;
-    if (contests.tripleThreat == null) {
-      tripleThreat = null;
-    } else {
-      let triples = 0, bounces = 0;
-      for (let i = 0; i < HOLES; i++) {
-        if (!played(i) || over(i) < 2) continue;
-        triples++;
-        // The 18th has no next hole, so a blow-up there can only cost. Two net
-        // doubles running leave the first unanswered, which is the intent.
-        if (i + 1 < HOLES && played(i + 1) && over(i + 1) <= 0) bounces++;
-      }
-      const raw = triples * contests.tripleThreat.perTriple
-                + bounces * contests.tripleThreat.perBounceBack;
-      tripleThreat = { strokes: toTenth(raw),
-        detail: triples === 0 ? "no net doubles"
-          : triples + " net double" + (triples === 1 ? "" : "s") + ", " +
-            bounces + " bounce-back" + (bounces === 1 ? "" : "s"),
-        live: true };
+    // A picked-up hole IS counted. It is filled in at par + 4, which caps to a
+    // net double, and a hole a man picked up on was a blow-up by any reading.
+    let blowUps = 0, bounces = 0;
+    for (let i = 0; i < HOLES; i++) {
+      if (!played(i) || over(i) < 2) continue;
+      blowUps++;
+      // The 18th has no next hole, so a blow-up there can only cost. Two net
+      // doubles running leave the first unanswered, which is the intent.
+      if (i + 1 < HOLES && played(i + 1) && over(i + 1) <= 0) bounces++;
+    }
+
+    let tripleThreat = null;
+    if (contests.tripleThreat != null) {
+      tripleThreat = {
+        strokes: toTenth(blowUps * contests.tripleThreat.perTriple),
+        detail: blowUps === 0 ? "no net doubles"
+          : blowUps + " net double" + (blowUps === 1 ? "" : "s"),
+        live: true,
+      };
+    }
+
+    let bounceBack = null;
+    if (contests.bounceBack != null) {
+      bounceBack = {
+        strokes: toTenth(bounces * contests.bounceBack.perBounceBack),
+        detail: bounces === 0 ? "no bounce-backs"
+          : bounces + " off a net double" + (bounces === 1 ? "" : "s"),
+        live: true,
+      };
     }
 
     // Go Long and Get Shorty — switched off, Easy Street replaces them. The
@@ -769,17 +951,6 @@
       if (idxs.filter(played).length < 4) return { strokes: 0, detail: "needs the " + label, live: false };
       const total = sum(idxs.map(over));
       return { strokes: gradeAtMost(total, ladder), detail: signed(total) + " vs par on the " + label, live: true };
-    }
-
-    // Bounce Back — switched off; Triple Threat's second half carries the name.
-    let bounceBack = null;
-    if (contests.bounceBack != null) {
-      let bounces = 0;
-      for (let i = 0; i < HOLES - 1; i++) {
-        if (played(i) && played(i + 1) && over(i) >= 1 && over(i + 1) <= -1) bounces++;
-      }
-      bounceBack = { strokes: gradeAtLeast(bounces, contests.bounceBack),
-        detail: bounces + " bounce-back" + (bounces === 1 ? "" : "s"), live: true };
     }
 
     // Hit List is NOT scored here. It needs the opponent's card, and this
@@ -1387,6 +1558,7 @@
     resolveCourseHandicap, strokesOnHole, netOnHole, cappedNetByHole,
     birdiePickHoles, birdiePickCandidates, PICK_SLOTS, LEGACY_SLOT_KEYS,
     migratePicks, readPicks, randomPicks,
+    mergeContests, diffContests, checkContests,
     scorePlayer, scoreField, computeLeaderboard,
     computeFlights, flightOf, flightsInUse, sortFlights,
   };

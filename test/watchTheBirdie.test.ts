@@ -157,7 +157,7 @@ test("the total is always a clean tenth", () => {
 test("nothing on any of the six costs half a stroke", () => {
   const r = score(card(SIX));
   assert.equal(r.strokes, 0.5);
-  assert.match(r.detail, /nothing on any of the six/);
+  assert.match(r.detail, /nothing on any of his 6/);
 });
 
 test("the penalty is not charged while a pick is still unplayed", () => {

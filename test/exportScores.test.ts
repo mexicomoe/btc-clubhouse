@@ -82,8 +82,11 @@ test("the columns are the ones the brief asks for, in order", () => {
   const head = headerRow();
   // The event's own columns lead, and repeat on every row, so several rounds
   // can be piled into one sheet and still be told apart.
-  assert.deepEqual(head.slice(0, 19), [
-    "Event", "Date", "Format",
+  assert.deepEqual(head.slice(0, 20), [
+    // "Rules" says whether this round was scored on the defaults, and names
+    // what was changed when it was not. A round on house rules must not sit in
+    // a sheet looking like an ordinary one.
+    "Event", "Date", "Rules", "Format",
     "Name", "Name as entered", "GHIN",
     "Handicap index", "Tee", "Gender", "Group", "Flight",
     "Front par 4 pick", "Back par 4 pick",
@@ -91,16 +94,20 @@ test("the columns are the ones the brief asks for, in order", () => {
     "Hit List pick",
     "Course handicap",
   ]);
-  assert.deepEqual(head.slice(19, 37), Array.from({ length: 18 }, (_, i) => "H" + (i + 1)));
-  assert.deepEqual(head.slice(37, 55), Array.from({ length: 18 }, (_, i) => "N" + (i + 1)));
-  assert.deepEqual(head.slice(55, 57), ["Net", "Gross"]);
+  // Offsets derived from where the lead columns actually end, so adding one
+  // more shifts these on its own rather than silently breaking the assertion.
+  const H1 = head.indexOf("H1");
+  assert.equal(H1, 20, "the lead columns run to here");
+  assert.deepEqual(head.slice(H1, H1 + 18), Array.from({ length: 18 }, (_, i) => "H" + (i + 1)));
+  assert.deepEqual(head.slice(H1 + 18, H1 + 36), Array.from({ length: 18 }, (_, i) => "N" + (i + 1)));
+  assert.deepEqual(head.slice(H1 + 36, H1 + 38), ["Net", "Gross"]);
   // A FRESH WORKBOOK at the changeover. The zero base makes every past round
   // incomparable, so the archive is kept as it stands and this file starts
   // clean — which means the switched-off contests no longer need blank columns
   // holding their place.
-  assert.deepEqual(head.slice(57), [
+  assert.deepEqual(head.slice(H1 + 38), [
     "Watch the Birdie", "Six Pack", "Agony Alley", "Easy Street",
-    "Triple Threat", "Hit List", "Skins",
+    "Triple Threat", "Bounce Back", "Hit List", "Skins",
     "Final",
   ]);
 
@@ -174,10 +181,12 @@ test("the scoring columns come from the leaderboard, not recomputed", () => {
   assert.equal(cell(ken, "Agony Alley"), String(r.contests.agonyAlley!.strokes));
   assert.equal(cell(ken, "Six Pack"), String(r.contests.sixPack!.strokes));
   assert.equal(cell(ken, "Hit List"), String(r.contests.hitList!.strokes));
+  // Its own column again — a sheet could not otherwise tell a man who never
+  // blew up from one who blew up and recovered.
+  assert.equal(cell(ken, "Bounce Back"), String(r.contests.bounceBack!.strokes));
   // The switched-off contests have no columns at all now — a fresh workbook
   // does not need blanks holding places for contests nobody plays.
   const head = headerRow();
-  assert.equal(head.includes("Bounce Back"), false);
   assert.equal(head.includes("Damage Control"), false);
   assert.equal(head.includes("Go Long"), false);
   assert.equal(head.includes("Get Shorty"), false);
