@@ -2633,19 +2633,32 @@ function renderInvites(){
       : "sent " + niceDate(was.at) + " by " + was.how;
     const long = link.length > 219;
     const body = encodeURIComponent(inviteText(p));
-    const sms = smsHref(body);
-    const mail = "mailto:" + encodeURIComponent(rosterEmail(p)) +
+    const mobile = rosterMobile(p);
+    const email = rosterEmail(p);
+    const mail = "mailto:" + encodeURIComponent(email) +
       "?subject=" + encodeURIComponent("Beat the Crowd — your picks") + "&body=" + body;
+    // A BUTTON THAT OPENS AN EMPTY MESSAGE IS WORSE THAN NO BUTTON. It looks
+    // like it worked, and the man searching his contacts by hand does not know
+    // the app failed him — he thinks that is how it works.
+    const reach = [];
+    if(!mobile) reach.push("no mobile in the roster");
+    if(!email) reach.push("no e-mail in the roster");
     return `<div class="prev"><div class="pv">` +
         `<div class="pvn">${esc(displayName(p))}</div>` +
         `<div class="pvd">${esc(state_)}</div>` +
         `<div class="pvd">${link.length} characters — ${long
           ? "<b>too long to text reliably, e-mail this one</b>"
-          : "short enough to text"}</div>` +
+          : "short enough to text"}${reach.length ? " · <b>" + esc(reach.join(" · ")) + "</b>" : ""}</div>` +
       `</div></div>` +
       `<div class="pad" style="padding-top:0">` +
-        `<a class="big ${long ? "" : "solid"}" href="${sms}" data-sent="${p.id}" data-how="text">Text ${esc(firstNameOf(p))}</a>` +
-        `<a class="big ${long ? "solid" : ""}" href="${esc(mail)}" data-sent="${p.id}" data-how="e-mail">E-mail him</a>` +
+        (mobile
+          ? `<a class="big ${long ? "" : "solid"}" href="${esc(smsHref(body, mobile))}"` +
+            ` data-sent="${p.id}" data-how="text">Text ${esc(firstNameOf(p))} on ${esc(mobile)}</a>`
+          : `<button class="big" disabled>No mobile for ${esc(firstNameOf(p))} — add one in the roster</button>`) +
+        (email
+          ? `<a class="big ${long ? "solid" : ""}" href="${esc(mail)}"` +
+            ` data-sent="${p.id}" data-how="e-mail">E-mail ${esc(email)}</a>`
+          : `<button class="big" disabled>No e-mail for ${esc(firstNameOf(p))}</button>`) +
       `</div>`;
   }).join("");
 
@@ -2674,13 +2687,48 @@ function rosterEmail(p){
   return m && m.email ? m.email : "";
 }
 
-/** iOS wants sms:&body=, Android sms:?body= — the same rule the pick sheet uses. */
-function smsHref(body){
+/**
+ * A text to ONE MAN, addressed to him.
+ *
+ * THIS LEFT THE RECIPIENT OUT ENTIRELY and opened an empty message every time.
+ * The function was lifted from the pick sheet, where a blank recipient is a
+ * DELIBERATE decision — that page has no number to put there and publishing
+ * Rob's own on a public address was refused. Carried across here the reasoning
+ * inverted: this screen has every man's mobile sitting in the roster, and the
+ * whole point of it is to address the message.
+ *
+ * It looked like it worked, which is why it survived a walkthrough. The men it
+ * "worked" for were the ones already in the sending phone's contacts, found by
+ * hand — so the failure was invisible exactly where the app was most confident.
+ *
+ * The number goes immediately after `sms:`, before the separator. iOS still
+ * wants `&` before body and Android `?`, recipient or not.
+ */
+function smsHref(body, number){
   const ua = navigator.userAgent || "";
   const ios = !/Android/i.test(ua) &&
     (/iPhone|iPad|iPod/i.test(ua) ||
      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
-  return "sms:" + (ios ? "&" : "?") + "body=" + body;
+  return "sms:" + tel(number) + (ios ? "&" : "?") + "body=" + body;
+}
+
+/**
+ * A number as an sms: link will take it: digits, and a leading + kept because
+ * it is what makes a number unambiguous. Spaces, dashes and brackets are how a
+ * man writes a number down and are meaningless here.
+ */
+function tel(raw){
+  const s = String(raw == null ? "" : raw).trim();
+  if(s === "") return "";
+  const plus = s.charAt(0) === "+" ? "+" : "";
+  return plus + s.replace(/[^0-9]/g, "");
+}
+
+/** His mobile, from the roster. The twin of rosterEmail, which existed alone. */
+function rosterMobile(p){
+  const m = rosterMen().find(r => r.id === p.rosterId) ||
+            rosterMen().find(r => IMP.normaliseName(r.name) === IMP.normaliseName(p.name || ""));
+  return m && m.mobile ? m.mobile : "";
 }
 
 /** The slots and their legal holes, as the parser wants them. */

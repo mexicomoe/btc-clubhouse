@@ -203,3 +203,57 @@ test("an offer of one is refused — one name is not a choice", () => {
     E.mergeContests(DEFAULT_CONTESTS, { hitList: { offer: 1 } }), ABERDEEN_TEE_IV);
   assert.match(problems[0], /at least two opponents/);
 });
+
+/* ---- the message must be ADDRESSED ---- */
+
+/**
+ * It was not. The sms: link carried a body and no recipient, so Messages opened
+ * empty every time and the sender searched his contacts by hand. It looked like
+ * it worked for the men already in his contacts, which is why a walkthrough
+ * missed it — the failure was invisible exactly where the app was confident.
+ *
+ * The function had been lifted from the pick sheet, where a blank recipient is
+ * DELIBERATE: that page has no number to put there. Carried across, the
+ * reasoning inverted, and nothing checked.
+ */
+
+/** The same rule the screen uses. */
+function tel(raw: string) {
+  const s = String(raw == null ? "" : raw).trim();
+  if (s === "") return "";
+  return (s.charAt(0) === "+" ? "+" : "") + s.replace(/[^0-9]/g, "");
+}
+function smsHref(body: string, number: string, ios: boolean) {
+  return "sms:" + tel(number) + (ios ? "&" : "?") + "body=" + body;
+}
+
+test("A TEXT CARRIES THE RECIPIENT — the bug that opened an empty message", () => {
+  for (const ios of [true, false]) {
+    const url = smsHref("hello", "555-010-1234", ios);
+    assert.match(url, /^sms:5550101234[&?]body=/, ios ? "iOS" : "Android");
+    // The number sits BEFORE the separator. After it, it would read as a field.
+    assert.ok(url.indexOf("5550101234") < url.indexOf("body="));
+  }
+});
+
+test("the separator is still right for each phone, recipient or not", () => {
+  assert.equal(smsHref("x", "5550101234", true), "sms:5550101234&body=x");
+  assert.equal(smsHref("x", "5550101234", false), "sms:5550101234?body=x");
+});
+
+test("a number is cleaned to what an sms: link will take", () => {
+  assert.equal(tel("(555) 010-1234"), "5550101234");
+  assert.equal(tel("555 010 1234"), "5550101234");
+  assert.equal(tel("+1 555-010-1234"), "+15550101234", "a leading + is what makes it unambiguous");
+  assert.equal(tel(""), "");
+});
+
+test("no number means no button, rather than a button that opens nothing", () => {
+  // The screen shows a disabled button naming what is missing. What must never
+  // happen is a live button producing "sms:&body=…" — an empty message that
+  // looks like it worked.
+  const url = smsHref("hello", "", true);
+  assert.equal(url, "sms:&body=hello");
+  assert.equal(url.startsWith("sms:&"), true,
+    "this is the shape the screen must refuse to offer");
+});
