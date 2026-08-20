@@ -24,6 +24,24 @@
   <div id="shareBox"></div>
 </section>
 
+<section id="roster" class="screen">
+  <div class="backbar"><button class="back" id="rosterBack">‹ Setup</button></div>
+  <header class="band">
+    <div class="title">The roster</div>
+    <div class="sub" id="rosterSub">Men who play, round after round</div>
+  </header>
+  <div id="rosterScreen"></div>
+</section>
+
+<section id="invites" class="screen">
+  <div class="backbar"><button class="back" id="invitesBack">‹ Setup</button></div>
+  <header class="band">
+    <div class="title">Send the invitations</div>
+    <div class="sub" id="invitesSub">One message a man</div>
+  </header>
+  <div id="invitesScreen"></div>
+</section>
+
 <section id="settings" class="screen">
   <div class="backbar"><button class="back" id="settingsBack">‹ Setup</button></div>
   <header class="band">
@@ -97,6 +115,14 @@
     <div id="skinsSwitch"></div>
     <div id="autoPicksSwitch"></div>
   </details>
+
+  <button class="fold step go" id="goInvites">
+    <span><span class="fname">Send the invitations</span>
+      <span class="fsub" id="goInvitesSub"></span></span></button>
+
+  <button class="fold step go" id="goRoster">
+    <span><span class="fname">The roster</span>
+      <span class="fsub" id="goRosterSub"></span></span></button>
 
   <button class="fold step go" id="goRules">
     <span><span class="fname">The rules</span>
@@ -210,7 +236,52 @@ const DEFAULT_FORMAT = "Individual net";
 const COMMON_FORMATS = ["Individual net", "Individual gross", "Stableford",
                         "Better ball", "Best two of four", "Scramble"];
 
-let store = { version: 2, nextEventId: 1, currentId: null, events: [] };
+let store = { version: 2, nextEventId: 1, currentId: null, events: [], roster: [] };
+
+/* ---------- the roster ----------
+   A list of men that OUTLIVES an event. Rob types the same eight to ten names,
+   indexes and tees every Friday for a group that barely changes, because until
+   now a new event started from nothing.
+
+   It sits beside the events rather than inside one, and is saved by the same
+   save() — nothing new to persist and nothing new to go wrong.
+
+   A FIELD IS A COPY, NEVER A REFERENCE. A player in an event keeps his own
+   index and tee, so correcting one for a round writes to the round and never
+   back to the roster, and a round already scored is untouched by anything done
+   here afterwards. That is the existing shape; the roster only fills it in. */
+function rosterMen(){ return Array.isArray(store.roster) ? store.roster : (store.roster = []); }
+
+/** A man from the roster, as a player in THIS round. */
+function playerFromRoster(m){
+  const p = blankPlayer();
+  p.rosterId = m.id;
+  p.name = m.name;
+  p.index = m.index;
+  p.tee = m.tee || state.lastTee || "IV";
+  p.gender = m.gender || "M";
+  return p;
+}
+
+/** Is he already in this round? By roster id where there is one, else by name. */
+function inField(m){
+  return state.players.some(p =>
+    (p.rosterId && p.rosterId === m.id) ||
+    IMP.normaliseName(p.name || "") === IMP.normaliseName(m.name || ""));
+}
+
+function addToRoster(fields){
+  const roster = rosterMen();
+  const id = "r" + (Date.now().toString(36)) + roster.length;
+  const m = { id, name: "", index: null, tee: state.lastTee || "IV", gender: "M",
+              email: "", mobile: "" };
+  Object.assign(m, fields || {});
+  m.id = id;
+  roster.push(m);
+  roster.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+  save();
+  return m;
+}
 // `handicaps` holds the course handicap the export printed beside a player's
 // name — the one that was in force on the day. It outranks anything derived
 // from today's index, because an index moves and a played round does not.
@@ -271,6 +342,10 @@ function normalisePlayer(p){
   ["front","back","f3","f4","f5","b3","b4","b5"].forEach(k => { delete out[k]; });
   // The man he named, and his team for Team Skins. Both are plain strings.
   out.hitList = typeof out.hitList === "string" ? out.hitList : "";
+  // Where he came from, when he came from the roster. Absent on every round
+  // scored before the roster existed, and absent is fine — it only ever means
+  // "edit him in the roster" has nowhere to go.
+  out.rosterId = typeof out.rosterId === "string" ? out.rosterId : null;
   out.team = typeof out.team === "string" ? out.team : "";
   return out;
 }
@@ -319,6 +394,7 @@ function load(){
       const s = JSON.parse(raw);
       if(s && Array.isArray(s.events) && s.events.length){
         store.nextEventId = s.nextEventId || s.events.length + 1;
+        store.roster = Array.isArray(s.roster) ? s.roster : [];
         store.events = s.events.map((e, i) => normaliseEvent(e, "Round " + (i + 1)));
         store.currentId = s.currentId;        // the last one opened comes back
         state = currentEvent();
@@ -783,7 +859,7 @@ function cardOf(p){
 function readyPlayers(){ return state.players.filter(isReady); }
 
 /* ---------- screen routing ---------- */
-const SCREENS = ["board","player","setup","edit","skins","import","settings"];
+const SCREENS = ["board","player","setup","edit","skins","import","settings","roster","invites"];
 // Four tabs across a phone: short labels, so none has to shrink below 18px.
 const TAB_LABELS = [["board","Leaders"],["setup","Setup"],["skins","Skins"],["import","Import"]];
 
@@ -1412,6 +1488,22 @@ function drawFoldSubs(){
      state.autoPicks ? "picks drawn" : "picks not drawn",
     ].join(" · "), false);
 
+  const roster = rosterMen();
+  say("goRosterSub",
+    roster.length === 0 ? "Nobody saved yet — add the men who play every week"
+      : roster.length + " saved · " + roster.filter(m => inField(m)).length + " in this round",
+    false);
+
+  const sent = state.invitesSent || {};
+  const inviteable = readyPlayers();
+  const sentCount = inviteable.filter(p => sent[p.id] && sent[p.id].six === sixKey(p)).length;
+  const stale = inviteable.filter(p => sent[p.id] && sent[p.id].six !== sixKey(p)).length;
+  say("goInvitesSub",
+    inviteable.length === 0 ? "Nobody to send to yet"
+      : sentCount + " of " + inviteable.length + " sent" +
+        (stale ? " · " + stale + " changed since — send again" : ""),
+    stale > 0);
+
   /* THE RULES — default, or what was changed. */
   say("goRulesSub",
     rulesChanged() ? "Changed: " + changedRulesNote() : "The default values",
@@ -1971,6 +2063,19 @@ function rungLabel(key, rungs, i){
 /** A value as it reads on the card, never as a negative nought. */
 function fmtRule(v){ return fmtStrokes(Object.is(v, -0) ? 0 : Number(v)); }
 
+/** An on/off for a single nested value, rather than a whole contest. */
+function sw2(path, label, value, dflt){
+  return `<div class="field"><span class="flab">${esc(label)}</span>` +
+    `<div class="seg" data-sw2="${path}">` +
+      `<button type="button" data-v="1" aria-pressed="${!!value}">On</button>` +
+      `<button type="button" data-v="0" aria-pressed="${!value}">Off</button>` +
+    `</div>` +
+    (!!value === !!dflt ? `` :
+      `<div class="cd" style="margin-top:10px;font-size:18px;font-weight:700">` +
+        `was <b>${dflt ? "On" : "Off"}</b></div>`) +
+    `</div>`;
+}
+
 function numField(label, path, value, dflt, opts){
   const o = opts || {};
   const same = Number(value) === Number(dflt);
@@ -2162,6 +2267,12 @@ function wireSettings(){
     const v = Number(raw.replace("−", "-").replace(",", "."));
     return Number.isFinite(v) ? v : null;
   };
+  body.querySelectorAll("[data-sw2]").forEach(seg =>
+    seg.querySelectorAll("button").forEach(b =>
+      b.addEventListener("click", () => {
+        settingsSet(seg.dataset.sw2, b.dataset.v === "1");
+        renderSettings();
+      })));
   body.querySelectorAll("input[data-path]").forEach(el =>
     el.addEventListener("input", () => {
       const v = readNumber(el);
@@ -2316,6 +2427,260 @@ function showLink(url){
   return `<div class="field"><label for="fieldLinkText">Copy this by hand</label>` +
     `<textarea id="fieldLinkText" readonly rows="4"
        style="width:100%;font-size:18px">${esc(url)}</textarea></div>`;
+}
+
+/* ---------- the roster screen ---------- */
+
+function renderRoster(){
+  const box = document.getElementById("rosterScreen");
+  const roster = rosterMen();
+  document.getElementById("rosterSub").textContent =
+    roster.length === 0 ? "Nobody saved yet" :
+    roster.length + " men · " + roster.filter(m => inField(m)).length + " in this round";
+
+  const rows = roster.map((m, i) => {
+    const here = inField(m);
+    const bits = [m.index == null ? "no index" : "idx " + E.formatHandicapIndex(m.index),
+                  "Tee " + (m.tee || "IV")];
+    if(m.mobile) bits.push("mobile");
+    if(m.email) bits.push("e-mail");
+    return `<div class="prev"><div class="pv">` +
+        `<div class="pvn">${esc(m.name || "(no name)")}</div>` +
+        `<div class="pvd">${esc(bits.join(" · "))}</div>` +
+      `</div><div class="pvt">` +
+        (here ? `<span class="tag">in</span>`
+              : `<button class="big" data-add="${i}" style="min-height:44px;padding:8px 12px;font-size:18px">Add</button>`) +
+      `</div></div>` +
+      `<div class="pad" style="padding-top:0"><button class="big" data-edit="${i}">Edit ${esc(m.name || "him")}</button></div>`;
+  }).join("");
+
+  box.innerHTML =
+    `<div class="note">These men outlive a round. Building a field is picking
+      names off this list rather than typing them again — his index and tee come
+      with him, and correcting one <b>for a round</b> never changes him here.
+      Editing him here never touches a round already scored.</div>` +
+    (roster.length ? `<div class="pad">` +
+       `<button class="big solid" id="rosterAddAll">Add everyone not in this round</button></div>` : ``) +
+    rows +
+    `<div class="pad">` +
+      `<button class="big solid" id="rosterNew">+ Add a man to the roster</button>` +
+      `<button class="big" id="rosterFromField">Save this round's players to the roster</button>` +
+    `</div>` +
+    `<div id="rosterEdit"></div>`;
+
+  box.querySelectorAll("[data-add]").forEach(b =>
+    b.addEventListener("click", () => {
+      if(state.players.length >= MAX_PLAYERS) return;
+      state.players.push(playerFromRoster(roster[Number(b.dataset.add)]));
+      state.nextId = state.nextId;   // blankPlayer already advanced it
+      save(); renderRoster(); renderSetup(); renderBoard();
+    }));
+  box.querySelectorAll("[data-edit]").forEach(b =>
+    b.addEventListener("click", () => editRosterMan(Number(b.dataset.edit))));
+
+  const all = document.getElementById("rosterAddAll");
+  if(all) all.addEventListener("click", () => {
+    for(const m of roster){
+      if(state.players.length >= MAX_PLAYERS) break;
+      if(!inField(m)) state.players.push(playerFromRoster(m));
+    }
+    save(); renderRoster(); renderSetup(); renderBoard();
+  });
+  document.getElementById("rosterNew").addEventListener("click", () => {
+    addToRoster({ name: "" });
+    renderRoster();
+    editRosterMan(rosterMen().findIndex(m => m.name === ""));
+  });
+  document.getElementById("rosterFromField").addEventListener("click", () => {
+    // Anybody in the round who is not yet saved. One tap, because the usual way
+    // in is a tee sheet paste and retyping them here would be the whole problem
+    // over again.
+    let added = 0;
+    for(const p of state.players){
+      if(rosterMen().some(m => IMP.normaliseName(m.name) === IMP.normaliseName(p.name || ""))) continue;
+      if(!(p.name || "").trim()) continue;
+      const m = addToRoster({ name: p.name, index: p.index, tee: p.tee, gender: p.gender });
+      p.rosterId = m.id;
+      added++;
+    }
+    save(); renderRoster();
+  });
+}
+
+function editRosterMan(i){
+  const roster = rosterMen();
+  const m = roster[i];
+  if(!m) return;
+  const box = document.getElementById("rosterEdit");
+  const f = (id, label, value, type, hint) =>
+    `<div class="field"><label for="${id}">${esc(label)}</label>` +
+    `<input id="${id}" type="${type || "text"}" value="${esc(value == null ? "" : value)}">` +
+    (hint ? `<div class="cd" style="margin-top:8px;font-size:18px;font-weight:700">${esc(hint)}</div>` : ``) +
+    `</div>`;
+  box.innerHTML =
+    `<div class="section-label">Editing ${esc(m.name || "a new man")}</div>` +
+    f("rmName", "Name", m.name, "text", "As Golf Genius writes it — Ridgeway, Ken") +
+    f("rmIndex", "Handicap index", m.index == null ? "" : m.index, "text") +
+    `<div class="field"><label for="rmTee">Usual tee</label><select id="rmTee">` +
+      E.TEE_IDS.map(t => `<option value="${t}"${t === (m.tee || "IV") ? " selected" : ""}>${t}</option>`).join("") +
+    `</select></div>` +
+    f("rmMobile", "Mobile", m.mobile, "tel", "For the invitations") +
+    f("rmEmail", "E-mail", m.email, "email", "Used when a link is too long to text") +
+    `<div class="pad">` +
+      `<button class="big solid" id="rmSave">Save him</button>` +
+      `<button class="big" id="rmCancel">Cancel</button>` +
+      `<button class="big danger" id="rmRemove">Remove from the roster</button>` +
+    `</div><div id="rmErr" class="note warn" hidden></div>`;
+
+  document.getElementById("rmSave").addEventListener("click", () => {
+    const name = document.getElementById("rmName").value.trim();
+    const read = E.parseHandicapIndex(document.getElementById("rmIndex").value);
+    const err = document.getElementById("rmErr");
+    const wrong = [];
+    if(name === "") wrong.push("He needs a name.");
+    if(!read.ok) wrong.push(read.error);
+    if(wrong.length){ err.hidden = false; err.innerHTML = wrong.map(esc).join("<br>"); return; }
+    m.name = name;
+    m.index = read.value;
+    m.tee = document.getElementById("rmTee").value;
+    m.mobile = document.getElementById("rmMobile").value.trim();
+    m.email = document.getElementById("rmEmail").value.trim();
+    rosterMen().sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    save();
+    box.innerHTML = "";
+    renderRoster();
+  });
+  document.getElementById("rmCancel").addEventListener("click", () => { box.innerHTML = ""; });
+  document.getElementById("rmRemove").addEventListener("click", () => {
+    // The ROSTER only. A man already in a round stays in it — this list is who
+    // usually plays, not who is playing.
+    roster.splice(i, 1); save(); box.innerHTML = ""; renderRoster();
+  });
+  box.scrollIntoView();
+}
+
+/* ---------- the invitations ----------
+
+   ONE MESSAGE A MAN, carrying his own six opponents.
+
+   The whole-field link could not be texted: 283 characters at eight men and 501
+   at sixteen, against a phone that delivered 219 first time and needed a second
+   attempt at 250. It failed hardest exactly when there were most men to reach.
+   A man's own link does not grow with the field — sixteen men get the same 209
+   characters as eight.
+
+   NO HANDICAP INDEX TRAVELS. The bands are worked out here, against his index,
+   and only the words go into the link. */
+
+/** His six, worked out with the ENGINE's rule and nobody else's. */
+function sixFor(p){
+  const cfg = contestConfig().hitList;
+  if(!cfg) return [];
+  const others = readyPlayers().filter(o => o.id !== p.id && o.index != null);
+  return E.nearestByIndex(p.index, others, cfg.offer).map(o => ({
+    name: displayName(o),
+    band: p.index == null || o.index == null ? "e"
+      : Math.abs(p.index - o.index) <= cfg.equalBand ? "e"
+      : o.index < p.index ? "l" : "h",
+  }));
+}
+
+/** What his six ARE, as one string — so a change to them can be spotted. */
+function sixKey(p){
+  return sixFor(p).map(o => o.name + ":" + o.band).join("|");
+}
+
+function inviteLink(p){
+  const base = location.href.split("?")[0].split("#")[0]
+    .replace(/leaderboard\.html$/, "picks.html");
+  return FL.manLink(base, displayName(p), sixFor(p));
+}
+
+function inviteText(p){
+  return "Beat the Crowd, " + niceDate(state.date) + ". Pick your six holes and " +
+    "your Hit List man here: " + inviteLink(p);
+}
+
+function markSent(p, how){
+  if(!state.invitesSent) state.invitesSent = {};
+  state.invitesSent[p.id] = { at: todayISO(), how, six: sixKey(p) };
+  save();
+}
+
+function renderInvites(){
+  const box = document.getElementById("invitesScreen");
+  const men = readyPlayers();
+  const sent = state.invitesSent || {};
+
+  if(men.length === 0){
+    box.innerHTML = `<div class="note warn">Nobody in this round has an index and a tee yet.</div>`;
+    return;
+  }
+  if(!contestConfig().hitList){
+    box.innerHTML = `<div class="note warn">The Hit List is switched off for this round,
+      so there is nothing to invite anybody to. Turn it on under <b>The rules</b>.</div>`;
+    return;
+  }
+
+  document.getElementById("invitesSub").textContent =
+    men.filter(p => sent[p.id] && sent[p.id].six === sixKey(p)).length + " of " + men.length + " sent";
+
+  const rows = men.map(p => {
+    const link = inviteLink(p);
+    const was = sent[p.id];
+    const changed = was && was.six !== sixKey(p);
+    const state_ = !was ? "not sent" : changed ? "his six have CHANGED — send again"
+      : "sent " + niceDate(was.at) + " by " + was.how;
+    const long = link.length > 219;
+    const body = encodeURIComponent(inviteText(p));
+    const sms = smsHref(body);
+    const mail = "mailto:" + encodeURIComponent(rosterEmail(p)) +
+      "?subject=" + encodeURIComponent("Beat the Crowd — your picks") + "&body=" + body;
+    return `<div class="prev"><div class="pv">` +
+        `<div class="pvn">${esc(displayName(p))}</div>` +
+        `<div class="pvd">${esc(state_)}</div>` +
+        `<div class="pvd">${link.length} characters — ${long
+          ? "<b>too long to text reliably, e-mail this one</b>"
+          : "short enough to text"}</div>` +
+      `</div></div>` +
+      `<div class="pad" style="padding-top:0">` +
+        `<a class="big ${long ? "" : "solid"}" href="${sms}" data-sent="${p.id}" data-how="text">Text ${esc(firstNameOf(p))}</a>` +
+        `<a class="big ${long ? "solid" : ""}" href="${esc(mail)}" data-sent="${p.id}" data-how="e-mail">E-mail him</a>` +
+      `</div>`;
+  }).join("");
+
+  box.innerHTML =
+    `<div class="note">Each man gets his OWN link, carrying only his six opponents —
+      no handicap indexes travel. Tapping a button opens the message already
+      written; you still press send.<br><br>
+      Marks are kept, so you can do these over a couple of days.</div>` +
+    rows +
+    `<div class="pad"><button class="big" id="invitesForget">Forget who has been sent to</button></div>`;
+
+  box.querySelectorAll("[data-sent]").forEach(a =>
+    a.addEventListener("click", () => {
+      const p = state.players.find(x => x.id === a.dataset.sent);
+      if(p){ markSent(p, a.dataset.how); setTimeout(renderInvites, 400); }
+    }));
+  document.getElementById("invitesForget").addEventListener("click", () => {
+    state.invitesSent = {}; save(); renderInvites(); renderSetup();
+  });
+}
+
+const firstNameOf = (p) => displayName(p).split(/\s+/)[0] || displayName(p);
+function rosterEmail(p){
+  const m = rosterMen().find(r => r.id === p.rosterId) ||
+            rosterMen().find(r => IMP.normaliseName(r.name) === IMP.normaliseName(p.name || ""));
+  return m && m.email ? m.email : "";
+}
+
+/** iOS wants sms:&body=, Android sms:?body= — the same rule the pick sheet uses. */
+function smsHref(body){
+  const ua = navigator.userAgent || "";
+  const ios = !/Android/i.test(ua) &&
+    (/iPhone|iPad|iPod/i.test(ua) ||
+     (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
+  return "sms:" + (ios ? "&" : "?") + "body=" + body;
 }
 
 /** The slots and their legal holes, as the parser wants them. */
@@ -3142,6 +3507,10 @@ document.getElementById("addBtn").addEventListener("click", () => {
   editPlayer(null);
 });
 // The three pastes are fold contents now, built when their step is opened.
+document.getElementById("goRoster").addEventListener("click", () => { renderRoster(); show("roster"); });
+document.getElementById("rosterBack").addEventListener("click", () => { renderSetup(); show("setup"); });
+document.getElementById("goInvites").addEventListener("click", () => { renderInvites(); show("invites"); });
+document.getElementById("invitesBack").addEventListener("click", () => { renderSetup(); show("setup"); });
 document.getElementById("goRules").addEventListener("click", () => {
   draft = null; renderSettings(); show("settings");
 });

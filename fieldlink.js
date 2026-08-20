@@ -125,8 +125,91 @@
     return decodeField(s.slice(at + FIELD_QUERY.length));
   }
 
+  /* ---- one man's own invitation ----
+
+     THE WHOLE FIELD WAS TOO LONG TO TEXT. 283 characters at eight men and 501
+     at sixteen, against a phone that delivered 219 first time and needed a
+     second attempt at 250. Worse, it GREW with the field, so it failed hardest
+     exactly when there were most men to reach.
+
+     A man's own link carries his name and his six opponents and nothing else.
+     It does not grow: sixteen men get the same 212 characters as eight.
+
+     NO HANDICAP INDEX TRAVELS. The bands are worked out before the link is
+     built, so the page can say "Mike Knazick · an equal handicap" without a
+     single figure on a public address. That is deliberate, and it is also why
+     this cannot simply be the field link with fewer rows in it.
+
+     ONE LINK FOR BOTH CONTESTS. The holes need nothing but the course, which
+     the page already knows, so the same address serves Watch the Birdie and the
+     Hit List together. A man taps once. */
+
+  const MAN_PREFIX = "P1_";
+  const MAN_QUERY = "?p=";
+  /** One character each, because six of them ride in every invitation. */
+  const BANDS = { l: "a lower handicap", e: "an equal handicap", h: "a higher handicap" };
+
+  /**
+   * Pack one man's invitation. `six` is [{ name, band }, ...] where band is
+   * "l", "e" or "h" — already decided against HIS index, which stays behind.
+   */
+  function encodeMan(me, six) {
+    const rows = (six || []).map((o) => [clean(o.name), o.band || "e"].join(FIELD));
+    return MAN_PREFIX + toBase64Url([["1", clean(me)].join(FIELD)].concat(rows).join(ROW));
+  }
+
+  function decodeMan(text) {
+    let raw = String(text == null ? "" : text).trim();
+    if (raw === "") return { ok: false, man: null, error: "There is nobody in this link." };
+    if (raw.indexOf("%") !== -1) {
+      try { raw = decodeURIComponent(raw); } catch (err) { /* leave it as it came */ }
+    }
+    if (raw.indexOf(MAN_PREFIX) === 0) raw = raw.slice(MAN_PREFIX.length);
+
+    let plain;
+    try { plain = fromBase64Url(raw); }
+    catch (err) { return { ok: false, man: null, error: "This link is damaged and cannot be read." }; }
+
+    const lines = plain.split(ROW);
+    const head = (lines.shift() || "").split(FIELD);
+    if (head[0] !== "1") {
+      return { ok: false, man: null, error: "This link was made by a newer version of the app." };
+    }
+    const name = head[1] || "";
+    if (name === "") return { ok: false, man: null, error: "This link does not say who it is for." };
+
+    const six = [];
+    for (const line of lines) {
+      if (line.trim() === "") continue;
+      const cell = line.split(FIELD);
+      if (!cell[0]) continue;
+      six.push({ name: cell[0], band: BANDS[cell[1]] ? cell[1] : "e" });
+    }
+    return { ok: true, man: { name, six }, error: null };
+  }
+
+  /** The address one man is sent. */
+  function manLink(base, me, six) {
+    return String(base).split("?")[0].split("#")[0] + MAN_QUERY + encodeMan(me, six);
+  }
+
+  /** Whichever kind of link this is, or neither. */
+  function manFromUrl(url) {
+    const s = String(url == null ? "" : url);
+    const at = s.indexOf(MAN_QUERY);
+    if (at === -1) {
+      if (s.indexOf(MAN_PREFIX) === 0) return decodeMan(s);
+      return { ok: false, man: null, error: "There is nobody in this link." };
+    }
+    return decodeMan(s.slice(at + MAN_QUERY.length));
+  }
+
+  /** What a band code means, in the words the card will use. */
+  function bandWords(code) { return BANDS[code] || BANDS.e; }
+
   globalThis.ClubhouseFieldLink = {
     encodeField, decodeField, fieldLink, fieldFromUrl,
-    FIELD_PREFIX, FIELD_QUERY,
+    encodeMan, decodeMan, manLink, manFromUrl, bandWords,
+    FIELD_PREFIX, FIELD_QUERY, MAN_PREFIX, MAN_QUERY, BANDS,
   };
 })();

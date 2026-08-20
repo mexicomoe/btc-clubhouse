@@ -222,29 +222,61 @@ function picksInOrder(){
   return out;
 }
 
-/* ---------- the field, when the link carries one ----------
-   Opened WITHOUT one, everything below sits still and the page behaves exactly
-   as it always has: type your name, pick your holes, no opponent. Not every
-   round will have a field ready when the sheet goes out. */
-const FIELD = (() => {
-  const read = window.ClubhouseFieldLink.fieldFromUrl(location.search || location.href);
-  return read.ok ? read.field : null;
+/* ---------- what the link brought, if anything ----------
+
+   THREE WAYS THIS PAGE CAN BE OPENED, and it has to be right in all of them.
+
+   · HIS OWN INVITATION (?p=) — his name and his six opponents, worked out
+     before the link was built. The one Rob texts. It carries NO handicap
+     index: the bands were decided against his own index, which stayed behind
+     on the phone that made it.
+   · THE WHOLE FIELD (?f=) — every player and his index, from which the page
+     works out anybody's opponents. Longer, and it grows with the field.
+   · PLAINLY, with neither. Type your name, pick your holes, no opponent box.
+     Not every round has a field ready when the sheet goes out, and this is
+     what the page has always done.
+
+   ONE LINK SERVES BOTH CONTESTS. The holes need nothing but the course, which
+   this page already knows, so a man taps once for Watch the Birdie and the Hit
+   List together. */
+const FL = window.ClubhouseFieldLink;
+const INVITE = (() => {
+  const where = location.search || location.href;
+  const man = FL.manFromUrl(where);
+  if (man.ok) return { kind: "man", name: man.man.name, six: man.man.six };
+  const field = FL.fieldFromUrl(where);
+  if (field.ok) return { kind: "field", made: field.field.made, players: field.field.players };
+  return null;
 })();
-let me = null;          // the player he tapped
-let opponent = null;    // the man he named
+
+let me = INVITE && INVITE.kind === "man" ? { name: INVITE.name, index: null } : null;
+let opponent = null;
 
 const whoBox = document.getElementById("whoBox");
 const pickWho = document.getElementById("pickWho");
 const oppBox = document.getElementById("oppBox");
 const fieldNote = document.getElementById("fieldNote");
 
+const esc = (t) => String(t == null ? "" : t)
+  .replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const idx = (v) => v == null ? "" : E.formatHandicapIndex(v);
+
 function drawField(){
-  if(!FIELD){ pickWho.innerHTML = ""; fieldNote.innerHTML = ""; return; }
-  whoBox.style.display = "none";     // he taps his name; he never types it
+  if(!INVITE){ pickWho.innerHTML = ""; fieldNote.innerHTML = ""; return; }
+  whoBox.style.display = "none";
+
+  if(INVITE.kind === "man"){
+    // His name came with the link. There is nothing to choose and nothing to
+    // type — the one thing a man cannot get wrong about himself.
+    pickWho.innerHTML = `<div class="mine">${esc(me.name)}</div>`;
+    fieldNote.innerHTML =
+      `This is your own sheet. If the name above is not you, ask for your own link.`;
+    return;
+  }
 
   if(me){
     pickWho.innerHTML =
-      `<div class="mine">${esc(me.name)} \u00b7 ${idx(me.index)}` +
+      `<div class="mine">${esc(me.name)}${me.index == null ? "" : " \u00b7 " + idx(me.index)}` +
       `<button type="button" id="notMe">Not you? Tap to change</button></div>`;
     document.getElementById("notMe").addEventListener("click", () => {
       me = null; opponent = null; drawField(); drawOpponent(); refresh();
@@ -252,64 +284,68 @@ function drawField(){
   } else {
     pickWho.innerHTML =
       `<label class="namelab">Tap your name</label>` +
-      FIELD.players.map((p, i) =>
+      INVITE.players.map((p, i) =>
         `<button type="button" class="who" data-i="${i}">${esc(p.name)}` +
-        `<span class="idx">${idx(p.index)}</span></button>`).join("");
+        `<span class="idx">${idx(p.index) || "no handicap index"}</span></button>`).join("");
     pickWho.querySelectorAll("button[data-i]").forEach(b =>
       b.addEventListener("click", () => {
-        me = FIELD.players[Number(b.dataset.i)];
+        me = INVITE.players[Number(b.dataset.i)];
         opponent = null;
         drawField(); drawOpponent(); refresh();
       }));
   }
 
-  // THE LINK IS A SNAPSHOT. Men who joined or dropped out after it was made are
-  // not in it, and a man looking at a stale one should be able to tell.
   fieldNote.innerHTML =
-    `This list was made <b>${esc(FIELD.made || "at some point")}</b> and has ` +
-    `<b>${FIELD.players.length}</b> players in it. If somebody is missing, ask ` +
+    `This list was made <b>${esc(INVITE.made || "at some point")}</b> and has ` +
+    `<b>${INVITE.players.length}</b> players in it. If somebody is missing, ask ` +
     `for a newer link — naming a man who does not play pays nothing.`;
 }
 
-const idx = (v) => v == null ? "no handicap index" : E.formatHandicapIndex(v);
-const esc = (t) => String(t == null ? "" : t)
-  .replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
-
 /**
- * His eight — the players nearest him by index, four each way where the field
- * allows it.
+ * The men he may name.
  *
- * THE ENGINE'S OWN RULE, not a second copy of it. A page that recommends a man
- * the app then refuses is the worst outcome available here, and two
- * implementations of "nearest eight" would drift the first time either moved.
+ * From HIS OWN LINK they arrive already decided, bands and all, and the page
+ * does no arithmetic — it cannot, because no index travelled.
+ *
+ * From a field link the page works them out with the ENGINE's own rule. Never a
+ * second copy of it: a page that recommends a man the app then refuses is the
+ * worst outcome available here.
  */
-function drawOpponent(){
-  if(!FIELD || !me){ oppBox.innerHTML = ""; return; }
-  const others = FIELD.players.filter(p => p !== me && p.index != null);
-  const eight = E.nearestByIndex(me.index, others, 8);
+function opponentsFor(){
+  if(!INVITE) return [];
+  if(INVITE.kind === "man") return INVITE.six.map(o => ({ name: o.name, said: FL.bandWords(o.band) }));
+  if(!me) return [];
+  const others = INVITE.players.filter(p => p !== me && p.index != null);
   const band = E.DEFAULT_CONTESTS.hitList.equalBand;
-  const say = (their) => their == null || me.index == null ? "an equal handicap"
-    : Math.abs(me.index - their) <= band ? "an equal handicap"
-    : their < me.index ? "a lower handicap" : "a higher handicap";
+  const howMany = E.DEFAULT_CONTESTS.hitList.offer;
+  return E.nearestByIndex(me.index, others, howMany).map(o => ({
+    name: o.name,
+    said: me.index == null || o.index == null ? "an equal handicap"
+      : Math.abs(me.index - o.index) <= band ? "an equal handicap"
+      : o.index < me.index ? "a lower handicap" : "a higher handicap",
+    index: o.index,
+  }));
+}
 
+function drawOpponent(){
+  if(!INVITE || !me){ oppBox.innerHTML = ""; return; }
+  const list = opponentsFor();
   oppBox.innerHTML =
     `<section class="pick"><h2>Hit List \u00b7 pick one</h2>` +
-    `<div class="cd" style="font-size:16px;color:var(--quiet);margin:-6px 0 12px">` +
+    `<div style="font-size:16px;color:var(--quiet);margin:-6px 0 12px">` +
       `Back yourself to post the better net score. Beating a better player pays ` +
       `more, so the easy pick is not the best one.</div>` +
-    (eight.length === 0
-      ? `<div style="font-size:17px">Nobody else in this list has a handicap index.</div>`
-      : eight.map(o =>
+    (list.length === 0
+      ? `<div style="font-size:17px">Nobody to name in this round.</div>`
+      : list.map(o =>
           `<button type="button" class="who" data-opp="${esc(o.name)}"` +
           ` aria-pressed="${opponent && opponent.name === o.name}">${esc(o.name)}` +
-          `<span class="idx">${idx(o.index)} \u00b7 ${say(o.index)}</span></button>`).join("")) +
+          `<span class="idx">${esc(o.said)}</span></button>`).join("")) +
     `</section>`;
-
   oppBox.querySelectorAll("button[data-opp]").forEach(b =>
     b.addEventListener("click", () => {
       const name = b.dataset.opp;
-      opponent = opponent && opponent.name === name ? null
-        : eight.find(o => o.name === name) || null;
+      opponent = opponent && opponent.name === name ? null : list.find(o => o.name === name) || null;
       drawOpponent(); refresh();
     }));
 }
@@ -355,10 +391,10 @@ function smsHref(text){
 function refresh(){
   const n = picksInOrder().filter(h => h != null).length;
   const named = me ? true : who.value.trim().length > 0;
-  // An opponent is only ASKED FOR when the link carried a field to choose from.
-  const wantsOpponent = !!(FIELD && me);
+  // An opponent is only ASKED FOR when the link brought somebody to name.
+  const wantsOpponent = !!(INVITE && me && opponentsFor().length > 0);
   let ready = false;
-  if (FIELD && !me) {
+  if (INVITE && INVITE.kind === "field" && !me) {
     summary.textContent = "Tap your name in the list first.";
   } else if (n < TOTAL_PICKS) {
     summary.textContent = n + " of " + TOTAL_PICKS + " picked.";

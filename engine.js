@@ -217,6 +217,26 @@
      * better player.
      */
     hitList: {
+      /**
+       * How many opponents a man is offered — three above and three below where
+       * the field allows it. Eight to start with, six since: eight was most of
+       * a ten-man field, which made it a list rather than a choice.
+       *
+       * A VALUE, not a constant, because it is the sort of thing that wants
+       * changing after a few Saturdays and should never need a code change.
+       */
+      offer: 6,
+      /**
+       * Whether a man who never replies gets an opponent drawn for him. OFF, and
+       * meant to stay off.
+       *
+       * Draw missing PICKS is a different matter: choosing holes affects nobody
+       * else. Naming an opponent puts another man in it, and a drawn opponent
+       * would collect the reward for a gamble the player never took. The Hit
+       * List is the one contest a man has to enter — if it works when he ignores
+       * it, he learns he never needs to reply.
+       */
+      drawMissing: false,
       equalBand: 1.0,
       /** How many names a man is offered. A short field offers everybody. */
       offers: 8,
@@ -707,6 +727,16 @@
               " left to choose from. Every slot needs at least two.");
           }
         }
+      }
+    }
+
+    /* HOW MANY OPPONENTS. Fewer than two is not a choice, and more than the
+       field can supply simply offers everybody — which is fine, but a figure
+       below two would leave a man with one name and call it a decision. */
+    if (full.hitList && full.hitList.offer != null) {
+      const n = full.hitList.offer;
+      if (!Number.isInteger(n) || n < 2) {
+        problems.push("The Hit List must offer at least two opponents — one name is not a choice.");
       }
     }
 
