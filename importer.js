@@ -651,6 +651,17 @@
    * a name was recognised, the index of the player it belongs to. A name that
    * matches nothing — or matches two men equally — is reported, never guessed.
    */
+  /**
+   * A Hit List line: "Hit List: Mike Knazick", sitting under the man it belongs
+   * to.
+   *
+   * THE LABEL IS THE WHOLE POINT. A block of these is pasted in one go, so
+   * without it a bare name on its own line is indistinguishable from the start
+   * of the next man's entry — and guessing wrong would either lose a target or
+   * invent a player.
+   */
+  const HIT_LIST_LINE = /^\s*hit\s*list\s*[:\-–—]\s*(.+?)\s*$/i;
+
   function parseBirdiePicks(text, opts) {
     const names = (opts && opts.names) || [];
     const slots = (opts && opts.slots) || [];
@@ -660,6 +671,39 @@
     String(text == null ? "" : text).split(/\r?\n/).forEach((raw) => {
       const line = raw.trim();
       if (line === "") { ignored++; return; }
+
+      /* A TARGET BELONGS TO THE MAN ABOVE IT. It is read here, before anything
+         else, because it is not a player line and must never be treated as one. */
+      const hit = line.match(HIT_LIST_LINE);
+      if (hit) {
+        const target = hit[1].trim();
+        const owner = rows.length ? rows[rows.length - 1] : null;
+        if (!owner) {
+          rows.push({ name: target, index: -1, how: null, picks: {}, holes: [],
+            hitList: null, problems: ["a Hit List line with nobody above it to belong to"] });
+          return;
+        }
+        if (owner.hitList != null || owner.hitListProblem) {
+          owner.problems.push("two Hit List lines for one man");
+          return;
+        }
+        const m = matchName(target, names);
+        if (m.index === -1) {
+          owner.hitListProblem = true;
+          owner.problems.push(m.how === "ambiguous"
+            ? "Hit List “" + target + "” could be more than one player"
+            : "Hit List “" + target + "” is not a player on the list");
+          return;
+        }
+        if (owner.index !== -1 && m.index === owner.index) {
+          owner.hitListProblem = true;
+          owner.problems.push("a man cannot name himself on the Hit List");
+          return;
+        }
+        owner.hitList = names[m.index];
+        owner.hitListHow = m.how;
+        return;
+      }
 
       // Split the name off the numbers. Where no separator was typed, the first
       // digit is the boundary — "Ken Ridgeway 8 2 4 13 14 16" is a real message.
@@ -677,7 +721,8 @@
       // A heading row off a spreadsheet, or a line that is only a name.
       if (namePart === "" || !PICK_FIRST_NUMBER.test(numberPart)) { ignored++; return; }
 
-      const row = { name: namePart, index: -1, how: null, picks: {}, holes: [], problems: [] };
+      const row = { name: namePart, index: -1, how: null, picks: {}, holes: [],
+                    hitList: null, problems: [] };
 
       // The name first, so a line that is wrong in both ways says so about both.
       //

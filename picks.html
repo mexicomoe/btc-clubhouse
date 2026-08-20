@@ -68,6 +68,26 @@
      gets covered. Navigation is not urgent enough to be always visible. */
   #elsewhere{margin:4px 0 0;font-size:16px;text-align:center}
   #elsewhere a{color:var(--felt);text-decoration:underline;padding:10px 6px;display:inline-block}
+  /* The field, when the link carries one. Whole-width rows, because a man
+     picking himself out of a list is doing it once and must not miss. */
+  .who{
+    display:block;width:100%;text-align:left;font:inherit;font-size:20px;font-weight:600;
+    padding:16px 14px;margin:0 0 10px;background:var(--card);color:var(--ink);
+    border:1px solid var(--line);border-radius:10px;cursor:pointer;
+  }
+  .who[aria-pressed="true"]{background:var(--felt);color:#fff;border-color:var(--felt)}
+  .who .idx{display:block;font-size:16px;font-weight:400;margin-top:3px;opacity:.85}
+  .who:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+  #fieldNote{font-size:16px;line-height:1.45;color:var(--quiet);padding:4px 0 0}
+  #fieldNote b{color:var(--ink)}
+  .mine{
+    background:var(--felt);color:#fff;border-radius:10px;padding:14px;margin:0 0 4px;
+    font-size:20px;font-weight:600;
+  }
+  .mine button{
+    display:block;margin-top:8px;min-height:44px;padding:8px 12px;font:inherit;font-size:16px;
+    background:transparent;color:#fff;border:1px solid rgba(255,255,255,.6);border-radius:8px;cursor:pointer;
+  }
   @media (prefers-reduced-motion:no-preference){.hole{transition:background .12s}}
 </style>
 </head>
@@ -79,9 +99,14 @@
 </header>
 
 <main>
-  <label class="namelab" for="who">Your name</label>
-  <input id="who" type="text" autocomplete="name" placeholder="Rob Tanenbaum">
+  <div id="whoBox">
+    <label class="namelab" for="who">Your name</label>
+    <input id="who" type="text" autocomplete="name" placeholder="Rob Tanenbaum">
+  </div>
+  <div id="pickWho"></div>
   <div id="slots"></div>
+  <div id="oppBox"></div>
+  <div id="fieldNote"></div>
   <p id="elsewhere"><a href="index.html">Clubhouse home</a> &middot; <a href="leaderboard.html">Leaderboard</a></p>
 </main>
 
@@ -92,6 +117,8 @@
   <p id="copied"></p>
 </div></div>
 
+<script src="engine.js"></script>
+<script src="fieldlink.js"></script>
 <script>
 /**
  * Where a completed card is filed, on top of the text message.
@@ -111,6 +138,8 @@
  * Sent with sendBeacon because the tap that files the card is the same tap that
  * leaves for Messages, and an ordinary request dies with the page.
  */
+const E = window.ClubhouseEngine;
+
 const FORM_POST = "https://docs.google.com/forms/d/e/1FAIpQLSdbtFLO94Gq1RYC2-YJm-pDK1OMuBy8kzdkvY7MvfmOh8Fnuw/formResponse";
 const FORM_FIELD = "entry.1094711796";
 
@@ -193,6 +222,98 @@ function picksInOrder(){
   return out;
 }
 
+/* ---------- the field, when the link carries one ----------
+   Opened WITHOUT one, everything below sits still and the page behaves exactly
+   as it always has: type your name, pick your holes, no opponent. Not every
+   round will have a field ready when the sheet goes out. */
+const FIELD = (() => {
+  const read = window.ClubhouseFieldLink.fieldFromUrl(location.search || location.href);
+  return read.ok ? read.field : null;
+})();
+let me = null;          // the player he tapped
+let opponent = null;    // the man he named
+
+const whoBox = document.getElementById("whoBox");
+const pickWho = document.getElementById("pickWho");
+const oppBox = document.getElementById("oppBox");
+const fieldNote = document.getElementById("fieldNote");
+
+function drawField(){
+  if(!FIELD){ pickWho.innerHTML = ""; fieldNote.innerHTML = ""; return; }
+  whoBox.style.display = "none";     // he taps his name; he never types it
+
+  if(me){
+    pickWho.innerHTML =
+      `<div class="mine">${esc(me.name)} \u00b7 ${idx(me.index)}` +
+      `<button type="button" id="notMe">Not you? Tap to change</button></div>`;
+    document.getElementById("notMe").addEventListener("click", () => {
+      me = null; opponent = null; drawField(); drawOpponent(); refresh();
+    });
+  } else {
+    pickWho.innerHTML =
+      `<label class="namelab">Tap your name</label>` +
+      FIELD.players.map((p, i) =>
+        `<button type="button" class="who" data-i="${i}">${esc(p.name)}` +
+        `<span class="idx">${idx(p.index)}</span></button>`).join("");
+    pickWho.querySelectorAll("button[data-i]").forEach(b =>
+      b.addEventListener("click", () => {
+        me = FIELD.players[Number(b.dataset.i)];
+        opponent = null;
+        drawField(); drawOpponent(); refresh();
+      }));
+  }
+
+  // THE LINK IS A SNAPSHOT. Men who joined or dropped out after it was made are
+  // not in it, and a man looking at a stale one should be able to tell.
+  fieldNote.innerHTML =
+    `This list was made <b>${esc(FIELD.made || "at some point")}</b> and has ` +
+    `<b>${FIELD.players.length}</b> players in it. If somebody is missing, ask ` +
+    `for a newer link — naming a man who does not play pays nothing.`;
+}
+
+const idx = (v) => v == null ? "no handicap index" : E.formatHandicapIndex(v);
+const esc = (t) => String(t == null ? "" : t)
+  .replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+
+/**
+ * His eight — the players nearest him by index, four each way where the field
+ * allows it.
+ *
+ * THE ENGINE'S OWN RULE, not a second copy of it. A page that recommends a man
+ * the app then refuses is the worst outcome available here, and two
+ * implementations of "nearest eight" would drift the first time either moved.
+ */
+function drawOpponent(){
+  if(!FIELD || !me){ oppBox.innerHTML = ""; return; }
+  const others = FIELD.players.filter(p => p !== me && p.index != null);
+  const eight = E.nearestByIndex(me.index, others, 8);
+  const band = E.DEFAULT_CONTESTS.hitList.equalBand;
+  const say = (their) => their == null || me.index == null ? "an equal handicap"
+    : Math.abs(me.index - their) <= band ? "an equal handicap"
+    : their < me.index ? "a lower handicap" : "a higher handicap";
+
+  oppBox.innerHTML =
+    `<section class="pick"><h2>Hit List \u00b7 pick one</h2>` +
+    `<div class="cd" style="font-size:16px;color:var(--quiet);margin:-6px 0 12px">` +
+      `Back yourself to post the better net score. Beating a better player pays ` +
+      `more, so the easy pick is not the best one.</div>` +
+    (eight.length === 0
+      ? `<div style="font-size:17px">Nobody else in this list has a handicap index.</div>`
+      : eight.map(o =>
+          `<button type="button" class="who" data-opp="${esc(o.name)}"` +
+          ` aria-pressed="${opponent && opponent.name === o.name}">${esc(o.name)}` +
+          `<span class="idx">${idx(o.index)} \u00b7 ${say(o.index)}</span></button>`).join("")) +
+    `</section>`;
+
+  oppBox.querySelectorAll("button[data-opp]").forEach(b =>
+    b.addEventListener("click", () => {
+      const name = b.dataset.opp;
+      opponent = opponent && opponent.name === name ? null
+        : eight.find(o => o.name === name) || null;
+      drawOpponent(); refresh();
+    }));
+}
+
 const who = document.getElementById("who");
 const tray = document.getElementById("tray");
 const summary = document.getElementById("summary");
@@ -201,8 +322,12 @@ const send = document.getElementById("send");
 const copied = document.getElementById("copied");
 
 function line(){
-  const name = who.value.trim() || "(no name)";
-  return name + " — " + picksInOrder().join(", ");
+  const name = me ? me.name : (who.value.trim() || "(no name)");
+  const first = name + " — " + picksInOrder().join(", ");
+  // THE TARGET GOES ON ITS OWN LINE, LABELLED. A block of these is pasted in
+  // one go, and without the label a bare name is indistinguishable from the
+  // start of the next man's entry.
+  return opponent ? first + "\n" + "Hit List: " + opponent.name : first;
 }
 
 /**
@@ -229,12 +354,18 @@ function smsHref(text){
 
 function refresh(){
   const n = picksInOrder().filter(h => h != null).length;
-  const named = who.value.trim().length > 0;
+  const named = me ? true : who.value.trim().length > 0;
+  // An opponent is only ASKED FOR when the link carried a field to choose from.
+  const wantsOpponent = !!(FIELD && me);
   let ready = false;
-  if (n < TOTAL_PICKS) {
+  if (FIELD && !me) {
+    summary.textContent = "Tap your name in the list first.";
+  } else if (n < TOTAL_PICKS) {
     summary.textContent = n + " of " + TOTAL_PICKS + " picked.";
   } else if (!named) {
     summary.textContent = "All " + TOTAL_PICKS + " picked. Add your name above.";
+  } else if (wantsOpponent && !opponent) {
+    summary.textContent = "All " + TOTAL_PICKS + " picked. Now pick your Hit List man.";
   } else {
     summary.textContent = line();
     ready = true;
@@ -280,6 +411,9 @@ addEventListener("orientationchange", fitTray);
 if (window.ResizeObserver) new ResizeObserver(fitTray).observe(tray);
 
 who.addEventListener("input", refresh);
+drawField();
+drawOpponent();
+refresh();
 
 /**
  * File the card. Sending the same line twice does nothing — a man who taps the

@@ -71,9 +71,11 @@
     <div id="rosterBox"></div>
   </details>
 
-  <a class="fold step go" id="goPicks" href="picks.html">
-    <span><span class="fname">Open the pick sheet</span>
-      <span class="fsub">Send this to the men before the round</span></span></a>
+  <details class="fold step" id="foldPickLink">
+    <summary><span><span class="fname">Open the pick sheet</span>
+      <span class="fsub" id="foldPickLinkSub"></span></span></summary>
+    <div id="pickLinkBox"></div>
+  </details>
 
   <details class="fold step" id="foldPicks">
     <summary><span><span class="fname">Paste birdie picks</span>
@@ -146,6 +148,7 @@
 <script src="importer.js"></script>
 <script src="exporter.js"></script>
 <script src="results.js"></script>
+<script src="fieldlink.js"></script>
 <script src="boardimage.js"></script>
 <script src="version.js"></script>
 <script src="display.js"></script>
@@ -158,6 +161,7 @@ const E = window.ClubhouseEngine;
 const IMP = window.ClubhouseImporter;
 const XP = window.ClubhouseExporter;
 const RS = window.ClubhouseResults;
+const FL = window.ClubhouseFieldLink;
 const IMG = window.ClubhouseBoardImage;
 const D  = window.ClubhouseDisplay;
 /* The display helpers live in display.js so results.html can use the same ones.
@@ -1304,6 +1308,7 @@ function wireFolds(){
      has to ask for it. Built on open rather than up front so twenty-four
      players are not laid out five times over on a screen nobody has opened. */
   const build = {
+    foldPickLink: showPickLinkBox,
     foldRoster: showRosterBox,
     foldPicks: showPicksBox,
     foldHitList: showHitListBox,
@@ -1359,6 +1364,13 @@ function drawFoldSubs(){
       (notReady ? " · " + notReady + (notReady === 1 ? " still needs" : " still need") +
                   " an index and a tee" : ""),
     notReady > 0);
+
+  const noIdx = state.players.filter(p => p.index == null).length;
+  say("foldPickLinkSub",
+    men === 0 ? "Send it to the men before the round"
+      : noIdx ? noIdx + " without an index — no Hit List link until they have one"
+      : "Send it to the men · " + ready + " in the field link",
+    noIdx > 0);
 
   /* PASTE A LIST — whether a paste is sitting there unfinished. */
   const rosterBad = rosterPreview ? rosterPreview.rows.filter(r => r.problems.length).length : 0;
@@ -2217,6 +2229,95 @@ function saveSettings(){
   renderSetup();
 }
 
+/**
+ * The pick sheet, and the link that carries the field with it.
+ *
+ * TWO LINKS, because they are not the same thing. The plain sheet works for
+ * anybody at any time and needs nothing; the one with the field in it lets a
+ * man pick his own Hit List opponent, which is the whole point — the pick is
+ * meant to be the player's, and Rob choosing it for him is not the game.
+ */
+function showPickLinkBox(){
+  const box = document.getElementById("pickLinkBox");
+  const base = location.href.split("?")[0].split("#")[0]
+    .replace(/leaderboard\.html$/, "picks.html");
+  const men = readyPlayers();
+  // The eight cannot be worked out without an index, so a man without one is
+  // NAMED and the link refused rather than quietly leaving him off it.
+  const noIndex = state.players.filter(p => p.index == null);
+
+  box.innerHTML =
+    `<div class="pad">` +
+      `<a class="big" href="picks.html">Open the plain pick sheet</a>` +
+      `<div class="cd" style="margin:10px 0 18px;font-size:18px;font-weight:700">
+         Holes only. Every man types his own name and there is no Hit List —
+         which is right when the field is not settled yet.</div>` +
+      (noIndex.length
+        ? `<div class="note warn"><b>No link with the field yet.</b><br>
+             ${noIndex.map(p => esc(displayName(p))).join(", ")}
+             ${noIndex.length === 1 ? "has" : "have"} no handicap index, and a man's
+             eight opponents cannot be worked out without one. Give
+             ${noIndex.length === 1 ? "him" : "them"} an index on the player list
+             below and this link appears.</div>`
+        : men.length < 2
+        ? `<div class="note warn"><b>No link with the field yet.</b><br>
+             There have to be at least two players with an index and a tee before
+             anybody has an opponent to name.</div>`
+        : `<button class="big solid" id="makeFieldLink">Copy the link WITH the field</button>
+           <div class="cd" style="margin-top:10px;font-size:18px;font-weight:700">
+             Carries all ${men.length} players and their handicap indexes, readable
+             by anyone who opens it — the same names and figures that are on the
+             Golf Genius portal. Each man taps his own name and gets his own eight
+             opponents.<br><br>
+             It is a SNAPSHOT of the field as it stands now. Send a fresh one if
+             men join or drop out.</div>
+           <div id="fieldLinkOut"></div>`) +
+    `</div>`;
+
+  const make = document.getElementById("makeFieldLink");
+  if(make) make.addEventListener("click", () => {
+    // The NAME AS THE BOARD SHOWS IT, because that is the form the paste is
+    // matched against when the picks come back.
+    const url = FL.fieldLink(base, men.map(p => ({ name: displayName(p), index: p.index })),
+      niceDate(todayISO()));
+    /* THE BANDS ARE MEASURED, not guessed — on the club's own phone, through
+       iOS Messages: 154, 159, 190 and 219 arrived first time; 250 and 299 each
+       failed once and arrived on a second attempt; 350 failed twice.
+       A field link passes 219 at about six men and 300 at about nine, so for
+       any real Saturday field this is an E-MAIL, not a text. */
+    const said = `<div class="note${url.length > 219 ? " warn" : ""}">` +
+      `<b>${url.length} characters.</b><br>` +
+      (url.length > 299
+        ? `<b>Do not text this — it will arrive broken.</b> Measured on your own
+           phone, a link this long is cut short by iOS Messages and the men open a
+           page with no field in it, which looks like the app is broken rather
+           than the message. <b>E-mail it</b>, the way you already e-mail the
+           results.`
+        : url.length > 219
+        ? `<b>Too long to text reliably.</b> Measured on your own phone, links
+           between 250 and 299 characters arrived only on the second attempt. A
+           link that works on the second try is not good enough for the men —
+           <b>e-mail it</b>.`
+        : `Short enough to text — under the 219 that arrived first time every
+           time on your own phone.`) + `</div>`;
+    const out = document.getElementById("fieldLinkOut");
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(url).then(
+        () => { out.innerHTML = `<div class="note"><b>Copied.</b></div>` + said; },
+        () => { out.innerHTML = said + showLink(url); });
+    } else {
+      out.innerHTML = said + showLink(url);
+    }
+  });
+}
+
+/** The link on screen, for a browser that refused the clipboard. */
+function showLink(url){
+  return `<div class="field"><label for="fieldLinkText">Copy this by hand</label>` +
+    `<textarea id="fieldLinkText" readonly rows="4"
+       style="width:100%;font-size:18px">${esc(url)}</textarea></div>`;
+}
+
 /** The slots and their legal holes, as the parser wants them. */
 function pickSlotRules(){
   const legal = E.birdiePickHoles(E.courseForTee(state.lastTee || "IV", "M"));
@@ -2248,6 +2349,8 @@ function drawPicksPreview(){
     const who = r.index >= 0 ? state.players[r.index].name : r.name;
     const said = isBad ? r.problems.join(" · ")
       : E.PICK_SLOTS.map(sl => r.picks[sl.key]).join(", ") +
+        // The man he named, said before it is committed like everything else.
+        (r.hitList ? " · Hit List " + r.hitList : " · no Hit List") +
         (r.how && r.how !== "exact" ? " · matched on the " + r.how + " name" : "");
     return `<div class="prev"><div class="pv">` +
       `<div class="pvn">${esc(who)}</div>` +
@@ -2285,6 +2388,10 @@ function commitPicks(){
     const p = state.players[r.index];
     if(!p) continue;
     E.PICK_SLOTS.forEach(sl => { p[sl.key] = r.picks[sl.key] == null ? null : r.picks[sl.key]; });
+    // The man he named, when the line carried one. A line without a Hit List
+    // leaves whatever was already set alone rather than clearing it — a man who
+    // sends his holes twice must not lose an opponent he named the first time.
+    if(r.hitList != null) p.hitList = r.hitList;
   }
   picksPreview = null;
   save();
