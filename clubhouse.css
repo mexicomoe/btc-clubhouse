@@ -219,6 +219,34 @@
   #foldMove  > summary { background: var(--tint-move); }
   #foldAbout > summary { background: var(--tint-about); }
 
+  /* A STEP THAT GOES SOMEWHERE rather than opening. Built to sit in the same
+     column as the folds and read as one of them — same height, same type, same
+     full-width target — and marked with a › instead of a ＋, because a man
+     should be able to tell before he taps whether the screen is about to change
+     under him. */
+  a.fold.go, button.fold.go {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    min-height: 60px; padding: 14px 18px;
+    font: inherit; font-size: 22px; font-weight: 800; text-align: left;
+    color: var(--ink); background: var(--paper); text-decoration: none;
+    border: 0; border-top: 3px solid var(--ink); border-bottom: 3px solid var(--ink);
+    cursor: pointer;
+  }
+  a.fold.go::after, button.fold.go::after {
+    content: "›"; margin-left: auto; font-size: 30px; font-weight: 800;
+  }
+  a.fold.go .fname, button.fold.go .fname { display: block; }
+  a.fold.go .fsub, button.fold.go .fsub {
+    display: block; font-size: 18px; font-weight: 700; margin-top: 3px;
+  }
+  a.fold.go:active, button.fold.go:active { background: var(--ink); color: var(--paper); }
+  #goRules { background: var(--tint-event); }
+
+  /* A step whose closed line is reporting something wrong. Never colour alone —
+     the line itself says what it is. */
+  details.fold.step > summary.wrong, button.fold.go.wrong { box-shadow: inset 6px 0 0 var(--penalty); }
+  .fsub.wrong { color: var(--penalty); }
+
   /* Setup list */
   .prow {
     display: flex; align-items: center; gap: 10px; width: 100%;

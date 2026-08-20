@@ -45,27 +45,49 @@
   </header>
   <nav class="tabs" data-tabs></nav>
 
-  <!-- Always out: the two figures checked first, then the field itself and the
-       two ways of adding to it. Everything below here folds away, because it is
-       touched once a round at most. -->
-  <div id="setupStatus"></div>
-  <div id="setupRows"></div>
-  <div class="pad">
-    <button class="big solid" id="addBtn">+ Add player</button>
-    <button class="big" id="pastePlayersBtn">Paste a list of players</button>
-    <button class="big" id="pastePicksBtn">Paste birdie picks</button>
-    <button class="big" id="hitListBtn">Set the Hit List</button>
-    <button class="big" id="settingsBtn">The rules — every value this round uses</button>
-    <!-- The three pages used to be islands. Land on this one — which is where a
-         browser's address-bar autocomplete tends to dump you — and there was no
-         way through to the pick sheet at all. -->
-    <a class="big" href="picks.html">Open the pick sheet</a>
-  </div>
-  <div id="rosterBox"></div>
-  <div id="picksBox"></div>
-  <div id="hitListBox"></div>
+  <!--
+    THE ORDER IS THE ORDER HE DOES IT IN, actions first and the player list
+    last. The list was at the top, so every action sat below ten men and
+    everything he came to do needed scrolling to.
 
-  <details class="fold" id="foldEvent">
+    Each step is shut and says where it stands, so the screen answers "what have
+    I done and what is left" without opening anything.
+
+    Three of these EXPAND and three GO SOMEWHERE — Add player and the two other
+    pages are screens of their own, not boxes. They are built to look alike and
+    marked differently: a + to open here, a › to leave.
+  -->
+  <div id="setupStatus"></div>
+
+  <details class="fold step" id="foldAdd">
+    <summary><span><span class="fname">Add player</span>
+      <span class="fsub" id="foldAddSub"></span></span></summary>
+    <div class="pad"><button class="big solid" id="addBtn">+ Add a player</button></div>
+  </details>
+
+  <details class="fold step" id="foldRoster">
+    <summary><span><span class="fname">Paste a list of players</span>
+      <span class="fsub" id="foldRosterSub"></span></span></summary>
+    <div id="rosterBox"></div>
+  </details>
+
+  <a class="fold step go" id="goPicks" href="picks.html">
+    <span><span class="fname">Open the pick sheet</span>
+      <span class="fsub">Send this to the men before the round</span></span></a>
+
+  <details class="fold step" id="foldPicks">
+    <summary><span><span class="fname">Paste birdie picks</span>
+      <span class="fsub" id="foldPicksSub"></span></span></summary>
+    <div id="picksBox"></div>
+  </details>
+
+  <details class="fold step" id="foldHitList">
+    <summary><span><span class="fname">Set the Hit List</span>
+      <span class="fsub" id="foldHitListSub"></span></span></summary>
+    <div id="hitListBox"></div>
+  </details>
+
+  <details class="fold step" id="foldEvent">
     <summary><span><span class="fname">Event settings</span>
       <span class="fsub" id="foldEventSub"></span></span></summary>
     <div id="eventBox"></div>
@@ -73,6 +95,15 @@
     <div id="skinsSwitch"></div>
     <div id="autoPicksSwitch"></div>
   </details>
+
+  <button class="fold step go" id="goRules">
+    <span><span class="fname">The rules</span>
+      <span class="fsub" id="goRulesSub"></span></span></button>
+
+  <!-- Open, and scrolled PAST rather than through. It is a reference, not an
+       action, and it is the longest thing on the screen. -->
+  <div class="section-label" id="rosterHead">The player list</div>
+  <div id="setupRows"></div>
 
   <details class="fold" id="foldMove">
     <summary><span><span class="fname">Move this event</span>
@@ -1268,11 +1299,31 @@ function readFolds(){
 }
 function wireFolds(){
   const open = readFolds();
+  /* Opening a step is what BUILDS what is inside it. They were buttons before,
+     each drawing its own box; the box is the fold's content now, so the fold
+     has to ask for it. Built on open rather than up front so twenty-four
+     players are not laid out five times over on a screen nobody has opened. */
+  const build = {
+    foldRoster: showRosterBox,
+    foldPicks: showPicksBox,
+    foldHitList: showHitListBox,
+  };
   document.querySelectorAll("details.fold").forEach(d => {
     d.open = open[d.id] === true;
+    if(d.open && build[d.id]) build[d.id]();
     d.addEventListener("toggle", () => {
-      const now = readFolds();
-      now[d.id] = d.open;
+      if(d.open && build[d.id]) build[d.id]();
+      // ONE STEP AT A TIME. Six open sections is the wall this screen was, and
+      // a man opening the fifth cannot see he left the first open above him.
+      // Only the numbered STEPS take part — Move this event and About sit under
+      // the player list and are nobody's next action.
+      if(d.open && d.classList.contains("step")){
+        document.querySelectorAll("details.fold.step").forEach(o => {
+          if(o !== d && o.open) o.open = false;
+        });
+      }
+      const now = {};
+      document.querySelectorAll("details.fold").forEach(o => { now[o.id] = o.open; });
       try { localStorage.setItem(FOLD_KEY, JSON.stringify(now)); } catch(e) { /* full or private — the fold simply forgets */ }
     });
   });
@@ -1285,13 +1336,79 @@ function wireFolds(){
  * be able to hide.
  */
 function drawFoldSubs(){
+  const men = state.players.length;
+  const ready = readyPlayers().length;
+  const say = (id, text, wrong) => {
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.textContent = text;
+    el.classList.toggle("wrong", !!wrong);
+    const head = el.closest("summary") || el.closest("button.fold.go");
+    if(head) head.classList.toggle("wrong", !!wrong);
+  };
+
+  /* ADD PLAYER — the count, and how many cannot be scored yet.
+     COUNTED ON isReady, not on missingFrom. missingFrom also reports a man with
+     no cart, which is a thing to fix before skins and not a thing that stops
+     him being scored — counting it here said "10 still need an index or a tee"
+     about a field where eight had both. A shut line that overstates is as bad
+     as one that hides. */
+  const notReady = men - ready;
+  say("foldAddSub",
+    (men === 0 ? "Nobody yet" : men + " player" + (men === 1 ? "" : "s")) +
+      (notReady ? " · " + notReady + (notReady === 1 ? " still needs" : " still need") +
+                  " an index and a tee" : ""),
+    notReady > 0);
+
+  /* PASTE A LIST — whether a paste is sitting there unfinished. */
+  const rosterBad = rosterPreview ? rosterPreview.rows.filter(r => r.problems.length).length : 0;
+  say("foldRosterSub",
+    !rosterPreview ? "A tee sheet or a spreadsheet, all at once"
+      : rosterBad ? rosterBad + " of " + rosterPreview.rows.length + " lines could not be read — not yet added"
+      : rosterPreview.rows.length + " read and waiting to be added",
+    rosterBad > 0);
+
+  /* BIRDIE PICKS — how many men are actually holding a full set. */
+  const withPicks = state.players.filter(p =>
+    E.PICK_SLOTS.every(sl => p[sl.key] != null)).length;
+  const picksBad = picksPreview ? picksPreview.rows.filter(r => r.problems.length).length : 0;
+  say("foldPicksSub",
+    picksBad ? picksBad + " of " + picksPreview.rows.length + " lines could not be read — not yet set"
+      : men === 0 ? "Nobody to give picks to yet"
+      : withPicks + " of " + men + " picks in",
+    // ONLY A FAILED PASTE IS WRONG. Seven of ten picks in on a Wednesday is
+    // progress, and painting it red says a thing is broken when the thing is
+    // simply not finished — which teaches a man to ignore the colour by
+    // Saturday, when it will mean something.
+    picksBad > 0);
+
+  /* HIT LIST — how many have named an opponent. */
+  const named = state.players.filter(p => (p.hitList || "").trim() !== "").length;
+  // Never wrong: a man is allowed to name nobody, and the pick simply pays 0.
+  say("foldHitListSub",
+    men === 0 ? "Nobody to name yet" : named + " of " + men + " named",
+    false);
+
+  /* EVENT SETTINGS — the two figures that move every man's score, plus whether
+     picks will be drawn for the men who sent none. */
   const carts = new Set(readyPlayers()
     .filter(p => p.cart != null && String(p.cart).trim() !== "").map(p => String(p.cart)));
-  document.getElementById("foldEventSub").textContent =
+  say("foldEventSub",
     [state.format || DEFAULT_FORMAT,
      state.allowancePercent + "%",
      skinsOn() ? (carts.size < 2 ? "skins on, one group" : "skins on") : "skins off",
-    ].join(" · ");
+     state.autoPicks ? "picks drawn" : "picks not drawn",
+    ].join(" · "), false);
+
+  /* THE RULES — default, or what was changed. */
+  say("goRulesSub",
+    rulesChanged() ? "Changed: " + changedRulesNote() : "The default values",
+    false);
+
+  const head = document.getElementById("rosterHead");
+  if(head) head.textContent = men === 0 ? "The player list" :
+    "The player list · " + men + (ready < men ? " · " + (men - ready) + " not ready" : "");
+
   document.getElementById("foldMoveSub").textContent = exportNote(state);
   const v = window.ClubhouseVersion;
   document.getElementById("foldAboutSub").textContent =
@@ -1352,7 +1469,7 @@ function drawEventBox(){
   document.getElementById("eventBox").innerHTML =
     `<div class="field"><label for="fEvent">Event</label>
        <select id="fEvent">${options}</select>
-       <div class="pad" style="padding:12px 0 0"><button class="big" id="fNewEvent">+ New event</button></div></div>
+</div>
      <div class="field"><label for="fEventName">Name</label>
        <input type="text" id="fEventName" autocomplete="off" value="${esc(e.name || "")}"></div>
      <div class="field"><label for="fEventDate">Date</label>
@@ -1383,7 +1500,6 @@ function drawEventBox(){
   $("fEventFormat").addEventListener("input", (ev) => {
     state.format = ev.target.value; save(); refresh(); drawFoldSubs();
   });
-  $("fNewEvent").addEventListener("click", addEvent);
 }
 
 /**
@@ -1394,6 +1510,10 @@ function drawEventBox(){
 function drawMoveBox(){
   document.getElementById("moveBox").innerHTML =
     `<div class="pad">
+       <!-- Starting a fresh round is not a SETTING, and it was three taps down
+            under a heading called Event inside Event settings. It belongs with
+            the other things done to a whole event. -->
+       <button class="big solid" id="fNewEvent">+ New event</button>
        <button class="big" id="fExportEvent">Export a spreadsheet (CSV)</button>
        <button class="big" id="fCopyEvent">Copy this event</button>
        <button class="big" id="fPasteEvent">Paste an event</button>
@@ -1401,6 +1521,7 @@ function drawMoveBox(){
        <div class="cd" style="margin:16px 0 12px;font-size:18px;font-weight:700">${esc(deleteNote(state))}</div>
        <button class="big danger" id="fDeleteEvent">Delete this event</button>
      </div>`;
+  document.getElementById("fNewEvent").addEventListener("click", addEvent);
   document.getElementById("fExportEvent").addEventListener("click", exportEvent);
   document.getElementById("fCopyEvent").addEventListener("click", copyEvent);
   document.getElementById("fPasteEvent").addEventListener("click", showPasteBox);
@@ -2913,10 +3034,8 @@ document.getElementById("addBtn").addEventListener("click", () => {
   if(state.players.length >= MAX_PLAYERS) return;
   editPlayer(null);
 });
-document.getElementById("pastePlayersBtn").addEventListener("click", showRosterBox);
-document.getElementById("pastePicksBtn").addEventListener("click", showPicksBox);
-document.getElementById("hitListBtn").addEventListener("click", showHitListBox);
-document.getElementById("settingsBtn").addEventListener("click", () => {
+// The three pastes are fold contents now, built when their step is opened.
+document.getElementById("goRules").addEventListener("click", () => {
   draft = null; renderSettings(); show("settings");
 });
 document.getElementById("settingsBack").addEventListener("click", () => {
