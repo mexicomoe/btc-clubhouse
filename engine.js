@@ -725,6 +725,23 @@
           break;
         }
       }
+      /* EASY STREET COUNTS THREE HOLES, so only 0, 1 and 2 are real counts —
+         the last rung covers "all three". A middle rung set to 3 or more can
+         never be beaten, so the final rung becomes unreachable and the value a
+         man was promised for sweeping the stretch is silently never paid. It
+         reads plausibly on screen, which is what makes it worth refusing. */
+      if (key === "easyStreet") {
+        const holes = (course && course.easyStreetHoles ? course.easyStreetHoles.length : 3);
+        for (let i = 0; i < ladder.length - 1; i++) {
+          if (ladder[i].threshold >= holes) {
+            problems.push("Easy Street counts only " + holes + " holes, so " +
+              ladder[i].threshold + " can never be beaten — the line below it would " +
+              "never be reached. Use " + (holes - 1) + " or less.");
+            break;
+          }
+        }
+      }
+
       for (const rung of ladder) {
         if (typeof rung.strokes !== "number" || !Number.isFinite(rung.strokes)) {
           problems.push(label + " has a rung with no value on it.");

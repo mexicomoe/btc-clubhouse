@@ -1841,12 +1841,17 @@ function fmtRule(v){ return fmtStrokes(Object.is(v, -0) ? 0 : Number(v)); }
 function numField(label, path, value, dflt, opts){
   const o = opts || {};
   const same = Number(value) === Number(dflt);
+  // NOTHING UNDER AN UNTOUCHED VALUE. Forty-odd lines reading "was −2.0"
+  // beside −2.0 is a drone, and a drone is what a man reads past — which is
+  // the opposite of what the line is for. It appears only where something has
+  // actually moved, so seeing one means something.
   return `<div class="field"><label for="s_${path}">${esc(label)}</label>` +
     `<input id="s_${path}" data-path="${path}" type="number" inputmode="decimal" ` +
       `step="${o.step || 0.1}" value="${value}">` +
-    `<div class="cd" style="margin-top:8px;font-size:18px;font-weight:700">` +
-      (same ? `was <b>${fmtRule(dflt)}</b>` : `was <b>${fmtRule(dflt)}</b> — changed`) +
-    `</div></div>`;
+    (same ? `` :
+      `<div class="cd" style="margin-top:8px;font-size:18px;font-weight:700">` +
+        `was <b>${fmtRule(dflt)}</b></div>`) +
+    `</div>`;
 }
 
 function settingsGet(path){
@@ -1935,7 +1940,13 @@ function renderSettings(){
           `</div>` +
           `<div class="cd" style="margin-top:8px;font-size:18px;font-weight:700">` +
             `pays <b>${fmtRule(rung.strokes)}</b>` +
-            (wasRung ? ` · was <b>${fmtRule(wasRung.strokes)}</b>` : ``) +
+            // Named separately, because a moved threshold and a moved value are
+            // different changes and "was −2.0" beside an unchanged −2.0 would
+            // be the wrong one to point at.
+            (wasRung && Number(wasRung.strokes) !== Number(rung.strokes)
+              ? ` · was <b>${fmtRule(wasRung.strokes)}</b>` : ``) +
+            (wasRung && !lastRung && Number(wasRung.threshold) !== Number(rung.threshold)
+              ? ` · figure was <b>${wasRung.threshold}</b>` : ``) +
           `</div></div>`;
       });
     }

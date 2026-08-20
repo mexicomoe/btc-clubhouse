@@ -255,3 +255,19 @@ test("a round played on house rules says so in the shared note", () => {
   assert.match(note, /HOUSE RULES/);
   assert.ok(note.length < 60, "short enough not to cost a player off the field");
 });
+
+test("an Easy Street rung that makes the last one unreachable is refused", () => {
+  // It counts three holes, so only 0, 1 and 2 are real counts and the last rung
+  // covers all three. A middle rung of 3 can never be beaten, so the value for
+  // sweeping the stretch would be silently never paid — and it reads perfectly
+  // plausibly on screen, which is exactly what makes it worth refusing.
+  const problems = check(merge({ easyStreet: [
+    { threshold: 0, strokes: 2 }, { threshold: 1, strokes: 1 },
+    { threshold: 3, strokes: 0 }, { threshold: 99, strokes: -1 },
+  ] }));
+  assert.match(problems[0], /counts only 3 holes/);
+});
+
+test("the ordinary Easy Street ladder is not caught by that", () => {
+  assert.deepEqual(check(DEFAULT_CONTESTS), []);
+});
