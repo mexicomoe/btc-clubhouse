@@ -661,6 +661,37 @@
    * invent a player.
    */
   const HIT_LIST_LINE = /^\s*hit\s*list\s*[:\-–—]\s*(.+?)\s*$/i;
+  /** The same label riding at the end of the player's own line. */
+  const SAME_LINE_HIT = /^(.*?)[\s\u00b7,;|-]*hit\s*list\s*[:\-–—]\s*(.+?)\s*$/i;
+
+  /**
+   * Attach a target to the man it belongs to, from either shape.
+   *
+   * One rule, called from two places — the label on its own line and the label
+   * riding at the end of his own. Two copies of this would have drifted the
+   * first time "he named himself" needed saying differently.
+   */
+  function applyHitList(owner, target, names) {
+    if (owner.hitList != null || owner.hitListProblem) {
+      owner.problems.push("two Hit List lines for one man");
+      return;
+    }
+    const m = matchName(target, names);
+    if (m.index === -1) {
+      owner.hitListProblem = true;
+      owner.problems.push(m.how === "ambiguous"
+        ? "Hit List “" + target + "” could be more than one player"
+        : "Hit List “" + target + "” is not a player on the list");
+      return;
+    }
+    if (owner.index !== -1 && m.index === owner.index) {
+      owner.hitListProblem = true;
+      owner.problems.push("a man cannot name himself on the Hit List");
+      return;
+    }
+    owner.hitList = names[m.index];
+    owner.hitListHow = m.how;
+  }
 
   function parseBirdiePicks(text, opts) {
     const names = (opts && opts.names) || [];
@@ -669,7 +700,14 @@
     let ignored = 0;
 
     String(text == null ? "" : text).split(/\r?\n/).forEach((raw) => {
-      const line = raw.trim();
+      /* UNQUOTED FIRST. A column copied out of Google Sheets arrives with every
+         cell that held a newline wrapped in quotes, and doubled quotes inside.
+         Left on, the leading one makes the name `"Eli Marsden`, which matches
+         nobody — and every row of the paste fails at once. */
+      let line = raw.trim();
+      if (line.charAt(0) === '"') line = line.slice(1);
+      if (line.charAt(line.length - 1) === '"') line = line.slice(0, -1);
+      line = line.replace(/""/g, '"').trim();
       if (line === "") { ignored++; return; }
 
       /* A TARGET BELONGS TO THE MAN ABOVE IT. It is read here, before anything
@@ -683,27 +721,17 @@
             hitList: null, problems: ["a Hit List line with nobody above it to belong to"] });
           return;
         }
-        if (owner.hitList != null || owner.hitListProblem) {
-          owner.problems.push("two Hit List lines for one man");
-          return;
-        }
-        const m = matchName(target, names);
-        if (m.index === -1) {
-          owner.hitListProblem = true;
-          owner.problems.push(m.how === "ambiguous"
-            ? "Hit List “" + target + "” could be more than one player"
-            : "Hit List “" + target + "” is not a player on the list");
-          return;
-        }
-        if (owner.index !== -1 && m.index === owner.index) {
-          owner.hitListProblem = true;
-          owner.problems.push("a man cannot name himself on the Hit List");
-          return;
-        }
-        owner.hitList = names[m.index];
-        owner.hitListHow = m.how;
+        applyHitList(owner, target, names);
         return;
       }
+
+      /* THE LABEL MAY BE ON THIS LINE OR THE NEXT. A text message sends two
+         lines; the Google Sheet holds one, because a newline in a cell breaks
+         the column when it is copied. Both are read, and the same label means
+         the same thing in both. */
+      let sameLine = null;
+      const tail = line.match(SAME_LINE_HIT);
+      if (tail) { sameLine = tail[2].trim(); line = tail[1].trim(); }
 
       // Split the name off the numbers. Where no separator was typed, the first
       // digit is the boundary — "Ken Ridgeway 8 2 4 13 14 16" is a real message.
@@ -749,6 +777,7 @@
 
       if (holes.length !== slots.length) {
         row.problems.push("expected " + slots.length + " numbers, found " + holes.length);
+        if (sameLine != null) applyHitList(row, sameLine, names);
         rows.push(row);
         return;
       }
@@ -783,6 +812,7 @@
         }
       });
 
+      if (sameLine != null) applyHitList(row, sameLine, names);
       rows.push(row);
     });
 

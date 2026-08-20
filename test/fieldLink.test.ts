@@ -206,3 +206,84 @@ test("a whole block of ten pastes in one go", () => {
   assert.equal(rows.filter((r) => r.problems.length === 0).length, 10);
   assert.equal(rows.filter((r) => r.hitList != null).length, 10);
 });
+
+/* ---- the Google Sheet, and pasting a column of it ---- */
+
+/**
+ * The text message is TWO lines and stays that way — the label is what tells a
+ * target apart from the next man's name in a pasted block.
+ *
+ * The Google Sheet is ONE, and had to become one. A newline inside a Sheet cell
+ * is a trap: copying that column wraps every cell in quotes, so the name lands
+ * as `"Eli Marsden` and matches nobody. Every row fails at once, at the paste
+ * rather than at the send, where nobody is looking.
+ */
+
+test("a column filed one-line-per-cell pastes straight in", () => {
+  const names = TEN.map((p) => p.name);
+  const column = [
+    "Abe Whitfield — 2, 14, 3, 8, 7, 16 · Hit List: Mike Knazick",
+    "Ben Castellan — 1, 10, 8, 17, 7, 18 · Hit List: Ken Ridgeway",
+  ].join("\n");
+  const { rows } = parseBirdiePicks(column, { names, slots: SLOTS });
+  assert.equal(rows.length, 2);
+  assert.deepEqual(rows[0].problems, []);
+  assert.equal(rows[0].hitList, "Knazick, Mike");
+  assert.equal(rows[1].hitList, "Ridgeway, Ken");
+  assert.deepEqual(rows[0].picks, { p4f: 2, p4b: 14, p3a: 3, p3b: 8, p5a: 7, p5b: 16 });
+});
+
+test("a QUOTED column still reads — the rows already in the form", () => {
+  // Sheets wraps any cell holding a newline. Rows filed before the change look
+  // like this, and refusing them would mean re-collecting a round of picks.
+  const names = TEN.map((p) => p.name);
+  const column = [
+    '"Abe Whitfield — 2, 14, 3, 8, 7, 16',
+    'Hit List: Mike Knazick"',
+    '"Ben Castellan — 1, 10, 8, 17, 7, 18',
+    'Hit List: Ken Ridgeway"',
+  ].join("\n");
+  const { rows } = parseBirdiePicks(column, { names, slots: SLOTS });
+  assert.equal(rows.length, 2);
+  assert.deepEqual(rows[0].problems, []);
+  assert.equal(rows[0].hitList, "Knazick, Mike");
+  assert.equal(rows[1].hitList, "Ridgeway, Ken");
+});
+
+test("a doubled quote inside a cell survives too", () => {
+  const names = TEN.concat([{ name: 'O"Hara, Sean', index: 16.0 }]).map((p) => p.name);
+  const { rows } = parseBirdiePicks('"Abe Whitfield — 2, 14, 3, 8, 7, 16"',
+    { names, slots: SLOTS });
+  assert.deepEqual(rows[0].problems, []);
+});
+
+test("the same label on one line means what it means on two", () => {
+  const names = TEN.map((p) => p.name);
+  const two = parseBirdiePicks(
+    "Abe Whitfield — 2, 14, 3, 8, 7, 16\nHit List: Mike Knazick",
+    { names, slots: SLOTS }).rows[0];
+  const one = parseBirdiePicks(
+    "Abe Whitfield — 2, 14, 3, 8, 7, 16 · Hit List: Mike Knazick",
+    { names, slots: SLOTS }).rows[0];
+  assert.equal(one.hitList, two.hitList);
+  assert.deepEqual(one.picks, two.picks);
+  assert.deepEqual(one.problems, two.problems);
+});
+
+test("naming himself is caught on one line as well as two", () => {
+  const names = TEN.map((p) => p.name);
+  const { rows } = parseBirdiePicks(
+    "Abe Whitfield — 2, 14, 3, 8, 7, 16 · Hit List: Abe Whitfield",
+    { names, slots: SLOTS });
+  assert.match(rows[0].problems[0], /cannot name himself/);
+});
+
+test("a separator other than the dot works, since a man may type it", () => {
+  const names = TEN.map((p) => p.name);
+  for (const sep of [" · ", " - ", ", ", "; ", " | ", " "]) {
+    const { rows } = parseBirdiePicks(
+      "Abe Whitfield — 2, 14, 3, 8, 7, 16" + sep + "Hit List: Mike Knazick",
+      { names, slots: SLOTS });
+    assert.equal(rows[0].hitList, "Knazick, Mike", JSON.stringify(sep));
+  }
+});

@@ -452,6 +452,22 @@ drawOpponent();
 refresh();
 
 /**
+ * THE SAME CARD, ON ONE LINE, for the Google Sheet.
+ *
+ * The text message is two lines and stays that way — the label is what tells a
+ * target apart from the next man's name in a pasted block. But a newline INSIDE
+ * a Sheet cell is a trap: copying that column wraps every cell in quotes, so
+ * the name arrives as `"Eli Marsden` and matches nobody. Every row fails, and
+ * it fails at the paste rather than at the send, where nobody is looking.
+ *
+ * One line here, with the label kept so the parser reads it either way.
+ */
+function filedLine(){
+  const both = line().split("\n");
+  return both.length > 1 ? both[0] + " \u00b7 " + both[1] : both[0];
+}
+
+/**
  * File the card. Sending the same line twice does nothing — a man who taps the
  * text button and then the copy button has not changed his mind. A man who
  * CHANGES a pick and taps again files a second row, on purpose: it is stamped
@@ -475,12 +491,12 @@ function fileWithRob(text){
 // Filed on the way out to Messages, and on the copy fallback too — a man who
 // copies and texts by hand should not go missing from the Sheet.
 sendsms.addEventListener("click", () => {
-  if (sendsms.getAttribute("href")) fileWithRob(line());
+  if (sendsms.getAttribute("href")) fileWithRob(filedLine());
 });
 
 send.addEventListener("click", async () => {
   const text = line();
-  fileWithRob(text);
+  fileWithRob(filedLine());
   try {
     await navigator.clipboard.writeText(text);
     copied.textContent = "Copied. Now text it to Rob.";
