@@ -34,9 +34,13 @@
   input#who:focus{outline:3px solid var(--felt);outline-offset:1px}
   section.pick{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin:16px 0}
   section.pick h2{margin:0 0 12px;font-size:19px;font-weight:600}
-  .holes{display:flex;flex-wrap:wrap;gap:10px}
+  /* A GRID RATHER THAN A FLEX ROW, since the par 4 box holds eight holes.
+     Flex gave the last row's two buttons half the width of the six above them,
+     which reads as a different kind of button rather than the same one wrapped.
+     Every cell is one column wide whatever falls in it. */
+  .holes{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:10px}
   .hole{
-    flex:1 1 0;min-width:88px;padding:20px 8px;font-size:22px;font-weight:600;
+    padding:20px 8px;font-size:22px;font-weight:600;
     background:var(--paper);color:var(--ink);border:1px solid var(--line);
     border-radius:10px;cursor:pointer;font-family:inherit;
   }
@@ -95,7 +99,7 @@
 
 <header>
   <h1>CLUBHOUSE</h1>
-  <p>Pick six holes before you tee off. A net birdie on one takes half a stroke off, a net eagle a stroke and a half. Nothing on any of the six costs you half.</p>
+  <p>Pick nine holes before you tee off. A net birdie on one takes half a stroke off, a net eagle a stroke and a half. Nothing on any of the nine costs you half.</p>
 </header>
 
 <main>
@@ -111,7 +115,7 @@
 </main>
 
 <div id="tray"><div class="inner">
-  <p id="summary">Pick one par 4 on each nine, then two par 3s and two par 5s.</p>
+  <p id="summary"></p>
   <a id="sendsms" role="button" aria-disabled="true">Text my picks</a>
   <button id="send" disabled>Copy my picks instead</button>
   <p id="copied"></p>
@@ -144,25 +148,45 @@ const FORM_POST = "https://docs.google.com/forms/d/e/1FAIpQLSdbtFLO94Gq1RYC2-YJm
 const FORM_FIELD = "entry.1094711796";
 
 /**
- * The four boxes, and what each one asks for.
+ * The three boxes, and what each one asks for — BUILT FROM THE ENGINE, not
+ * typed out here.
  *
- * Par 4s are still split front and back. THE PAR 3s AND PAR 5s NOW FLOAT across
- * the whole course and take TWO picks each, because once Agony Alley (4, 5, 6)
- * and Easy Street (11, 12, 13) have taken their holes there are only three par
- * 3s and three par 5s left — and splitting three across two nines leaves a box
- * with one hole in it, which is not a choice.
+ * THIS PAGE USED TO KEEP ITS OWN COPY of the hole lists, and it was the only
+ * place in the app that did. It survived the last two changes by being edited
+ * twice; it would not have survived a third, and the failure would have been
+ * silent — a man offered hole 13 on a sheet that the parser then refused, or
+ * worse, not offered a hole he was entitled to. The engine says which holes are
+ * legal for which slot and this asks it.
+ *
+ * TWO PAR 5s OF THREE, THREE PAR 3s OF FOUR, FOUR PAR 4s OF EIGHT. Front and
+ * back no longer matter to any box: the par 4s were split when six of them were
+ * left, and with Easy Street off there are eight.
  *
  * `keys` is the slot the engine files each pick under, and their ORDER is the
- * order the six numbers are written in the message. That order is the only
- * thing the parser at the other end has to go on, so it must match the engine's
- * PICK_SLOTS exactly: front par 4, back par 4, par 3, par 3, par 5, par 5.
+ * order the nine numbers are written in the message. That order is the only
+ * thing the parser at the other end has to go on, which is why it is taken
+ * straight from PICK_SLOTS rather than restated.
  */
-const SLOTS = [
-  { label: "Front nine \u00b7 par 4", holes: [1, 2, 9],    pick: 1, keys: ["p4f"] },
-  { label: "Back nine \u00b7 par 4",  holes: [10, 14, 15], pick: 1, keys: ["p4b"] },
-  { label: "Par 3s \u00b7 pick two",  holes: [3, 8, 17],   pick: 2, keys: ["p3a", "p3b"] },
-  { label: "Par 5s \u00b7 pick two",  holes: [7, 16, 18],  pick: 2, keys: ["p5a", "p5b"] }
-];
+const LEGAL = E.birdiePickHoles(E.ABERDEEN_TEE_IV);
+const PAR_SAID = { 3: "Par 3s", 4: "Par 4s", 5: "Par 5s" };
+const COUNT_SAID = ["", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
+
+const SLOTS = [];
+E.PICK_SLOTS.forEach((sl) => {
+  // Slots of one par run together in PICK_SLOTS and share a list, so they are
+  // one box. Written this way rather than grouped by par so the box order
+  // follows the slot order and cannot drift from it.
+  const box = SLOTS[SLOTS.length - 1];
+  if (box && box.par === sl.par) { box.keys.push(sl.key); box.pick++; return; }
+  SLOTS.push({ par: sl.par, holes: LEGAL[sl.key], pick: 1, keys: [sl.key] });
+});
+SLOTS.forEach((s) => {
+  // "pick two of three" — the count AND the field it comes from, because the
+  // whole point of this shape is that every box is a real choice. Both in
+  // words: "two of 3" is a jarring thing to read on a card.
+  s.label = PAR_SAID[s.par] + " \u00b7 pick " + COUNT_SAID[s.pick] +
+            " of " + (COUNT_SAID[s.holes.length] || s.holes.length);
+});
 const TOTAL_PICKS = SLOTS.reduce((n, s) => n + s.pick, 0);
 
 /** Holes chosen in each box, oldest first, so a third tap knows what to drop. */
@@ -209,7 +233,7 @@ SLOTS.forEach((s, si) => {
   slotsEl.appendChild(sec);
 });
 
-/** Every pick in slot order, lowest hole first inside a two-pick box. */
+/** Every pick in slot order, lowest hole first inside a multi-pick box. */
 function picksInOrder(){
   const out = [];
   SLOTS.forEach((s, si) => {
@@ -396,6 +420,11 @@ function refresh(){
   let ready = false;
   if (INVITE && INVITE.kind === "field" && !me) {
     summary.textContent = "Tap your name in the list first.";
+  } else if (n === 0) {
+    // The instruction, before he has tapped anything — and derived, so it can
+    // never come to say something the boxes above it do not.
+    summary.textContent = "Pick " +
+      SLOTS.map(s => COUNT_SAID[s.pick] + " " + PAR_SAID[s.par].toLowerCase()).join(", ") + ".";
   } else if (n < TOTAL_PICKS) {
     summary.textContent = n + " of " + TOTAL_PICKS + " picked.";
   } else if (!named) {

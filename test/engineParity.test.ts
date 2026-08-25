@@ -22,16 +22,16 @@ const html = readFileSync(new URL("../leaderboard.html", import.meta.url), "utf8
  * The seed round's finals, ON THE ZERO BASE — strokes under and over par, not
  * net scores in the sixties and seventies. This is the board the app opens on,
  * so it is also what an organiser sees before he has entered anything of his
- * own, and it should look like a real Saturday: a spread of about ten strokes
- * with the median a shade under level.
+ * own, and it should look like a real Saturday.
  *
- * Boyd and Alex are LEVEL at -3.70 and are separated by the card match, which
- * on this scale is the normal case rather than the exception — every value in
- * the game is a half or a tenth across roughly a ten-stroke range.
+ * RE-CUT WITH THE GAME. Four contests instead of eight, and nine picks instead
+ * of six. The spread narrowed from 10.0 strokes to 6.3, which is the cut doing
+ * exactly what it was for: four of the eight were mostly repeating the net
+ * score, so taking them out takes the pile-on with them.
  */
 const EXPECTED: Record<string, string> = {
-  Finn: "-5.50", Dex: "-4.80", Boyd: "-3.70", Alex: "-3.70",
-  Hoyt: "0.10", Emmet: "2.10", Chip: "3.80", Grady: "4.50",
+  Alex: "-5.20", Finn: "-5.00", Dex: "-4.30", Boyd: "-3.20",
+  Hoyt: "-0.40", Chip: "-0.20", Grady: "0.00", Emmet: "1.10",
 };
 
 test("engine.js reproduces the section 11 leaderboard", () => {

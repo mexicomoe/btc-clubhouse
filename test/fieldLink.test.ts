@@ -124,7 +124,7 @@ test("a damaged link says so rather than showing a blank page", () => {
 test("the line parses back with the holes and the opponent intact", () => {
   const names = TEN.map((p) => p.name);
   const block = [
-    "Abe Whitfield — 2, 14, 3, 8, 7, 16",
+    "Abe Whitfield — 7, 16, 3, 8, 13, 2, 14, 1, 10",
     "Hit List: Mike Knazick",
     "Ben Castellan — 1, 10, 8, 17, 7, 18",
     "Hit List: Ken Ridgeway",
@@ -132,14 +132,14 @@ test("the line parses back with the holes and the opponent intact", () => {
   const { rows } = parseBirdiePicks(block, { names, slots: SLOTS });
   assert.equal(rows.length, 2);
   assert.deepEqual(rows[0].problems, []);
-  assert.deepEqual(rows[0].picks, { p4f: 2, p4b: 14, p3a: 3, p3b: 8, p5a: 7, p5b: 16 });
+  assert.deepEqual(rows[0].picks, { p5a: 7, p5b: 16, p3a: 3, p3b: 8, p3c: 13, p4f: 2, p4b: 14, p4c: 1, p4d: 10 });
   assert.equal(rows[0].hitList, "Knazick, Mike", "matched back to the roster's own spelling");
   assert.equal(rows[1].hitList, "Ridgeway, Ken");
 });
 
 test("a man with no Hit List line is not a problem — he simply named nobody", () => {
   const names = TEN.map((p) => p.name);
-  const { rows } = parseBirdiePicks("Abe Whitfield — 2, 14, 3, 8, 7, 16",
+  const { rows } = parseBirdiePicks("Abe Whitfield — 7, 16, 3, 8, 13, 2, 14, 1, 10",
     { names, slots: SLOTS });
   assert.deepEqual(rows[0].problems, []);
   assert.equal(rows[0].hitList, null);
@@ -150,7 +150,7 @@ test("the label is what keeps a target from reading as the next player", () => {
   // start of the next man's entry — and guessing either way is wrong.
   const names = TEN.map((p) => p.name);
   const { rows } = parseBirdiePicks(
-    ["Abe Whitfield — 2, 14, 3, 8, 7, 16", "Mike Knazick"].join("\n"),
+    ["Abe Whitfield — 7, 16, 3, 8, 13, 2, 14, 1, 10", "Mike Knazick"].join("\n"),
     { names, slots: SLOTS });
   assert.equal(rows.length, 1, "the bare name is not a row");
   assert.equal(rows[0].hitList, null, "and it did not become his target either");
@@ -165,7 +165,7 @@ test("a Hit List line with nobody above it is refused, not attached to thin air"
 test("a man cannot name himself", () => {
   const names = TEN.map((p) => p.name);
   const { rows } = parseBirdiePicks(
-    ["Abe Whitfield — 2, 14, 3, 8, 7, 16", "Hit List: Abe Whitfield"].join("\n"),
+    ["Abe Whitfield — 7, 16, 3, 8, 13, 2, 14, 1, 10", "Hit List: Abe Whitfield"].join("\n"),
     { names, slots: SLOTS });
   assert.match(rows[0].problems[0], /cannot name himself/);
   assert.equal(rows[0].hitList, null);
@@ -174,7 +174,7 @@ test("a man cannot name himself", () => {
 test("a target who is not in the round is named, not guessed at", () => {
   const names = TEN.map((p) => p.name);
   const { rows } = parseBirdiePicks(
-    ["Abe Whitfield — 2, 14, 3, 8, 7, 16", "Hit List: Nobody At All"].join("\n"),
+    ["Abe Whitfield — 7, 16, 3, 8, 13, 2, 14, 1, 10", "Hit List: Nobody At All"].join("\n"),
     { names, slots: SLOTS });
   assert.match(rows[0].problems[0], /is not a player on the list/);
 });
@@ -182,7 +182,7 @@ test("a target who is not in the round is named, not guessed at", () => {
 test("two Hit List lines for one man is refused rather than the last winning", () => {
   const names = TEN.map((p) => p.name);
   const { rows } = parseBirdiePicks(
-    ["Abe Whitfield — 2, 14, 3, 8, 7, 16", "Hit List: Mike Knazick", "Hit List: Ken Ridgeway"].join("\n"),
+    ["Abe Whitfield — 7, 16, 3, 8, 13, 2, 14, 1, 10", "Hit List: Mike Knazick", "Hit List: Ken Ridgeway"].join("\n"),
     { names, slots: SLOTS });
   assert.match(rows[0].problems[0], /two Hit List lines/);
 });
@@ -191,7 +191,7 @@ test("the label is read however it was written", () => {
   const names = TEN.map((p) => p.name);
   for (const label of ["Hit List:", "hit list:", "HitList:", "Hit List -", "Hit List —"]) {
     const { rows } = parseBirdiePicks(
-      ["Abe Whitfield — 2, 14, 3, 8, 7, 16", label + " Mike Knazick"].join("\n"),
+      ["Abe Whitfield — 7, 16, 3, 8, 13, 2, 14, 1, 10", label + " Mike Knazick"].join("\n"),
       { names, slots: SLOTS });
     assert.equal(rows[0].hitList, "Knazick, Mike", label);
   }
@@ -200,7 +200,7 @@ test("the label is read however it was written", () => {
 test("a whole block of ten pastes in one go", () => {
   const names = TEN.map((p) => p.name);
   const block = TEN.map((p, i) =>
-    `${p.name} — 2, 14, 3, 8, 7, 16\nHit List: ${TEN[(i + 1) % TEN.length].name}`).join("\n");
+    `${p.name} — 7, 16, 3, 8, 13, 2, 14, 1, 10\nHit List: ${TEN[(i + 1) % TEN.length].name}`).join("\n");
   const { rows } = parseBirdiePicks(block, { names, slots: SLOTS });
   assert.equal(rows.length, 10);
   assert.equal(rows.filter((r) => r.problems.length === 0).length, 10);
@@ -222,7 +222,7 @@ test("a whole block of ten pastes in one go", () => {
 test("a column filed one-line-per-cell pastes straight in", () => {
   const names = TEN.map((p) => p.name);
   const column = [
-    "Abe Whitfield — 2, 14, 3, 8, 7, 16 · Hit List: Mike Knazick",
+    "Abe Whitfield — 7, 16, 3, 8, 13, 2, 14, 1, 10 · Hit List: Mike Knazick",
     "Ben Castellan — 1, 10, 8, 17, 7, 18 · Hit List: Ken Ridgeway",
   ].join("\n");
   const { rows } = parseBirdiePicks(column, { names, slots: SLOTS });
@@ -230,7 +230,7 @@ test("a column filed one-line-per-cell pastes straight in", () => {
   assert.deepEqual(rows[0].problems, []);
   assert.equal(rows[0].hitList, "Knazick, Mike");
   assert.equal(rows[1].hitList, "Ridgeway, Ken");
-  assert.deepEqual(rows[0].picks, { p4f: 2, p4b: 14, p3a: 3, p3b: 8, p5a: 7, p5b: 16 });
+  assert.deepEqual(rows[0].picks, { p5a: 7, p5b: 16, p3a: 3, p3b: 8, p3c: 13, p4f: 2, p4b: 14, p4c: 1, p4d: 10 });
 });
 
 test("a QUOTED column still reads — the rows already in the form", () => {
@@ -238,7 +238,7 @@ test("a QUOTED column still reads — the rows already in the form", () => {
   // like this, and refusing them would mean re-collecting a round of picks.
   const names = TEN.map((p) => p.name);
   const column = [
-    '"Abe Whitfield — 2, 14, 3, 8, 7, 16',
+    '"Abe Whitfield — 7, 16, 3, 8, 13, 2, 14, 1, 10',
     'Hit List: Mike Knazick"',
     '"Ben Castellan — 1, 10, 8, 17, 7, 18',
     'Hit List: Ken Ridgeway"',
@@ -252,7 +252,7 @@ test("a QUOTED column still reads — the rows already in the form", () => {
 
 test("a doubled quote inside a cell survives too", () => {
   const names = TEN.concat([{ name: 'O"Hara, Sean', index: 16.0 }]).map((p) => p.name);
-  const { rows } = parseBirdiePicks('"Abe Whitfield — 2, 14, 3, 8, 7, 16"',
+  const { rows } = parseBirdiePicks('"Abe Whitfield — 7, 16, 3, 8, 13, 2, 14, 1, 10"',
     { names, slots: SLOTS });
   assert.deepEqual(rows[0].problems, []);
 });
@@ -260,10 +260,10 @@ test("a doubled quote inside a cell survives too", () => {
 test("the same label on one line means what it means on two", () => {
   const names = TEN.map((p) => p.name);
   const two = parseBirdiePicks(
-    "Abe Whitfield — 2, 14, 3, 8, 7, 16\nHit List: Mike Knazick",
+    "Abe Whitfield — 7, 16, 3, 8, 13, 2, 14, 1, 10\nHit List: Mike Knazick",
     { names, slots: SLOTS }).rows[0];
   const one = parseBirdiePicks(
-    "Abe Whitfield — 2, 14, 3, 8, 7, 16 · Hit List: Mike Knazick",
+    "Abe Whitfield — 7, 16, 3, 8, 13, 2, 14, 1, 10 · Hit List: Mike Knazick",
     { names, slots: SLOTS }).rows[0];
   assert.equal(one.hitList, two.hitList);
   assert.deepEqual(one.picks, two.picks);
@@ -273,7 +273,7 @@ test("the same label on one line means what it means on two", () => {
 test("naming himself is caught on one line as well as two", () => {
   const names = TEN.map((p) => p.name);
   const { rows } = parseBirdiePicks(
-    "Abe Whitfield — 2, 14, 3, 8, 7, 16 · Hit List: Abe Whitfield",
+    "Abe Whitfield — 7, 16, 3, 8, 13, 2, 14, 1, 10 · Hit List: Abe Whitfield",
     { names, slots: SLOTS });
   assert.match(rows[0].problems[0], /cannot name himself/);
 });
@@ -282,7 +282,7 @@ test("a separator other than the dot works, since a man may type it", () => {
   const names = TEN.map((p) => p.name);
   for (const sep of [" · ", " - ", ", ", "; ", " | ", " "]) {
     const { rows } = parseBirdiePicks(
-      "Abe Whitfield — 2, 14, 3, 8, 7, 16" + sep + "Hit List: Mike Knazick",
+      "Abe Whitfield — 7, 16, 3, 8, 13, 2, 14, 1, 10" + sep + "Hit List: Mike Knazick",
       { names, slots: SLOTS });
     assert.equal(rows[0].hitList, "Knazick, Mike", JSON.stringify(sep));
   }

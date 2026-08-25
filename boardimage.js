@@ -49,6 +49,10 @@
     title: 30, sub: 18,          // the band
     rank: 28, name: 26, meta: 18, tie: 18, final: 44,
     section: 20, foot: 18,
+    // The minigame boards, a size down from the leaderboard's — there are four
+    // of them under it and the leaderboard has to stay what the picture is
+    // about. Nothing here goes under MIN_TYPE.
+    mgRank: 22, mgName: 20, mgDetail: 18, mgStrokes: 24, duel: 19,
   };
   /** Nothing in the picture may be smaller than this, the same floor as the app. */
   const MIN_TYPE = 18;
@@ -195,6 +199,81 @@
 
       y += rowH;
       ops.push({ rect: true, x: 0, y: y - 3, w: W, h: 3, fill: INK });
+    }
+
+    /* ---- the minigame boards ----
+       Each contest's own table, then every duel in the round. THE PICTURE IS
+       THE THING THAT ALWAYS ARRIVES, so it carries these rather than leaving
+       them to the link — a man reads who won Agony Alley in the message rather
+       than by opening something.
+
+       Laid out with the same op list and the same wrap() as everything above,
+       so a long surname breaks a line instead of running off the edge. */
+    const boards = (round && round.boards) || [];
+    for (const board of boards) {
+      const noteLines = board.tieNote ? wrap(board.tieNote, textRoom, TYPE.foot, measure) : [];
+      const headH = 14 + TYPE.section + (noteLines.length ? 4 + noteLines.length * (TYPE.foot + 4) : 0) + 8;
+      ops.push({ rect: true, x: 0, y, w: W, h: headH, fill: WASH });
+      ops.push({ rect: true, x: 0, y, w: W, h: 3, fill: INK });
+      let hy = y + 14 + TYPE.section;
+      ops.push({ text: String(board.name).toUpperCase(), x: PAD + 6, y: hy,
+                 size: TYPE.section, weight: 800, fill: INK });
+      for (const line of noteLines) {
+        hy += 4 + TYPE.foot;
+        ops.push({ text: line, x: PAD + 6, y: hy, size: TYPE.foot, weight: 700, fill: INK });
+      }
+      y += headH;
+
+      for (const row of board.rows || []) {
+        const strokes = row.strokes;
+        const strokesW = measure(strokes, TYPE.mgStrokes);
+        const nameLeft = PAD + 32;
+        const room = W - nameLeft - strokesW - PAD - 16;
+        const detailLines = row.detail ? wrap(row.detail, room, TYPE.mgDetail, measure) : [];
+        const rowH = 12 + TYPE.mgName +
+          (detailLines.length ? 5 + detailLines.length * (TYPE.mgDetail + 4) : 0) + 12;
+        ops.push({ rect: true, x: 0, y, w: W, h: rowH, fill: row.rank === 1 ? LEADER : PAPER });
+
+        let ty = y + 12 + TYPE.mgName;
+        ops.push({ text: String(row.rank), x: PAD + 12, y: ty,
+                   size: TYPE.mgRank, weight: 800, align: "center", fill: INK });
+        const fitted = fitName(row.name, room, measure);
+        ops.push({ text: fitted.text, x: nameLeft, y: ty,
+                   size: Math.min(fitted.size, TYPE.mgName), weight: 800, fill: INK });
+        ops.push({ text: strokes, x: W - PAD, y: y + 12 + TYPE.mgStrokes * 0.82,
+                   size: TYPE.mgStrokes, weight: 800, align: "right", fill: INK });
+        for (const line of detailLines) {
+          ty += (ty === y + 12 + TYPE.mgName ? 5 : 4) + TYPE.mgDetail;
+          ops.push({ text: line, x: nameLeft, y: ty, size: TYPE.mgDetail, weight: 700, fill: INK });
+        }
+        y += rowH;
+        ops.push({ rect: true, x: 0, y: y - 2, w: W, h: 2, fill: INK });
+      }
+    }
+
+    /* ---- every duel ----
+       One sentence a line, wrapped. This is the reveal: nobody knows who named
+       whom until it is published. */
+    const duels = (round && round.duels) || [];
+    if (duels.length) {
+      const headH = 14 + TYPE.section + 8;
+      ops.push({ rect: true, x: 0, y, w: W, h: headH, fill: WASH });
+      ops.push({ rect: true, x: 0, y, w: W, h: 3, fill: INK });
+      ops.push({ text: "EVERY DUEL", x: PAD + 6, y: y + 14 + TYPE.section,
+                 size: TYPE.section, weight: 800, fill: INK });
+      y += headH;
+      for (const said of duels) {
+        const lines = wrap(said, textRoom, TYPE.duel, measure);
+        const rowH = 12 + lines.length * (TYPE.duel + 5) + 7;
+        ops.push({ rect: true, x: 0, y, w: W, h: rowH, fill: PAPER });
+        let dy = y + 12 + TYPE.duel;
+        for (const line of lines) {
+          ops.push({ text: line, x: PAD + 6, y: dy, size: TYPE.duel, weight: 700, fill: INK });
+          dy += TYPE.duel + 5;
+        }
+        y += rowH;
+        ops.push({ rect: true, x: 0, y: y - 2, w: W, h: 2, fill: INK });
+      }
     }
 
     /* ---- the footer ---- */

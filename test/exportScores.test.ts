@@ -13,7 +13,7 @@ import assert from "node:assert/strict";
 import { ABERDEEN_TEE_IV, DEFAULT_CONTESTS } from "../src/courseConfig.ts";
 import { computeLeaderboard, type PlayerCard } from "../src/scoring.ts";
 import {
-  eventToCsv, csvFilename, csvField, headerRow, eventSignature, changedSinceExport,
+  eventToCsv, csvFilename, csvField, headerRow, columnsFor, eventSignature, changedSinceExport,
   encodeEvent, decodeEvent, CODE_PREFIX,
 } from "../src/exportScores.ts";
 import { canonicalName } from "../src/importScores.ts";
@@ -23,11 +23,11 @@ const PAR = ABERDEEN_TEE_IV.par;
 const PLAYERS = [
   { id: "p1", name: "Ridgeway, Ken", ghin: "1234567", index: 19.4, tee: "IV", gender: "M",
     cart: 1, flight: "A", hitList: "Sal Merrick",
-    p4f: 2, p4b: 14, p3a: 3, p3b: 8, p5a: 7, p5b: 16 },
+    p5a: 7, p5b: 16, p3a: 3, p3b: 8, p3c: 13, p4f: 2, p4b: 14, p4c: 1, p4d: 10 },
   // No GHIN: the club does not have one for every man.
   { id: "p2", name: "Merrick, Sal", index: 22.7, tee: "I", gender: "F",
     cart: 2, flight: "A", hitList: "Ken Ridgeway",
-    p4f: 9, p4b: 15, p3a: 8, p3b: 17, p5a: 16, p5b: 18 },
+    p5a: 16, p5b: 18, p3a: 8, p3b: 17, p3c: 3, p4f: 9, p4b: 15, p4c: 2, p4d: 11 },
 ];
 const EVENT = { name: "Friday", date: "2026-08-07", format: "Individual net",
                 players: PLAYERS, allowancePercent: 100, skinsOn: true };
@@ -40,14 +40,19 @@ function board() {
   const cards: PlayerCard[] = PLAYERS.map((p) => ({
     name: canonicalName(p.name), handicapIndex: p.index, tee: p.tee, gender: p.gender as "M" | "F",
     cart: p.cart, flight: p.flight, gross: HOLES[p.id],
-    picks: { p4f: p.p4f, p4b: p.p4b, p3a: p.p3a, p3b: p.p3b, p5a: p.p5a, p5b: p.p5b },
+    picks: { p5a: p.p5a, p5b: p.p5b, p3a: p.p3a, p3b: p.p3b, p3c: p.p3c,
+             p4f: p.p4f, p4b: p.p4b, p4c: p.p4c, p4d: p.p4d },
     hitList: p.hitList,
   }));
   return computeLeaderboard(cards, undefined, DEFAULT_CONTESTS);
 }
 
 const shown = (p: { name: string }) => canonicalName(p.name);
-const csv = () => eventToCsv(EVENT, board(), { displayNameOf: shown, holesOf: (p) => HOLES[p.id] });
+/* THE ROUND'S RULES GO IN WITH IT. Which contests get a column is decided by
+   them — a contest that is not in the game gets no heading, rather than one
+   with blanks under it. */
+const csv = () => eventToCsv(EVENT, board(),
+  { displayNameOf: shown, holesOf: (p) => HOLES[p.id], contests: DEFAULT_CONTESTS });
 
 /**
  * Read a CSV line the way a spreadsheet does. Splitting on commas is exactly
@@ -82,32 +87,35 @@ test("the columns are the ones the brief asks for, in order", () => {
   const head = headerRow();
   // The event's own columns lead, and repeat on every row, so several rounds
   // can be piled into one sheet and still be told apart.
-  assert.deepEqual(head.slice(0, 20), [
+  assert.deepEqual(head.slice(0, 23), [
     // "Rules" says whether this round was scored on the defaults, and names
     // what was changed when it was not. A round on house rules must not sit in
     // a sheet looking like an ordinary one.
     "Event", "Date", "Rules", "Format",
     "Name", "Name as entered", "GHIN",
     "Handicap index", "Tee", "Gender", "Group", "Flight",
-    "Front par 4 pick", "Back par 4 pick",
-    "Par 3 pick 1", "Par 3 pick 2", "Par 5 pick 1", "Par 5 pick 2",
+    // THE NINE PICKS, in the order a man writes them in a text message and the
+    // order the paste reads them back. Nine bare numbers have nothing else to
+    // go on, so the sheet, the message and the parser all use the one order.
+    "Par 5 pick 1", "Par 5 pick 2",
+    "Par 3 pick 1", "Par 3 pick 2", "Par 3 pick 3",
+    "Par 4 pick 1", "Par 4 pick 2", "Par 4 pick 3", "Par 4 pick 4",
     "Hit List pick",
     "Course handicap",
   ]);
   // Offsets derived from where the lead columns actually end, so adding one
   // more shifts these on its own rather than silently breaking the assertion.
   const H1 = head.indexOf("H1");
-  assert.equal(H1, 20, "the lead columns run to here");
+  assert.equal(H1, 23, "the lead columns run to here");
   assert.deepEqual(head.slice(H1, H1 + 18), Array.from({ length: 18 }, (_, i) => "H" + (i + 1)));
   assert.deepEqual(head.slice(H1 + 18, H1 + 36), Array.from({ length: 18 }, (_, i) => "N" + (i + 1)));
   assert.deepEqual(head.slice(H1 + 36, H1 + 38), ["Net", "Gross"]);
-  // A FRESH WORKBOOK at the changeover. The zero base makes every past round
-  // incomparable, so the archive is kept as it stands and this file starts
-  // clean — which means the switched-off contests no longer need blank columns
-  // holding their place.
+  // FOUR CONTESTS, FOUR COLUMNS. A contest that is not in the game gets no
+  // heading at all — a column of blanks under "Six Pack" is worse than no
+  // column, because it invites whoever sorts on it to read the field as having
+  // all scored zero.
   assert.deepEqual(head.slice(H1 + 38), [
-    "Watch the Birdie", "Six Pack", "Agony Alley", "Easy Street",
-    "Triple Threat", "Bounce Back", "Hit List", "Skins",
+    "Watch the Birdie", "Agony Alley", "Hit List", "Skins",
     "Final",
   ]);
 
@@ -158,14 +166,16 @@ test("the setup fields come out as they were entered", () => {
   assert.equal(cell(ken, "Gender"), "M");
   assert.equal(cell(ken, "Group"), "1");
   assert.equal(cell(ken, "Flight"), "A");
-  // The six picks, in slot order: a par 4 on each nine, then two par 3s and
-  // two par 5s floating across the whole course.
-  assert.equal(cell(ken, "Front par 4 pick"), "2");
-  assert.equal(cell(ken, "Back par 4 pick"), "14");
-  assert.equal(cell(ken, "Par 3 pick 1"), "3");
-  assert.equal(cell(ken, "Par 3 pick 2"), "8");
+  // The nine picks, in slot order: two par 5s, three par 3s, four par 4s.
   assert.equal(cell(ken, "Par 5 pick 1"), "7");
   assert.equal(cell(ken, "Par 5 pick 2"), "16");
+  assert.equal(cell(ken, "Par 3 pick 1"), "3");
+  assert.equal(cell(ken, "Par 3 pick 2"), "8");
+  assert.equal(cell(ken, "Par 3 pick 3"), "13");
+  assert.equal(cell(ken, "Par 4 pick 1"), "2");
+  assert.equal(cell(ken, "Par 4 pick 2"), "14");
+  assert.equal(cell(ken, "Par 4 pick 3"), "1");
+  assert.equal(cell(ken, "Par 4 pick 4"), "10");
   assert.equal(cell(ken, "Hit List pick"), "Sal Merrick");
 });
 
@@ -179,17 +189,27 @@ test("the scoring columns come from the leaderboard, not recomputed", () => {
   assert.equal(cell(ken, "Final"), String(r.final), "the final is the one that was placed");
   assert.equal(cell(ken, "Watch the Birdie"), String(r.contests.watchTheBirdie!.strokes));
   assert.equal(cell(ken, "Agony Alley"), String(r.contests.agonyAlley!.strokes));
-  assert.equal(cell(ken, "Six Pack"), String(r.contests.sixPack!.strokes));
   assert.equal(cell(ken, "Hit List"), String(r.contests.hitList!.strokes));
-  // Its own column again — a sheet could not otherwise tell a man who never
-  // blew up from one who blew up and recovered.
-  assert.equal(cell(ken, "Bounce Back"), String(r.contests.bounceBack!.strokes));
-  // The switched-off contests have no columns at all now — a fresh workbook
-  // does not need blanks holding places for contests nobody plays.
-  const head = headerRow();
-  assert.equal(head.includes("Damage Control"), false);
-  assert.equal(head.includes("Go Long"), false);
-  assert.equal(head.includes("Get Shorty"), false);
+  // The switched-off contests have NO COLUMNS AT ALL — absent, never a blank
+  // cell under a live heading, which in a spreadsheet is indistinguishable from
+  // a contest that was played and scored the man nothing.
+  const head = headerRow(DEFAULT_CONTESTS);
+  for (const gone of ["Six Pack", "Easy Street", "Triple Threat", "Bounce Back",
+                      "Damage Control", "Go Long", "Get Shorty"]) {
+    assert.equal(head.includes(gone), false, gone);
+  }
+});
+
+test("a round that switches a contest on gets its column back", () => {
+  // The columns follow the ROUND's rules, not the code's. A round played with
+  // Triple Threat switched on must export it, or the sheet quietly loses what
+  // the man was charged.
+  const on = { ...DEFAULT_CONTESTS, tripleThreat: { perTriple: 0.5 } } as any;
+  const head = headerRow(on);
+  assert.equal(head.includes("Triple Threat"), true);
+  assert.equal(head.includes("Six Pack"), false, "and only the one that was switched on");
+  assert.deepEqual(columnsFor(on).map((c) => c[1]),
+    ["Watch the Birdie", "Agony Alley", "Triple Threat", "Hit List", "Skins"]);
 });
 
 test("the hole columns carry the card, not the scoring device", () => {
@@ -520,7 +540,8 @@ function bigEvent(n: number) {
     const id = "p" + (i + 1);
     players.push({ id, name: "Ridgeway, Robert " + i, ghin: "12345" + i + "7",
       index: 19.4 + i, tee: "IV", gender: "M", cart: 1 + Math.floor(i / 2),
-      flight: "A", p4f: 2, p4b: 14, p3a: 3, p3b: 8, p5a: 7, p5b: 16 });
+      flight: "A", p5a: 7, p5b: 16, p3a: 3, p3b: 8, p3c: 13,
+      p4f: 2, p4b: 14, p4c: 1, p4d: 10 });
     scores[id] = PAR.map((p, h) => (h === 3 ? "X" : h === 17 ? null : p + (i % 3 ? 1 : 0)));
   }
   return { name: "Friday Medal", date: "2026-08-07", format: "Individual net",
@@ -530,10 +551,26 @@ function bigEvent(n: number) {
 // The first attempt spent 2,193 characters on eight players and was cut short
 // by a phone's clipboard. Nothing is named in the packed form, the ids are
 // dropped, and a card is eighteen characters rather than eighteen numbers.
-test("an eight-man round fits in about a third of what it did", () => {
+//
+// NINE PICKS PUT SOME OF IT BACK. Three more numbers a man is about 15
+// characters each once packed, so eight players went from 1,097 to 1,217 — a
+// little over half the original rather than the old half. That is the price of
+// the contest and it is worth stating rather than quietly widening the bound:
+// the figure to watch is the growth per player, which the test below pins.
+test("an eight-man round is still little more than half what it was", () => {
   const code = encodeEvent(bigEvent(8));
-  assert.ok(code.length < 1100, "eight players in " + code.length + " characters");
-  assert.ok(code.length < 2193 * 0.5, "less than half the old size");
+  assert.ok(code.length < 1300, "eight players in " + code.length + " characters");
+  assert.ok(code.length < 2193 * 0.6, "still well under the old size");
+});
+
+test("three more picks a man cost about fifteen characters each", () => {
+  const nine = encodeEvent(bigEvent(8)).length;
+  const six = encodeEvent({
+    ...bigEvent(8),
+    players: bigEvent(8).players.map(({ p3c, p4c, p4d, ...rest }: any) => rest),
+  }).length;
+  const perMan = (nine - six) / 8;
+  assert.ok(perMan > 10 && perMan < 20, "about 15 a man, was " + perMan);
 });
 
 test("the code grows in step with the field, not faster", () => {

@@ -72,26 +72,23 @@
       slope: tee[g].slope,
       courseRating: tee[g].courseRating,
       agonyHoles: [4, 5, 6],
-      // Easy Street's three holes — the stretch the card is supposed to give
-      // back. Beside the course for the same reason as Agony Alley: it is a
-      // property of these eighteen holes, not of the contest.
+      // Easy Street's three holes. The contest is switched off, but the stretch
+      // is still a fact about this course and the ladder still reads it if it
+      // is ever switched back on, so the holes stay where they always were.
       easyStreetHoles: [11, 12, 13],
       // Holes that may not be nominated for Watch the Birdie, whatever their
       // par. Kept beside the course rather than in the contest because it is
       // the COURSE that says which holes are already spoken for.
       //
-      // THE EIGHTEEN NOW PARTITION CLEANLY. Agony Alley takes 4, 5, 6 (par 13),
-      // Easy Street takes 11, 12, 13 (par 11), and the remaining twelve (par
-      // 48) are Watch the Birdie's candidates. No hole is used twice and none
-      // is unused; 13 + 11 + 48 = 72.
+      // ONLY AGONY ALLEY'S THREE ARE BARRED NOW. Easy Street is out of the
+      // game, so 11, 12 and 13 come back to Watch the Birdie — which is what
+      // makes the par 4 slot eight holes deep and hole 13 a legal par 3.
       //
-      // Holes 4 and 13 used to stay legal despite belonging to another contest,
-      // because barring them would have left a slot with only one hole in it —
-      // not a choice. Floating the par 3s and par 5s across the whole course
-      // removes that constraint: three par 3s (3, 8, 17) and three par 5s
-      // (7, 16, 18) remain, so every slot keeps a genuine three-way choice and
-      // both old overlaps go.
-      barredPicks: [4, 5, 6, 11, 12, 13],
+      // 4 AND 5 ARE NOT REALLY A LOSS. Rob's reason for barring the stretch
+      // rather than sharing it: no man at Aberdeen would nominate 4 or 5 in any
+      // case, so offering them offers nothing. Twelve of the eighteen are now
+      // in play — Agony Alley's three and the nine a man picks.
+      barredPicks: [4, 5, 6],
     };
   }
 
@@ -117,13 +114,24 @@
      Watch the Birdie is not graded — each pick pays its own value. */
   const DEFAULT_CONTESTS = {
     /**
-     * Watch the Birdie — six holes nominated before the round, settled one by
+     * Watch the Birdie — NINE holes nominated before the round, settled one by
      * one. A net eagle pays 1.5, a net birdie 0.5, and a hole pays one of them,
      * never both.
      *
-     * `blank` is new and is the contest's only penalty side: a man who makes no
-     * net birdie or better on ANY of his six pays half a stroke. Without it the
-     * contest could only ever help, which made nominating holes free.
+     * `blank` is the contest's only penalty side: a man who makes no net birdie
+     * or better on ANY of his nine pays half a stroke. Without it the contest
+     * could only ever help, which made nominating holes free.
+     *
+     * THE VALUES DID NOT MOVE WHEN THE PICKS WENT FROM SIX TO NINE, and that
+     * was tested rather than assumed. Birdie at −0.4 with a +0.8 blank repeats
+     * the net score at +0.58; these values come in at +0.48, which keeps this
+     * the most independent contest in the game. At nine picks it fires on 86%
+     * of rounds against 74% at six.
+     *
+     * NOTHING IS PAID FOR A NET PAR. Also tested: paying 0.2 for one takes the
+     * repetition of the net score from +0.51 to +0.73. Net pars are common —
+     * four a round across nine picks — so counting them comes close to counting
+     * how well a man played, which is the net score's job and not this one's.
      *
      * THE DOUBLING ON 4 AND 18 IS GONE. It was printed on the card and changed
      * nobody's behaviour — 8 of 10 still took hole 7 and 9 of 10 still took 16
@@ -132,21 +140,21 @@
      */
     watchTheBirdie: { birdie: -0.5, eagle: -1.5, blank: 0.5 },
     /**
-     * Six Pack — the six candidate holes a man did NOT nominate.
+     * Six Pack — SWITCHED OFF, the same way Go Long and Get Shorty are off. The
+     * code stays; the contest is not in the game.
      *
-     * The slot structure forces their shape: two par 4s of six are picked, one
-     * par 3 of three and one par 5 of three, so what is left is always four par
-     * 4s, one par 3 and one par 5. PAR 24, for every player, every round,
-     * whatever he chose. Nothing needs configuring except the par itself.
+     * IT WAS REPEATING THE NET SCORE more than any other contest in the game:
+     * +0.69 measured over 135 rounds, against +0.48 for Watch the Birdie. That
+     * is what cutting to four is for — Friday's eight contests put seven men in
+     * 90% the same order as the Stableford result, and dropping to four takes
+     * the agreement with the net order from 89% to 80%.
      *
-     * Scored as raw net strokes over or under that 24. No ladder, no threshold,
-     * no multiplier — it is deliberately the ONE contest scored as plain
-     * net-to-par, because it is the base the other six move a man away from. If
-     * they were all scored this way the total would just be his net score again.
-     *
-     * Measured over 135 rounds: mean +1.1, range -4 to +8, r = +0.05 with index.
+     * THE ARITHMETIC STILL HOLDS if it is ever switched back on, which is why
+     * `SIX_PACK_PAR` below is still 24. Fifteen candidate holes less the nine a
+     * man picks leaves one par 5, one par 3 and four par 4s — par 24, for every
+     * player, every round, exactly as it was when twelve candidates left six.
      */
-    sixPack: { par: 24 },
+    sixPack: null,
     /**
      * Agony Alley — the net total on 4, 5, 6, whose par is 13. Structure
      * unchanged from the net base; the values are rescaled to zero.
@@ -157,25 +165,26 @@
       { threshold: 99, strokes: 2 },
     ],
     /**
-     * Easy Street — holes 11, 12, 13 at NET par or better, counted.
+     * Easy Street — SWITCHED OFF, the same way Six Pack is off. The ladder is
+     * kept in `PARKED_CONTESTS` below, at the values it was last played on.
      *
-     * THIS REVERSES THE DECISION OF 9 AUGUST, which scored it on gross. Gross
-     * failed badly and in the direction that matters: on 14 August five of
-     * seven finishers made ZERO gross pars on these holes and nobody made two,
-     * so the contest penalised 71% of the field and rewarded no one. Across the
-     * archive gross pars run r = -0.36 with index WITHIN a single tee — it was
-     * measuring handicap, not play. Net pars run r = +0.08.
-     *
-     * The threshold moves up a rung because net pars are common: all three on
-     * 34% of rounds, two on 47%.
+     * It repeated the net score at +0.38 — the least of the four that were cut,
+     * but its three holes are worth more back in Watch the Birdie than they
+     * were as a contest of their own. Barring 11, 12 and 13 was what forced the
+     * par 4 slots down to six holes; giving them back is what makes the par 4
+     * slot eight deep and the par 3 slot four, and every slot a real choice.
      */
-    easyStreet: [
-      { threshold: 0, strokes: 2 }, { threshold: 1, strokes: 1 },
-      { threshold: 2, strokes: 0 }, { threshold: 99, strokes: -1 },
-    ],
+    easyStreet: null,
     /**
-     * Triple Threat — a blow-up hole costs 0.5, and a BOUNCE BACK off it, a net
-     * par or better on the very next hole, pays 1.0.
+     * Triple Threat — OFF BY DEFAULT, BUT SWITCHABLE. It is not cut the way Six
+     * Pack and Easy Street are cut: Rob wants it kept for testing later in the
+     * year rather than deleted, so it keeps its section on the rules screen and
+     * its values live in `PARKED_CONTESTS` below, ready for the switch.
+     *
+     * It repeated the net score at +0.67, second only to Six Pack.
+     *
+     * A blow-up hole costs 0.5, and a BOUNCE BACK off it — a net par or better
+     * on the very next hole — pays 1.0.
      *
      * A BLOW-UP IS NOW A NET DOUBLE BOGEY, not a gross triple. The net double
      * is the worst the cap allows, so it is the true ceiling of a bad hole.
@@ -189,15 +198,16 @@
      * A picked-up hole is filled in at par + 4 and so is a net double by
      * definition; that is correct here, it was a blow-up.
      */
-    tripleThreat: { perTriple: 0.5 },
+    tripleThreat: null,
     /**
      * Bounce Back — a net par or better on the hole immediately after a blow-up.
+     * OFF BY DEFAULT AND SWITCHABLE, on the same terms as Triple Threat.
      *
-     * Its own contest again, with its own switch, after a spell as the second
-     * half of Triple Threat. The scoring link is unchanged and always was the
-     * point of it: it fires on the NEXT hole and nowhere else.
+     * Its own contest, with its own switch, after a spell as the second half of
+     * Triple Threat. The scoring link is unchanged and always was the point of
+     * it: it fires on the NEXT hole and nowhere else.
      */
-    bounceBack: { perBounceBack: -1.0 },
+    bounceBack: null,
     /**
      * Hit List — before the round each man privately names one opponent from
      * the eight players nearest his own index and backs himself to post the
@@ -287,6 +297,49 @@
      * Jay's league already plays low net best 2 balls, so the format is familiar.
      */
     skins: { pot: -4, minSkin: -0.4, minPlayers: 8, teamFrom: 16 },
+    /**
+     * The minigame boards — how far down each contest's own table is shown.
+     *
+     * NOT A CONTEST, which is why it is not in CONTEST_ORDER and never appears
+     * as a line on a card. It is here because this is where the rules of a
+     * round live, and it travels with the event for the same reason every value
+     * does: the board a man is shown in the bar should be the board the round
+     * was played under.
+     *
+     * FIVE MEANS SOMETHING DIFFERENT AT EIGHT PLAYERS THAN AT EIGHTY, which is
+     * the whole reason it is a value rather than a constant.
+     *
+     * The depth is a FLOOR, never a ceiling: every man level with the last man
+     * shown is shown too, so a table can run to six or nine and say so. Cutting
+     * a tie off at five looks broken, and ties are common — 2.5 men share the
+     * top of Agony Alley on an average round, 2.8 in the Hit List and 4.3 in
+     * Team Skins.
+     */
+    boards: { depth: 5 },
+  };
+
+  /**
+   * The values a switched-off contest comes back on at.
+   *
+   * Switching one on restores it from DEFAULT_CONTESTS, and for a contest whose
+   * default IS null that would restore nothing and leave the switch doing
+   * nothing at all. These are the values each was last played on, kept exactly
+   * as they were so that turning Triple Threat on in November scores the same
+   * round it would have scored in August.
+   *
+   * Six Pack and Easy Street are in here too. They have no switch on the rules
+   * screen — they are off the way Go Long and Get Shorty are off — but a round
+   * that arrives carrying them in its own rules must still score, and the code
+   * is left in place for the day either comes back.
+   */
+  const PARKED_CONTESTS = {
+    sixPack: { par: 24 },
+    easyStreet: [
+      { threshold: 0, strokes: 2 }, { threshold: 1, strokes: 1 },
+      { threshold: 2, strokes: 0 }, { threshold: 99, strokes: -1 },
+    ],
+    tripleThreat: { perTriple: 0.5 },
+    bounceBack: { perBounceBack: -1.0 },
   };
 
   /* ---- Reading a handicap index that someone typed in ----
@@ -451,39 +504,60 @@
   }
 
   /**
-   * The six slots a player nominates for Watch the Birdie: a par 3, a par 4 and
-   * a par 5 on each nine. Always in this order — the paste reads six bare
+   * The NINE slots a player nominates for Watch the Birdie: two par 5s, three
+   * par 3s and four par 4s. Always in this order — the paste reads nine bare
    * numbers and has nothing else to go on.
+   *
+   * TWO OF THREE, THREE OF FOUR, FOUR OF EIGHT. Every slot is a real choice,
+   * which the shape before this was not: an earlier draft proposed three of
+   * each, and at Aberdeen that forces the par 3 and par 5 slots outright and
+   * leaves one genuine decision in the round. As it stands there are 840
+   * possible sets.
+   *
+   * FRONT AND BACK NO LONGER MATTER TO ANY SLOT. `nine: null` throughout means
+   * a hole is offered wherever it lies. The par 4s were split front and back
+   * when six of them remained, three a side; with Easy Street's holes back
+   * there are eight, and dividing them again would only take choices away.
+   *
+   * THE KEYS ARE HISTORICAL AND STAY THAT WAY. `p4f` and `p4b` were the front
+   * and back par 4 and are now simply the first and second — the label moved,
+   * the key did not. That is deliberate: a hole stored as `p4f` under the old
+   * rules was a par 4 and is still a legal par 4, so every round already on a
+   * phone and every event code already messaged to somebody reads correctly
+   * here with no migration at all. The three new slots are appended.
    */
   const PICK_SLOTS = [
-    { key: "p4f", par: 4, nine: "front", label: "front par 4" },
-    { key: "p4b", par: 4, nine: "back",  label: "back par 4" },
-    // `nine: null` means anywhere on the course. Par 3s and par 5s float: there
-    // are only three of each left once Agony Alley and Easy Street take their
-    // holes, and splitting three across two nines would leave a slot with one
-    // hole in it. Par 4s stay split because six of them remain, three a side.
-    { key: "p3a", par: 3, nine: null, label: "first par 3" },
-    { key: "p3b", par: 3, nine: null, label: "second par 3" },
     { key: "p5a", par: 5, nine: null, label: "first par 5" },
     { key: "p5b", par: 5, nine: null, label: "second par 5" },
+    { key: "p3a", par: 3, nine: null, label: "first par 3" },
+    { key: "p3b", par: 3, nine: null, label: "second par 3" },
+    { key: "p3c", par: 3, nine: null, label: "third par 3" },
+    { key: "p4f", par: 4, nine: null, label: "first par 4" },
+    { key: "p4b", par: 4, nine: null, label: "second par 4" },
+    { key: "p4c", par: 4, nine: null, label: "third par 4" },
+    { key: "p4d", par: 4, nine: null, label: "fourth par 4" },
   ];
+
+  /** How many holes each par is nominated on — the 2-3-4 of the brief. */
+  const PICKS_BY_PAR = { 5: 2, 3: 3, 4: 4 };
 
   /** The slot keys as they were before the par 3s and par 5s floated. */
   const LEGACY_SLOT_KEYS = { f4: "p4f", b4: "p4b", f3: "p3a", b3: "p3b", f5: "p5a", b5: "p5b" };
 
   /**
    * Which holes each slot allows. Derived from the course's par and its barred
-   * list, never hardcoded — at Aberdeen that gives front 3/8, 1/2/9, 4/7 and
-   * back 13/17, 10/14/15, 16/18.
+   * list, never hardcoded — at Aberdeen that gives 7/16/18 to both par 5 slots,
+   * 3/8/13/17 to all three par 3 slots and 1/2/9/10/11/12/14/15 to all four par
+   * 4 slots. Two of three, three of four, four of eight.
    *
-   * THE LISTS NOW OVERLAP, and that is a change of kind rather than of degree.
-   * `p3a` and `p3b` are handed the identical three holes, as are `p5a` and
-   * `p5b`. It used to be true that every hole fell in at most one slot, which
-   * is why nominating a hole twice was ALSO illegal for one of the two slots
-   * and either check would have caught it. That is no longer so: hole 8 is
-   * perfectly legal as both par 3s, and only the duplicate check stops a man
-   * nominating it twice and being paid twice for one birdie. The duplicate pass
-   * in `readPicks` runs first and is now the ONLY thing standing there.
+   * EVERY SLOT OF A PAR IS HANDED THE IDENTICAL LIST, so no hole falls in one
+   * slot alone. It used to be true that every hole fell in at most one slot,
+   * which is why nominating a hole twice was ALSO illegal for one of the two
+   * slots and either check would have caught it. That has not been so since the
+   * par 3s floated: hole 8 is perfectly legal as any of the three par 3s, and
+   * only the duplicate check stops a man nominating it twice and being paid
+   * twice for one birdie. The duplicate pass in `readPicks` runs first and is
+   * the ONLY thing standing there.
    */
   function birdiePickHoles(course, contests) {
     /* THE BARRED LIST IS A GAME RULE WEARING COURSE CLOTHING. It sits on the
@@ -511,9 +585,10 @@
   }
 
   /**
-   * Every hole Watch the Birdie may be played on — the union of the six slots,
-   * which at Aberdeen is the twelve left once Agony Alley and Easy Street have
-   * taken theirs. Six are nominated and the other six are the Six Pack.
+   * Every hole Watch the Birdie may be played on — the union of the nine slots,
+   * which at Aberdeen is the fifteen left once Agony Alley has taken its three.
+   * Nine are nominated; the six left over are the Six Pack, which is switched
+   * off but still adds to par 24 if it is ever switched back on.
    */
   function birdiePickCandidates(course, contests) {
     const legal = birdiePickHoles(course, contests);
@@ -523,7 +598,7 @@
   }
 
   /**
-   * Six legal holes drawn at random, one for every slot.
+   * Nine legal holes drawn at random, one for every slot.
    *
    * For the man who never sent his picks in. Drawn from the SAME lists the form
    * offers, so a drawn set is indistinguishable from a chosen one by the rules —
@@ -540,10 +615,11 @@
     const roll = rng || Math.random;
     const legal = birdiePickHoles(course, contests);
     const picks = {};
-    // Drawn WITHOUT REPLACEMENT. The two par 3 slots are offered the identical
-    // three holes and so are the two par 5s, so drawing each slot on its own
-    // put hole 8 in both par 3 slots about a third of the time — a set no man
-    // could have chosen, which `readPicks` would then refuse as a duplicate.
+    // Drawn WITHOUT REPLACEMENT. Every slot of a par is offered the identical
+    // list, so drawing each slot on its own put hole 8 in two par 3 slots about
+    // a third of the time — a set no man could have chosen, which `readPicks`
+    // would then refuse as a duplicate. With four par 4s drawn from eight
+    // holes there is more of this to go wrong, not less.
     const taken = new Set();
     for (const slot of PICK_SLOTS) {
       const holes = legal[slot.key].filter((h) => !taken.has(h));
@@ -558,10 +634,14 @@
   /**
    * Read whatever shape a card's picks arrive in.
    *
-   * The six named slots are what the app stores now. `{ front, back }` is the
-   * two-pick form that came before, kept readable so a round already on a phone
-   * — or in an event code already messaged to someone — still opens. Those two
-   * were always par 4s, so they map to the par 4 slots.
+   * The nine named slots are what the app stores now, and SIX OF THE NINE KEYS
+   * ARE THE OLD ONES — a round stored under the six-pick rules is already in
+   * the new shape and needs no migration at all. It simply arrives with the
+   * three new slots empty, which scores as six picks and says so.
+   *
+   * `{ front, back }` is the two-pick form that came before, kept readable so a
+   * round already on a phone — or in an event code already messaged to someone
+   * — still opens. Those two were always par 4s, so they map to par 4 slots.
    *
    * A legacy pick on a hole since barred is DROPPED rather than refused. It was
    * chosen under the old rules and there is nothing to guess at; refusing would
@@ -591,7 +671,7 @@
   }
 
   /**
-   * The six picks as holes, refusing anything outside the table. `legacy` marks
+   * The nine picks as holes, refusing anything outside the table. `legacy` marks
    * picks read from the old two-pick form, whose out-of-table holes are dropped
    * rather than thrown on.
    */
@@ -652,8 +732,8 @@
      a round scored in March still scores the same way in August because it
      carries the rules it was played under.
 
-     What is stored is a DIFF, not a copy. A full config is 735 characters of
-     JSON and would cost 980 in an event code; one changed contest costs 72.
+     What is stored is a DIFF, not a copy. A full config is 648 characters of
+     JSON and would add 860 to an event code; one changed contest adds 40.
      A round on the defaults stores nothing at all. */
 
   /** Is this a plain value to be replaced, rather than merged into? */
@@ -708,8 +788,14 @@
     const problems = [];
     const c = course || ABERDEEN_TEE_IV;
 
-    /* Barred holes. A slot with one legal hole is not a choice, it is a
-       formality, and a slot with none cannot be filled at all. */
+    /* Barred holes.
+       CHECKED BY PAR, NOT BY SLOT, and that is the change nine picks forced.
+       Every slot of a par is handed the identical list, so the question is
+       never "has this slot got two holes" — it is whether the par has more
+       holes than it has picks. Three par 3s drawn from three holes leaves every
+       slot with three to choose from and the man with no choice at all: he
+       nominates all of them or he is short. The old per-slot rule passed that
+       without a word. */
     const w = full.watchTheBirdie;
     if (w && w.barred) {
       for (const h of w.barred) {
@@ -719,14 +805,34 @@
       }
       if (!problems.length) {
         const legal = birdiePickHoles(c, full);
+        const said = { 3: "par 3", 4: "par 4", 5: "par 5" };
+        const byPar = new Map();
         for (const slot of PICK_SLOTS) {
-          const n = legal[slot.key].length;
-          if (n < 2) {
-            problems.push("The " + slot.label + " would have " +
-              (n === 0 ? "no holes" : "only hole " + legal[slot.key][0]) +
-              " left to choose from. Every slot needs at least two.");
+          if (!byPar.has(slot.par)) byPar.set(slot.par, { picks: 0, holes: legal[slot.key] });
+          byPar.get(slot.par).picks++;
+        }
+        for (const [par, group] of byPar) {
+          const n = group.holes.length, want = group.picks;
+          const name = said[par] || ("par " + par);
+          if (n < want) {
+            problems.push("The " + name + "s would have " +
+              (n === 0 ? "no holes" : n === 1 ? "only hole " + group.holes[0] : "only " + n + " holes") +
+              " left, and " + want + " must be nominated. There would be nothing to fill them with.");
+          } else if (n === want) {
+            problems.push("The " + name + "s would have exactly " + n + " holes for " + want +
+              " picks, so every man nominates the same ones. That is not a choice — leave at " +
+              "least one more hole than there are picks.");
           }
         }
+      }
+    }
+
+    /* How far down each minigame board runs. Zero shows nobody, and a negative
+       depth is not a number of men. */
+    if (full.boards && full.boards.depth != null) {
+      const d = full.boards.depth;
+      if (!Number.isInteger(d) || d < 1) {
+        problems.push("A minigame board must show at least one man — " + d + " shows nobody.");
       }
     }
 
@@ -830,9 +936,9 @@
       }
     }
 
-    // 1 · Watch the Birdie — six holes nominated before the round, a par 3, a
-    // par 4 and a par 5 on each nine. Each is settled on its own: a net birdie
-    // pays 0.5, a net eagle 1.0, and the hole pays one of them, never both.
+    // 1 · Watch the Birdie — nine holes nominated before the round, two par 5s,
+    // three par 3s and four par 4s. Each is settled on its own: a net birdie
+    // pays 0.5, a net eagle 1.5, and the hole pays one of them, never both.
     //
     // A hole he picked up on has already become net double above, so it is a
     // played hole that cannot possibly be a birdie — it pays nothing rather
@@ -844,18 +950,32 @@
     const chosen = read == null ? []
       : PICK_SLOTS.map((s) => read[s.key]).filter((h) => h != null);
 
-    if (chosen.length === 0) {
-      watchTheBirdie = { strokes: 0, detail: "no picks made", live: false };
+    if (contests.watchTheBirdie == null) {
+      // Switchable off like the rest. Same latent crash Agony Alley had: with
+      // no config, pickValue reached into null on the first nominated hole.
+      watchTheBirdie = null;
+    } else if (chosen.length === 0) {
+      watchTheBirdie = { strokes: 0, detail: "no picks made", live: false,
+        birdies: 0, eagles: 0 };
     } else {
-      let birdieStrokes = 0, paid = 0;
+      /* BIRDIES AND EAGLES ARE COUNTED SEPARATELY, not just totted up into the
+         strokes. The board's tiebreak is most net birdies and then the eagle,
+         and the strokes alone cannot answer it: three birdies and one eagle
+         both come to −1.5. `paid` — how many picks paid anything at all — is
+         what the detail line says, and is not the same number. */
+      let birdieStrokes = 0, paid = 0, birdies = 0, eagles = 0;
       for (const h of chosen) {
         if (!played(h - 1)) continue;
         const value = pickValue(h, contests.watchTheBirdie, over(h - 1));
         if (value !== 0) { birdieStrokes += value; paid++; }
+        if (over(h - 1) <= -2) eagles++;
+        else if (over(h - 1) === -1) birdies++;
       }
-      // The penalty side, and the contest's only one: nothing on any of the six
-      // costs half a stroke. Charged only once every pick has been PLAYED —
-      // a man cannot be charged for failing to birdie a hole he never stood on.
+      // The penalty side, and the contest's only one: nothing on any of the
+      // nine costs half a stroke. Charged only once every pick has been PLAYED
+      // — a man cannot be charged for failing to birdie a hole he never stood
+      // on. NOTHING IS PAID FOR A NET PAR; four a round is close to counting
+      // how well he played, which is the net score's job and not this one's.
       const allPlayed = chosen.every((h) => played(h - 1));
       const blank = contests.watchTheBirdie.blank || 0;
       if (paid === 0 && allPlayed && blank !== 0) birdieStrokes += blank;
@@ -863,47 +983,74 @@
         strokes: toTenth(birdieStrokes),
         detail: paid === 0
           ? (allPlayed ? "no net birdies" : "nothing yet")
-          // Counted, not assumed to be six. A pick on a hole barred after he
-          // chose it is dropped, so a man can arrive here with five.
+          // Counted, not assumed to be nine. A pick on a hole barred after he
+          // chose it is dropped, so a man can arrive here with eight — and a
+          // round stored under the old rules arrives with six.
           : paid + " of " + chosen.length + " pick" + (chosen.length === 1 ? "" : "s"),
-        live: true,
+        live: true, birdies, eagles,
       };
     }
 
-    // 2 · Six Pack — the six candidates he did NOT nominate.
+    // 2 · Six Pack — the candidates he did NOT nominate. SWITCHED OFF; this
+    // runs only for a round that carries it in its own rules.
     //
     // The slot structure forces their shape, so this is always four par 4s, one
-    // par 3 and one par 5: par 24, for every man, every round. Scored as raw
-    // net strokes over or under that 24 — no ladder, no threshold. It is the
-    // base the other contests move him away from.
+    // par 3 and one par 5: par 24, for every man, every round. Fifteen
+    // candidates less the nine he picks leaves six, exactly as twelve less six
+    // did. Scored as raw net strokes over or under that 24 — no ladder, no
+    // threshold.
     //
-    // Needs the picks, because without them there is no "did not choose". And
-    // needs all six played, because a missing hole would silently flatter the
-    // total by the whole of its par.
+    // Needs EVERY pick, because without them there is no "did not choose", and
+    // needs every leftover played, because a missing hole would silently
+    // flatter the total by the whole of its par.
+    //
+    // THE COUNT IS DERIVED, NOT THE NUMBER OF SLOTS. It was `PICK_SLOTS.length`
+    // on both sides, which was only ever true because six picks happened to
+    // leave six holes. At nine picks the leftovers are six and the slots are
+    // nine, and the old test could never pass again.
     const candidates = birdiePickCandidates(course, contests);
     const leftovers = candidates.filter((h) => chosen.indexOf(h) === -1);
+    const leftoverCount = candidates.length - PICK_SLOTS.length;
     if (contests.sixPack == null) {
       sixPack = null;
-    } else if (chosen.length !== PICK_SLOTS.length || leftovers.length !== PICK_SLOTS.length) {
+    } else if (chosen.length !== PICK_SLOTS.length || leftovers.length !== leftoverCount) {
       sixPack = { strokes: 0, live: false,
-        detail: chosen.length === 0 ? "no picks made" : "needs all six picks" };
+        detail: chosen.length === 0 ? "no picks made"
+              : "needs all " + PICK_SLOTS.length + " picks" };
     } else if (!leftovers.every((h) => played(h - 1))) {
-      sixPack = { strokes: 0, detail: "needs all six played", live: false };
+      sixPack = { strokes: 0, live: false,
+        detail: "needs all " + leftoverCount + " left played" };
     } else {
       const total = sum(leftovers.map((h) => net[h - 1]));
       const par = contests.sixPack.par;
       sixPack = { strokes: toTenth(total - par),
-        detail: "net " + total + " on the six left, par " + par, live: true };
+        detail: "net " + total + " on the " + leftoverCount + " left, par " + par, live: true };
     }
 
-    // 3 · Agony Alley — the net total on the stretch. Structure unchanged.
+    // 3 · Agony Alley — the net total on the stretch. Values unchanged; it is
+    // one of the four that stay.
+    //
+    // `netHoles` carries the stretch hole by hole, in the order the holes are
+    // played, because the board's tiebreak is the best net on hole 4, then 5,
+    // then 6. The figures are on `netByHole` as well, but a board that had to
+    // reach into the card to settle its own tie would be reading the round
+    // twice and could disagree with itself about which holes the stretch is.
     const agonyIdx = course.agonyHoles.map((h) => h - 1);
     let agonyAlley;
-    if (!agonyIdx.every(played)) {
-      agonyAlley = { strokes: 0, detail: "needs holes " + course.agonyHoles[0] + "–" + course.agonyHoles[course.agonyHoles.length - 1], live: false };
+    if (contests.agonyAlley == null) {
+      /* SWITCHABLE OFF LIKE EVERY OTHER CONTEST. It never had this guard,
+         because it was never off — but the rules screen has always offered the
+         switch, and turning it off threw "ladder is not iterable" out of the
+         grader and took the whole board down with it. Found by the test below
+         rather than by a man on a Saturday. */
+      agonyAlley = null;
+    } else if (!agonyIdx.every(played)) {
+      agonyAlley = { strokes: 0, detail: "needs holes " + course.agonyHoles[0] + "–" + course.agonyHoles[course.agonyHoles.length - 1], live: false,
+        holes: course.agonyHoles.slice(), netHoles: null };
     } else {
       const total = sum(agonyIdx.map((i) => net[i]));
-      agonyAlley = { strokes: gradeAtMost(total, contests.agonyAlley), detail: "net " + total + " across the stretch", live: true };
+      agonyAlley = { strokes: gradeAtMost(total, contests.agonyAlley), detail: "net " + total + " across the stretch", live: true,
+        holes: course.agonyHoles.slice(), netHoles: agonyIdx.map((i) => net[i]) };
     }
 
     // Damage Control — switched off, Triple Threat replaced it. The counter
@@ -1053,6 +1200,12 @@
 
     return {
       name: card.name, courseHandicap: ch,
+      /* The INDEX, not just the course handicap. The Hit List board is tied on
+         "the higher handicap index wins", and the course handicap is not a
+         stand-in for it: two men off different tees can share a course
+         handicap and be a stroke and a half apart on index. Null when the
+         handicap came in off a Golf Genius card with no index beside it. */
+      handicapIndex: card.handicapIndex == null ? null : card.handicapIndex,
       // What the contests came to before maxContestStrokes was applied. Equal to
       // strokesEarned unless the cap bit — and when it did, the contest lines on
       // screen add up to more than the total, which needs saying rather than
@@ -1535,22 +1688,38 @@
 
     cards.forEach((card, i) => {
       const r = results[i];
+      /* THE DUEL TRAVELS AS DATA, not only as a sentence.
+         `opponent`, `outcome` and `margin` are here for the Hit List results
+         table, which names both men and the margin — "Wallach beat Teitelbaum
+         by 4". Parsing that back out of `detail` would have been one regular
+         expression away from naming the wrong man, and `detail` is written to
+         be read rather than to be read FROM. A duel that never happened
+         carries an outcome all the same, so the table can say why. */
+      const duel = (fields) => Object.assign(
+        { opponent: null, outcome: null, margin: null, band: null }, fields);
+
       const target = card.hitList == null ? "" : String(card.hitList).trim();
       if (target === "") {
-        r.contests.hitList = { strokes: 0, detail: "nobody named", live: false };
+        r.contests.hitList = duel({ strokes: 0, detail: "nobody named", live: false,
+          outcome: "none" });
         return;
       }
       const j = byName.has(target) ? byName.get(target) : -1;
       if (j === -1 || j === i) {
-        r.contests.hitList = { strokes: 0, live: false,
-          detail: j === i ? "named himself" : "“" + target + "” is not in this round" };
+        r.contests.hitList = duel({ strokes: 0, live: false, opponent: target,
+          outcome: j === i ? "self" : "unknown",
+          detail: j === i ? "named himself" : "“" + target + "” is not in this round" });
         return;
       }
       const mine = results[i], theirs = results[j];
       if (mine.holesPlayed !== HOLES || theirs.holesPlayed !== HOLES) {
-        r.contests.hitList = { strokes: 0, live: false,
+        r.contests.hitList = duel({ strokes: 0, live: false, opponent: target,
+          // WHOSE card is short decides what the table says. "Void" is the
+          // named man's doing and reads as an excuse when it was the player
+          // himself who walked in.
+          outcome: mine.holesPlayed !== HOLES ? "unfinished" : "void",
           detail: mine.holesPlayed !== HOLES ? "no full round"
-                : target + " has no full round — void" };
+                : target + " has no full round — void" });
         return;
       }
 
@@ -1564,35 +1733,213 @@
 
       const result = mine.net < theirs.net ? "win" : mine.net > theirs.net ? "loss" : "tie";
       const said = { lower: "a lower handicap", equal: "an equal handicap", higher: "a higher handicap" };
-      r.contests.hitList = {
+      r.contests.hitList = duel({
         strokes: toTenth(rates[result]), live: true,
+        opponent: target, outcome: result, band: band,
+        // ALWAYS POSITIVE, and zero on a tie. It is the size of the gap, and
+        // which way it went is `outcome`'s to say — a signed margin would print
+        // "lost to Teitelbaum by −1" on the one table this is for.
+        margin: Math.abs(mine.net - theirs.net),
         detail: (result === "win" ? "beat " : result === "loss" ? "lost to " : "tied ") +
                 target + " · " + said[band],
-      };
+      });
       r.strokesEarned = toTenth(r.strokesEarned + rates[result]);
       if (r.holesPlayed === HOLES) r.final = r.strokesEarned;
     });
   }
 
-  /* ---- Section 11 round: the leaderboard's initial data (31 July) ---- */
+  /* ---- Section 11 round: the leaderboard's initial data (31 July) ----
+     The picks were re-cut to the 2-3-4 shape when the game went to nine. The
+     cards themselves are untouched — the same eight rounds, scored under the
+     four contests that are left. */
   const SAMPLE_ROUND = [
     { name: "Alex",  courseHandicap: 18, handicapIndex: 18.0, cart: "1", hitList: "Boyd",
-      picks: { p4f: 2, p4b: 14, p3a: 3, p3b: 8, p5a: 7, p5b: 16 }, gross: [5,5,3,6,5,5,6,3,5,7,5,5,4,4,6,6,3,7] },
+      picks: { p5a: 7, p5b: 16, p3a: 3, p3b: 8, p3c: 13, p4f: 2, p4b: 14, p4c: 9, p4d: 11 }, gross: [5,5,3,6,5,5,6,3,5,7,5,5,4,4,6,6,3,7] },
     { name: "Boyd",  courseHandicap: 21, handicapIndex: 21.0, cart: "1", hitList: "Alex",
-      picks: { p4f: 1, p4b: 10, p3a: 3, p3b: 17, p5a: 7, p5b: 18 }, gross: [6,5,4,7,6,5,7,4,5,6,6,5,4,5,7,4,4,6] },
+      picks: { p5a: 7, p5b: 18, p3a: 3, p3b: 17, p3c: 13, p4f: 1, p4b: 10, p4c: 12, p4d: 15 }, gross: [6,5,4,7,6,5,7,4,5,6,6,5,4,5,7,4,4,6] },
     { name: "Chip",  courseHandicap: 15, handicapIndex: 15.0, cart: "2", hitList: "Dex",
-      picks: { p4f: 9, p4b: 15, p3a: 8, p3b: 17, p5a: 16, p5b: 18 }, gross: [6,5,4,8,6,5,5,4,5,5,6,3,5,6,6,5,4,6] },
+      picks: { p5a: 16, p5b: 18, p3a: 8, p3b: 17, p3c: 3, p4f: 9, p4b: 15, p4c: 2, p4d: 11 }, gross: [6,5,4,8,6,5,5,4,5,5,6,3,5,6,6,5,4,6] },
     { name: "Dex",   courseHandicap: 23, handicapIndex: 23.0, cart: "2", hitList: "Chip",
-      picks: { p4f: 1, p4b: 10, p3a: 3, p3b: 8, p5a: 7, p5b: 16 }, gross: [5,5,4,6,6,6,7,3,5,4,4,6,3,6,6,6,6,5] },
+      picks: { p5a: 7, p5b: 16, p3a: 3, p3b: 8, p3c: 17, p4f: 1, p4b: 10, p4c: 12, p4d: 14 }, gross: [5,5,4,6,6,6,7,3,5,4,4,6,3,6,6,6,6,5] },
     { name: "Emmet", courseHandicap: 14, handicapIndex: 14.0, cart: "3", hitList: "Finn",
-      picks: { p4f: 2, p4b: 14, p3a: 3, p3b: 17, p5a: 7, p5b: 16 }, gross: [6,5,3,7,7,6,5,3,5,4,5,5,3,5,6,7,3,6] },
+      picks: { p5a: 7, p5b: 16, p3a: 3, p3b: 17, p3c: 13, p4f: 2, p4b: 14, p4c: 10, p4d: 11 }, gross: [6,5,3,7,7,6,5,3,5,4,5,5,3,5,6,7,3,6] },
     { name: "Finn",  courseHandicap: 26, handicapIndex: 26.0, cart: "3", hitList: "Emmet",
-      picks: { p4f: 9, p4b: 15, p3a: 3, p3b: 8, p5a: 7, p5b: 16 }, gross: [5,6,6,7,5,4,7,4,7,6,7,5,3,5,5,6,4,7] },
+      picks: { p5a: 7, p5b: 16, p3a: 3, p3b: 8, p3c: 13, p4f: 9, p4b: 15, p4c: 1, p4d: 12 }, gross: [5,6,6,7,5,4,7,4,7,6,7,5,3,5,5,6,4,7] },
     { name: "Grady", courseHandicap: 34, handicapIndex: 34.0, cart: "4", hitList: "Hoyt",
-      picks: { p4f: 1, p4b: 10, p3a: 3, p3b: 8, p5a: 7, p5b: 16 }, gross: [7,6,4,9,7,7,7,5,5,6,7,7,3,8,6,7,3,9] },
+      picks: { p5a: 7, p5b: 16, p3a: 3, p3b: 8, p3c: 17, p4f: 1, p4b: 10, p4c: 11, p4d: 14 }, gross: [7,6,4,9,7,7,7,5,5,6,7,7,3,8,6,7,3,9] },
     { name: "Hoyt",  courseHandicap: 20, handicapIndex: 20.0, cart: "4", hitList: "Grady",
-      picks: { p4f: 2, p4b: 14, p3a: 8, p3b: 17, p5a: 7, p5b: 18 }, gross: [7,5,4,8,8,4,8,4,6,5,6,7,4,7,5,5,4,6] },
+      picks: { p5a: 7, p5b: 18, p3a: 8, p3b: 17, p3c: 13, p4f: 2, p4b: 14, p4c: 9, p4d: 15 }, gross: [7,5,4,8,8,4,8,4,6,5,6,7,4,7,5,5,4,6] },
   ];
+
+  /* ---- The minigame boards ----
+     A table of its own for each contest, so a man who finished eleventh on the
+     final can still have won something and be told so. The board is what four
+     contests buy: with eight of them the screen had room for the final and
+     nothing else, and the contests were only ever a number in a column.
+
+     RANKED ON THE CONTEST, NOT ON THE FINAL, and tied on the contest's own
+     terms. `placeField` cannot do this — it settles the whole round on a match
+     of cards, which says nothing about who played hole 4 better.  */
+
+  /** 1st, 2nd, 3rd — for a note a man reads rather than a number he decodes. */
+  function ordinal(n) {
+    const t = n % 100;
+    if (t >= 11 && t <= 13) return n + "th";
+    return n + (["th", "st", "nd", "rd"][n % 10] || "th");
+  }
+
+  /**
+   * How each contest breaks a tie, in order, best first.
+   *
+   * Every `of` returns a number where LOWER IS BETTER, so the comparator is the
+   * same subtraction all the way down and a new tiebreak is one line. A count
+   * where more is better is therefore negated at the source.
+   *
+   * Team Skins has none, deliberately: it is already shown hole by hole on its
+   * own tab, so who won which hole is on the screen and a tie there is a real
+   * one rather than an unanswered question.
+   */
+  const BOARD_TIEBREAKS = {
+    watchTheBirdie: [
+      { label: "most net birdies", of: (r, c) => -(c.birdies || 0) },
+      /* AT THE DEFAULT VALUES THIS ONE CANNOT FIRE. A birdie is −0.5 and an
+         eagle −1.5, so two men level on strokes and level on birdies are level
+         on eagles as well — there is nothing left for it to separate. It is
+         here because it is the documented order and because the values are
+         adjustable: the moment an eagle is worth something other than three
+         birdies, the count has to decide. */
+      { label: "the eagle", of: (r, c) => -(c.eagles || 0) },
+    ],
+    hitList: [
+      /* THE HIGHER INDEX WINS, which is the opposite of a golfer's instinct and
+         is meant to be: two men who both beat their man are separated by which
+         of them had less business doing it. A man with no index recorded is
+         treated as the lowest, because a missing figure must not win a tie. */
+      { label: "the higher index", of: (r) => (r.handicapIndex == null ? Infinity : -r.handicapIndex) },
+      { label: "the bigger margin", of: (r, c) => -(c.margin || 0) },
+    ],
+    skins: [],
+  };
+
+  /**
+   * Agony Alley is tied on the best net score on the first hole of the stretch,
+   * then the second, then the third — so its tiebreaks are built from the holes
+   * the round was actually played on rather than written out here. The hole
+   * numbers ride on the contest result for exactly this reason.
+   */
+  function boardTiebreaks(key, entries) {
+    if (key !== "agonyAlley") return BOARD_TIEBREAKS[key] || [];
+    const withHoles = entries.find((e) => e.c && e.c.holes && e.c.holes.length);
+    const holes = withHoles ? withHoles.c.holes : [];
+    return holes.map((h, i) => ({
+      label: "hole " + h,
+      of: (r, c) => (c.netHoles && c.netHoles[i] != null ? c.netHoles[i] : Infinity),
+    }));
+  }
+
+  /**
+   * One contest's board.
+   *
+   * `depth` is a FLOOR, never a ceiling. Every man level with the last man
+   * shown is shown as well, so a five-deep table runs to eight when six share
+   * third — cutting a tie off at five looks broken, and ties are the norm here
+   * rather than the exception.
+   *
+   * Only men who ACTUALLY CONTESTED IT are on it: eighteen holes played, and
+   * the contest live on their card. A man who named nobody is not last in the
+   * Hit List, he is not in it.
+   */
+  function contestBoard(results, key, opts) {
+    const depth = Math.max(1, (opts && opts.depth) || 5);
+    const entries = (results || [])
+      .filter((r) => r.eligible && r.contests && r.contests[key] && r.contests[key].live)
+      .map((r) => ({ r, c: r.contests[key] }));
+
+    const breaks = boardTiebreaks(key, entries);
+    const level = (a, b) => a.c.strokes === b.c.strokes &&
+      breaks.every((t) => t.of(a.r, a.c) === t.of(b.r, b.c));
+
+    entries.sort((a, b) => {
+      if (a.c.strokes !== b.c.strokes) return a.c.strokes - b.c.strokes;
+      for (const t of breaks) {
+        const d = t.of(a.r, a.c) - t.of(b.r, b.c);
+        if (d) return d;
+      }
+      // Nothing left to separate them by. Alphabetical so the order is at least
+      // the same every time the board is drawn.
+      return String(a.r.name).localeCompare(String(b.r.name));
+    });
+
+    let lastRank = 0;
+    const all = entries.map((e, i) => {
+      if (i === 0 || !level(entries[i - 1], e)) lastRank = i + 1;
+      return { name: e.r.name, rank: lastRank, strokes: e.c.strokes,
+               detail: e.c.detail, wonBy: null, contest: e.c };
+    });
+
+    /* WHAT SEPARATED THEM, named — and hung on the man who WON, the way the
+       main board hangs its card match. Written the other way round it reads as
+       an accusation: the man who came third had "hole 4" printed beside him for
+       the hole he lost it on, which is precisely backwards. */
+    for (let i = 1; i < entries.length; i++) {
+      const a = entries[i - 1], b = entries[i];
+      if (a.c.strokes !== b.c.strokes || all[i].rank === all[i - 1].rank) continue;
+      const t = breaks.find((t2) => t2.of(a.r, a.c) !== t2.of(b.r, b.c));
+      if (t) all[i - 1].wonBy = t.label;
+    }
+
+    if (all.length === 0) {
+      return { key, depth, rows: [], entered: 0, tied: 0, tieNote: "" };
+    }
+
+    /* The cut. Everyone down to the depth, and then everyone sharing the place
+       the last of them holds. */
+    const cutoff = all[Math.min(depth, all.length) - 1].rank;
+    const rows = all.filter((row) => row.rank <= cutoff);
+    const tied = rows.filter((row) => row.rank === cutoff).length;
+
+    return {
+      key, depth, rows, entered: all.length,
+      tied: tied > 1 ? tied : 0,
+      // Said only when the table actually ran past its depth. A five-deep board
+      // showing five men has nothing to explain.
+      tieNote: rows.length > depth
+        ? depth + " deep · " + tied + " tied for " + ordinal(cutoff) + ", all shown"
+        : "",
+    };
+  }
+
+  /**
+   * Every duel in the round, with the margin.
+   *
+   * The most repeatable thing in the game — a sentence a man says in the bar —
+   * and the reveal: nobody knows who named whom until it is published.
+   *
+   * TWO MEN WHO NAMED EACH OTHER MAKE TWO ROWS, not one. They are two separate
+   * bets, priced separately by each man's band, and one of them can be void
+   * while the other stands.
+   *
+   * BIGGEST MARGIN FIRST, because the table is read aloud and the heaviest
+   * beating is the one worth leading with. Duels that never settled — a card
+   * short at either end — come last, in their own group, with the reason.
+   */
+  function hitListDuels(results) {
+    const rank = { win: 0, loss: 0, tie: 0 };
+    const duels = (results || [])
+      .filter((r) => r.contests && r.contests.hitList && r.contests.hitList.opponent != null)
+      .map((r) => {
+        const c = r.contests.hitList;
+        return { name: r.name, opponent: c.opponent, outcome: c.outcome,
+                 margin: c.margin, band: c.band, strokes: c.strokes,
+                 settled: c.outcome in rank };
+      });
+    duels.sort((a, b) => {
+      if (a.settled !== b.settled) return a.settled ? -1 : 1;
+      if (a.settled && (b.margin || 0) !== (a.margin || 0)) return (b.margin || 0) - (a.margin || 0);
+      return String(a.name).localeCompare(String(b.name));
+    });
+    return duels;
+  }
 
   const api = {
     ABERDEEN_TEE_IV, ABERDEEN_TEES, TEE_IDS, GENDERS, DEFAULT_CONTESTS, SAMPLE_ROUND,
@@ -1603,9 +1950,10 @@
     applySkins, applyHitList, nearestByIndex, matchOfCards, CARD_MATCH,
     courseHandicap, fullCourseHandicap, FULL_ALLOWANCE,
     resolveCourseHandicap, strokesOnHole, netOnHole, cappedNetByHole,
-    birdiePickHoles, birdiePickCandidates, PICK_SLOTS, LEGACY_SLOT_KEYS,
+    birdiePickHoles, birdiePickCandidates, PICK_SLOTS, PICKS_BY_PAR, LEGACY_SLOT_KEYS,
     migratePicks, readPicks, randomPicks,
-    mergeContests, diffContests, checkContests,
+    mergeContests, diffContests, checkContests, PARKED_CONTESTS,
+    contestBoard, hitListDuels, BOARD_TIEBREAKS, ordinal,
     scorePlayer, scoreField, computeLeaderboard,
     computeFlights, flightOf, flightsInUse, sortFlights,
   };

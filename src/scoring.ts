@@ -101,12 +101,85 @@ export interface ContestResult {
   detail: string;
   /** False when the contest can't be scored yet (needs holes not played). */
   live: boolean;
+
+  /* ---- Watch the Birdie: counted separately for the board's tiebreak ----
+     The strokes cannot answer "most net birdies" on their own — three birdies
+     and one eagle both come to −1.5. */
+  /** Net birdies among the nominated holes. */
+  birdies?: number;
+  /** Net eagles or better among them. A hole is one or the other, never both. */
+  eagles?: number;
+
+  /* ---- Agony Alley: the stretch, hole by hole, for its tiebreak ---- */
+  /** The stretch's hole numbers, from the course. */
+  holes?: number[];
+  /** Capped net on each of them, in the same order. Null until all are played. */
+  netHoles?: (number | null)[] | null;
+
+  /* ---- Hit List: the duel as data, for the results table ---- */
+  /** Who he named, spelled as he named him. Null when he named nobody. */
+  opponent?: string | null;
+  /**
+   * How it went: "win" | "loss" | "tie" once settled, or why it did not —
+   * "none" (named nobody), "unknown" (not in this round), "self",
+   * "unfinished" (his own card short), "void" (the named man's card short).
+   */
+  outcome?: string | null;
+  /** The size of the net gap, always positive, zero on a tie. */
+  margin?: number | null;
+  /** Which band the opponent fell in: "lower" | "equal" | "higher". */
+  band?: string | null;
+}
+
+/** One line of a minigame board. */
+export interface BoardRow {
+  name: string;
+  /** Place in THIS contest — men genuinely level share it. */
+  rank: number;
+  strokes: number;
+  detail: string;
+  /** What separated him from the man below, when a tiebreak had to do it. */
+  wonBy: string | null;
+  contest: ContestResult;
+}
+
+/** One contest's own table. */
+export interface ContestBoardResult {
+  key: string;
+  /** How deep it was asked to run. A floor, never a ceiling. */
+  depth: number;
+  rows: BoardRow[];
+  /** How many men contested it at all. */
+  entered: number;
+  /** How many share the last place shown, when more than one does. */
+  tied: number;
+  /** Said only when the table ran past its depth to keep a tie whole. */
+  tieNote: string;
+}
+
+/** One man's bet, for the Hit List results table. */
+export interface HitListDuel {
+  name: string;
+  opponent: string;
+  outcome: string;
+  margin: number | null;
+  band: string | null;
+  strokes: number;
+  /** Whether it actually came to a result. Unsettled duels sort last. */
+  settled: boolean;
 }
 
 export interface PlayerResult {
   name: string;
   /** The handicap actually played off — the allowance is already in it. */
   courseHandicap: number;
+  /**
+   * The INDEX, not the course handicap. The Hit List board is tied on the
+   * higher index, and two men off different tees can share a course handicap
+   * while being a stroke and a half apart on index. Null when the handicap came
+   * off a card with no index beside it.
+   */
+  handicapIndex: number | null;
   /**
    * The handicap before the allowance was taken off. Null when it came off a
    * Golf Genius card, which already has the event's allowance applied.
@@ -280,3 +353,20 @@ export const flightsInUse: (cards: PlayerCard[]) => string[] = E.flightsInUse;
 
 /** Flight names sorted for reading: the undivided field first, then naturally. */
 export const sortFlights: (names: string[]) => string[] = E.sortFlights;
+
+/* ---- the minigame boards ---- */
+
+/**
+ * One contest's own table, ranked on the contest rather than on the final and
+ * tied on the contest's own terms.
+ *
+ * `depth` is a FLOOR: every man level with the last man shown is shown too.
+ */
+export const contestBoard: (results: PlayerResult[], key: string, opts?: { depth?: number })
+  => ContestBoardResult = E.contestBoard;
+
+/** Every duel in the round, biggest margin first, unsettled ones last. */
+export const hitListDuels: (results: PlayerResult[]) => HitListDuel[] = E.hitListDuels;
+
+/** 1st, 2nd, 3rd — for a note a man reads rather than a number he decodes. */
+export const ordinal: (n: number) => string = E.ordinal;

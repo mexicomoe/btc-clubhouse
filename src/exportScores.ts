@@ -6,7 +6,13 @@
  * code. One row per player, in the order the brief asks for.
  */
 
+/* The engine as well as the exporter, and not for a function: the exporter
+   reads DEFAULT_CONTESTS to decide which contests get a column, and a test that
+   imported this module alone would otherwise get every column in the list
+   rather than the four this club plays. */
+import "../engine.js";
 import "../exporter.js";
+import type { ContestConfig } from "./courseConfig.ts";
 import type { PlayerResult } from "./scoring.ts";
 
 const X = (globalThis as { ClubhouseExporter: any }).ClubhouseExporter;
@@ -84,7 +90,14 @@ export const csvFilename: (name: string, date: string) => string = X.csvFilename
 export const csvField: (value: unknown) => string = X.csvField;
 
 /** The header row, in order. */
-export const headerRow: () => string[] = X.headerRow;
+export const headerRow: (contests?: ContestConfig | null) => string[] = X.headerRow;
+
+/**
+ * The contest columns this round's rules earn it. A contest that is not in the
+ * game gets no column at all — not a heading with blanks under it, which reads
+ * as a field that all scored zero.
+ */
+export const columnsFor: (contests?: ContestConfig | null) => [string, string][] = X.columnsFor;
 
 /** The contest columns as [key, label] pairs, in scoring order. */
 export const CONTEST_COLUMNS: [string, string][] = X.CONTEST_COLUMNS;

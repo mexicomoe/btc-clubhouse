@@ -17,20 +17,20 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { ABERDEEN_TEE_IV, DEFAULT_CONTESTS } from "../src/courseConfig.ts";
+import { ABERDEEN_TEE_IV, DEFAULT_CONTESTS, PARKED_CONTESTS } from "../src/courseConfig.ts";
 import { scorePlayer, computeLeaderboard, birdiePickHoles, PICK_SLOTS } from "../src/scoring.ts";
 
 const E = (globalThis as any).ClubhouseEngine;
 const C = ABERDEEN_TEE_IV;
 const PAR = C.par;
-const SIX = { p4f: 2, p4b: 14, p3a: 3, p3b: 8, p5a: 7, p5b: 16 };
+const NINE = { p5a: 7, p5b: 16, p3a: 3, p3b: 8, p3c: 13, p4f: 2, p4b: 14, p4c: 1, p4d: 10 };
 
 const merge = (diff: any) => E.mergeContests(DEFAULT_CONTESTS, diff);
 const diff = (full: any) => E.diffContests(DEFAULT_CONTESTS, full);
 const check = (full: any) => E.checkContests(full, C);
 
 function card(over: Record<number, number> = {}) {
-  return { name: "Ken", courseHandicap: 0, picks: { ...SIX },
+  return { name: "Ken", courseHandicap: 0, picks: { ...NINE },
            gross: PAR.map((p, i) => p + (over[i + 1] || 0)) } as any;
 }
 
@@ -39,20 +39,40 @@ function card(over: Record<number, number> = {}) {
 test("changing a value rescores from the scores already stored", () => {
   // The same card, twice, with nothing re-entered — only the rules moved.
   const c = card({ 18: 2 });               // one blow-up, on the last hole
-  const before = scorePlayer(c, C, DEFAULT_CONTESTS);
+  const before = scorePlayer(c, C, merge({ tripleThreat: { perTriple: 0.5 } }));
   const after = scorePlayer(c, C, merge({ tripleThreat: { perTriple: 2 } }));
   assert.equal(before.contests.tripleThreat!.strokes, 0.5);
   assert.equal(after.contests.tripleThreat!.strokes, 2);
   assert.equal(after.final! - before.final!, 1.5, "and the final moved with it");
 });
 
+test("a contest that is off on the defaults is switched on by the round's rules", () => {
+  // Triple Threat and Bounce Back are kept for testing later in the year, so
+  // they are null on the defaults and come back from the round's own rules.
+  const c = card({ 18: 2 });
+  assert.equal(scorePlayer(c, C, DEFAULT_CONTESTS).contests.tripleThreat, undefined);
+  assert.equal(scorePlayer(c, C, merge({ tripleThreat: { perTriple: 0.5 } }))
+    .contests.tripleThreat!.strokes, 0.5);
+});
+
 test("switching a contest off takes it off the card entirely", () => {
-  const r = scorePlayer(card(), C, merge({ easyStreet: null }));
-  assert.equal(r.contests.easyStreet, undefined, "absent, not a zero");
+  const r = scorePlayer(card(), C, merge({ agonyAlley: null }));
+  assert.equal(r.contests.agonyAlley, undefined, "absent, not a zero");
+});
+
+test("the four that are cut are absent from the card, not zero", () => {
+  const r = scorePlayer(card(), C, DEFAULT_CONTESTS);
+  for (const key of ["sixPack", "easyStreet", "tripleThreat", "bounceBack"]) {
+    assert.equal((r.contests as any)[key], undefined, key);
+  }
+  assert.deepEqual(Object.keys(r.contests), ["watchTheBirdie", "agonyAlley"],
+    "the two a single card can settle on its own");
 });
 
 test("a switch is independent of every other switch", () => {
-  const r = scorePlayer(card({ 1: 2 }), C, merge({ tripleThreat: null }));
+  const both = { tripleThreat: PARKED_CONTESTS.tripleThreat,
+                 bounceBack: PARKED_CONTESTS.bounceBack };
+  const r = scorePlayer(card({ 1: 2 }), C, merge({ ...both, tripleThreat: null }));
   assert.equal(r.contests.tripleThreat, undefined);
   assert.equal(r.contests.bounceBack!.strokes, -1, "the recovery still pays");
 });
@@ -83,17 +103,33 @@ test("a diff carries only what changed, not a copy of everything", () => {
 
 /* ---- what is refused ---- */
 
-test("a barred list that leaves one legal hole in a slot is refused", () => {
-  // Bar both 8 and 17 and the par 3 slots have only hole 3 left, which is not a
-  // choice — it is a formality.
-  const problems = check(merge({ watchTheBirdie: { barred: [4, 5, 6, 8, 11, 12, 13, 17] } }));
+test("a barred list that leaves one legal hole for three picks is refused", () => {
+  // Bar 8, 13 and 17 and the par 3s have only hole 3 left for three picks.
+  const problems = check(merge({ watchTheBirdie: { barred: [4, 5, 6, 8, 13, 17] } }));
   assert.ok(problems.length >= 1);
-  assert.match(problems[0], /par 3 would have only hole 3 left/);
+  assert.match(problems[0], /par 3s would have only hole 3 left, and 3 must be nominated/);
+});
+
+test("a par with exactly as many holes as picks is refused — that is not a choice", () => {
+  // THIS IS THE CHECK NINE PICKS FORCED. Bar one par 3 and there are three left
+  // for three picks: every slot still has three holes to offer, so the old
+  // per-slot rule passed it without a word, and every man in the field would
+  // nominate the same three.
+  const problems = check(merge({ watchTheBirdie: { barred: [4, 5, 6, 17] } }));
+  assert.ok(problems.length >= 1);
+  assert.match(problems[0], /par 3s would have exactly 3 holes for 3 picks/);
+  assert.match(problems[0], /at least one more hole than there are picks/);
 });
 
 test("a barred list that leaves NO legal hole is refused too", () => {
-  const problems = check(merge({ watchTheBirdie: { barred: [3, 4, 5, 6, 8, 11, 12, 13, 17] } }));
+  const problems = check(merge({ watchTheBirdie: { barred: [3, 4, 5, 6, 8, 13, 17] } }));
   assert.match(problems[0], /no holes/);
+});
+
+test("a board depth of nothing is refused", () => {
+  assert.match(check(merge({ boards: { depth: 0 } }))[0], /at least one man/);
+  assert.match(check(merge({ boards: { depth: -2 } }))[0], /at least one man/);
+  assert.deepEqual(check(merge({ boards: { depth: 8 } })), []);
 });
 
 test("a hole outside 1 to 18 is refused", () => {
@@ -109,6 +145,8 @@ test("an out-of-order Agony Alley ladder is refused", () => {
 });
 
 test("a ladder is refused for Easy Street on the same rule", () => {
+  // Easy Street is out of the game and has no switch on the rules screen, but a
+  // round that arrives carrying it in its own rules is still checked.
   const problems = check(merge({ easyStreet: [
     { threshold: 2, strokes: 0 }, { threshold: 1, strokes: 1 },
   ] }));
@@ -136,19 +174,22 @@ test("A PICK ON A HOLE BARRED LATER IS DROPPED, NOT THROWN", () => {
   // give a wrong number. A man picks 8, the organiser bars it that evening, and
   // his round must still open.
   const c = card();
-  const barred = merge({ watchTheBirdie: { barred: [4, 5, 6, 8, 11, 12, 13] } });
+  const barred = merge({ watchTheBirdie: { barred: [4, 5, 6, 8] } });
   const r = scorePlayer(c, C, barred);
   assert.equal(r.contests.watchTheBirdie!.live, true);
-  // Down to five, and the card SAYS five rather than claiming six.
+  // Down to eight, and the card SAYS eight rather than claiming nine.
   assert.match(r.contests.watchTheBirdie!.detail, /no net birdies/);
-  // And Six Pack cannot be scored on five, so it says so rather than inventing
-  // a seventh hole to make the numbers work.
-  assert.equal(r.contests.sixPack!.live, false);
+  // And Six Pack, were it in the game, cannot be scored on eight — it says so
+  // rather than inventing a ninth hole to make the numbers work.
+  const withSixPack = scorePlayer(c, C, merge({
+    watchTheBirdie: { barred: [4, 5, 6, 8] }, sixPack: PARKED_CONTESTS.sixPack }));
+  assert.equal(withSixPack.contests.sixPack!.live, false);
+  assert.match(withSixPack.contests.sixPack!.detail, /needs all 9 picks/);
 });
 
 test("the barred list is a contest value, overriding the course's own", () => {
-  assert.deepEqual(birdiePickHoles(C).p3a, [3, 8, 17], "the course's list");
-  const legal = birdiePickHoles(C, merge({ watchTheBirdie: { barred: [4, 5, 6, 8, 11, 12, 13] } }));
+  assert.deepEqual(birdiePickHoles(C).p3a, [3, 8, 13, 17], "the course's list");
+  const legal = birdiePickHoles(C, merge({ watchTheBirdie: { barred: [4, 5, 6, 8, 13] } }));
   assert.deepEqual(legal.p3a, [3, 17], "the event's");
 });
 
@@ -169,7 +210,7 @@ test("a whole field rescores on a changed rule with no card re-entered", () => {
   const field = ["A", "B", "C"].map((n, i) => ({
     ...card({ 18: 2 }), name: n, cart: String(i + 1), handicapIndex: 10 + i,
   }));
-  const before = computeLeaderboard(field as any, C, DEFAULT_CONTESTS);
+  const before = computeLeaderboard(field as any, C, merge({ tripleThreat: { perTriple: 0.5 } }));
   const after = computeLeaderboard(field as any, C, merge({ tripleThreat: { perTriple: 2 } }));
   assert.equal(before.length, after.length);
   for (let i = 0; i < before.length; i++) {
@@ -209,7 +250,7 @@ test("an event carrying changed values survives an event code", async () => {
   // Off scratch, so the gross double on the 18th IS the net double — with a
   // stroke on it, it would only be a net bogey and prove nothing.
   const scored = scorePlayer(
-    { name: "Ken", courseHandicap: 0, tee: "IV", picks: { ...SIX },
+    { name: "Ken", courseHandicap: 0, tee: "IV", picks: { ...NINE },
       gross: PAR.map((p, i) => p + (i === 17 ? 2 : 0)) } as any,
     undefined, E.mergeContests(DEFAULT_CONTESTS, ev.contests));
   assert.equal(scored.contests.tripleThreat!.strokes, 2, "not the default 0.5");

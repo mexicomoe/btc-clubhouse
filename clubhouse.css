@@ -150,6 +150,56 @@
     padding: 14px 20px 6px; font-size: 20px; font-weight: 800;
     border-top: 3px solid var(--ink); text-transform: uppercase; letter-spacing: .4px;
   }
+  /* ---- the minigame boards ----
+     A tighter row than the leaderboard's, because there are four of these
+     tables under it and the leaderboard has to stay the thing the screen is
+     about. Still 56px of target and nothing under 18px. */
+  .mg {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    padding: 12px 14px; min-height: 56px;
+    background: var(--paper); color: var(--ink);
+    border: 0; border-bottom: 2px solid var(--ink);
+    text-align: left; font: inherit; cursor: pointer;
+  }
+  .mg:active { background: var(--ink); color: var(--paper); }
+  .mg:active .mgs, .mg:active .mgr { color: var(--paper); }
+  .mg .mgr {
+    flex: 0 0 auto; min-width: 26px; text-align: center;
+    font-size: 22px; font-weight: 800;
+  }
+  .mg .mgw { flex: 1 1 auto; min-width: 0; overflow: hidden; }
+  .mg .mgn {
+    display: block; font-size: 20px; font-weight: 800; line-height: 1.15;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  /* What he actually did. Allowed to wrap rather than be cut — "won on hole 4"
+     is the half of the line worth reading, and it is the half that gets cut. */
+  .mg .mgd { display: block; font-size: 18px; font-weight: 700; margin-top: 5px; }
+  .mg .mgs {
+    flex: 0 0 auto; font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums;
+  }
+  .mg.leader { background: #fff7d6; }
+  .mg.leader:active { background: var(--ink); }
+  /* The note that says a table ran past its depth to keep a tie whole. On its
+     own line, because the label above is uppercase and a lower-case tail on the
+     end of it reads as part of the contest's name. */
+  .section-label .mgnote {
+    display: block; margin-top: 4px; font-size: 18px; font-weight: 700;
+    text-transform: none; letter-spacing: 0;
+  }
+  /* One duel a line. WRAPS — a line is a whole sentence with two names in it,
+     and two long surnames will not fit a phone. Nothing scrolls sideways. */
+  .duel {
+    padding: 12px 14px; min-height: 44px;
+    font-size: 19px; font-weight: 700; line-height: 1.4;
+    border-bottom: 2px solid var(--ink);
+    overflow-wrap: break-word;
+  }
+  /* A duel that never came off. Still said, and still a full-size line — only
+     the weight drops, because a man must not have to squint to learn he was
+     voided. */
+  .duel.quiet { font-weight: 600; background: var(--wash); }
+
   .contest { display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-bottom: 2px solid var(--ink); min-height: 60px; }
   .contest .cname { flex: 1 1 auto; }
   .contest .cn { font-size: 21px; font-weight: 800; }

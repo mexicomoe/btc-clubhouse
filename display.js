@@ -82,10 +82,36 @@
       damageControl: "Damage Control", goLong: "Go Long",
       getShorty: "Get Shorty", bounceBack: "Bounce Back",
       skins: "Skins",
+      // Not a contest and never a line on a card, but it is a rule of the round
+      // and it needs a name for the "what was changed" note.
+      boards: "The boards",
     };
+
+    /**
+     * One duel, as a sentence a man would say in the bar.
+     *
+     * "Wallach beat Teitelbaum by 4" — the most repeatable thing in the game,
+     * and the reveal: nobody knows who named whom until it is published.
+     *
+     * THE UNSETTLED ONES GET A SENTENCE TOO. A duel that never came off is
+     * still a bet a man made, and leaving it off the table would let him think
+     * he had been forgotten rather than voided.
+     */
+    function duelSentence(d){
+      const who = d.name, him = d.opponent;
+      switch(d.outcome){
+        case "win":  return who + " beat " + him + " by " + d.margin;
+        case "loss": return who + " lost to " + him + " by " + d.margin;
+        case "tie":  return who + " and " + him + " tied";
+        case "unfinished": return who + " named " + him + " — no full round, so it is void";
+        case "void": return who + " named " + him + ", who has no full round — void";
+        case "self": return who + " named himself";
+        default:     return who + " named " + him + ", who is not in this round";
+      }
+    }
 
     globalThis.ClubhouseDisplay = {
       esc, fmtFinal, fmtStrokes, fitText, abbreviate, fitName, niceDate,
-      MONTHS, CONTEST_NAMES,
+      MONTHS, CONTEST_NAMES, duelSentence,
     };
 })();

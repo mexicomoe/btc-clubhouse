@@ -17,11 +17,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { ABERDEEN_TEE_IV, DEFAULT_CONTESTS, courseForTee } from "../src/courseConfig.ts";
+import { ABERDEEN_TEE_IV, DEFAULT_CONTESTS, PARKED_CONTESTS, courseForTee } from "../src/courseConfig.ts";
 import { computeLeaderboard, scorePlayer, cappedNetByHole, courseHandicap, strokesOnHole, type PlayerCard } from "../src/scoring.ts";
 import { parseScores, PICKED_UP } from "../src/importScores.ts";
 
 const PAR = ABERDEEN_TEE_IV.par;
+/* Triple Threat is off on the defaults and kept for testing later in the year.
+   A picked-up hole being a blow-up is still its rule, so the two cases below
+   that read it switch it on rather than dropping the coverage. */
+const WITH_PARKED = { ...DEFAULT_CONTESTS, ...PARKED_CONTESTS };
 
 /** Level par off scratch, with the named holes (1-based) picked up. */
 function card(name: string, xHoles: number[] = [], ch = 0): PlayerCard {
@@ -107,7 +111,7 @@ test("that is not the same as walking in", () => {
 });
 
 test("every contest still runs on a card with Xs on it", () => {
-  const r = scorePlayer(card("Three Xs", [4, 11, 15]), ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
+  const r = scorePlayer(card("Three Xs", [4, 11, 15]), ABERDEEN_TEE_IV, WITH_PARKED);
   // Agony Alley needs 4–6 and hole 4 was picked up — it was still played, so
   // the contest is live and simply scores the net double.
   assert.equal(r.contests.agonyAlley.live, true, "the stretch was played");
@@ -123,14 +127,14 @@ test("every contest still runs on a card with Xs on it", () => {
 // now — a pick-up caps to exactly that — and a hole a man picked up on was a
 // blow-up by any honest reading. The exclusion went with the rule that needed it.
 test("a picked-up hole is a blow-up, and needs no special case", () => {
-  const r = scorePlayer(card("Three Xs", [4, 11, 15]), ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
+  const r = scorePlayer(card("Three Xs", [4, 11, 15]), ABERDEEN_TEE_IV, WITH_PARKED);
   assert.match(r.contests.tripleThreat.detail, /^3 net doubles/);
 
   // The same three holes actually played to par + 4 score identically — which
   // is the point: the card cannot tell, so neither should the contest.
   const played = card("Played them", []);
   for (const h of [4, 11, 15]) played.gross[h - 1] = (PAR[h - 1] as number) + 4;
-  const r2 = scorePlayer(played, ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
+  const r2 = scorePlayer(played, ABERDEEN_TEE_IV, WITH_PARKED);
   assert.equal(r2.contests.tripleThreat.strokes, r.contests.tripleThreat.strokes);
   assert.equal(r2.contests.tripleThreat.detail, r.contests.tripleThreat.detail);
 });

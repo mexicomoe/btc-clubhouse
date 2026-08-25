@@ -26,7 +26,7 @@ const PAR = ABERDEEN_TEE_IV.par;
 function card(name: string, opts: Partial<PlayerCard> = {}, edit: (g: (number | null)[]) => void = () => {}): PlayerCard {
   const gross = PAR.slice() as (number | null)[];
   edit(gross);
-  return { name, courseHandicap: 0, gross, picks: { p4f: 2, p4b: 14, p3a: 3, p3b: 8, p5a: 7, p5b: 16 }, ...opts };
+  return { name, courseHandicap: 0, gross, picks: { p5a: 7, p5b: 16, p3a: 3, p3b: 8, p3c: 13, p4f: 2, p4b: 14, p4c: 1, p4d: 10 }, ...opts };
 }
 
 /* ---- reading a flight ---- */
@@ -112,7 +112,11 @@ test("ties are settled inside the flight", () => {
   // Two level cards in A, and a third in B that would have joined the tie.
   const field = [
     card("A even", { flight: "A" }),
-    card("A better back", { flight: "A" }, (g) => { g[0] = 5; g[9] = 3; }),
+    // A bogey on 9 and a birdie on 15: level on the total, better on the back.
+    // BOTH HOLES ARE OUTSIDE HIS PICKS — nine picks cover twelve of the
+    // eighteen now, and a birdie on a nominated hole would pay Watch the Birdie
+    // and part the two cards on the final before the card match was reached.
+    card("A better back", { flight: "A" }, (g) => { g[8] = 5; g[14] = 3; }),
     card("B even", { flight: "B" }),
   ];
   const boards = computeFlights(field, ABERDEEN_TEE_IV, DEFAULT_CONTESTS);

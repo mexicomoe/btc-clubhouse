@@ -31,12 +31,12 @@ import { cartSkins, skinStrokes, skinValue, skinsFormat } from "../src/skins.ts"
 
 const PAR = ABERDEEN_TEE_IV.par;
 const CFG = DEFAULT_CONTESTS.skins!;
-const SIX = { p4f: 2, p4b: 14, p3a: 3, p3b: 8, p5a: 7, p5b: 16 };
+const NINE = { p5a: 7, p5b: 16, p3a: 3, p3b: 8, p3c: 13, p4f: 2, p4b: 14, p4c: 1, p4d: 10 };
 
 function card(name: string, cart: number | null, edit: (g: (number | null)[]) => void = () => {}): PlayerCard {
   const gross = PAR.slice() as (number | null)[];
   edit(gross);
-  return { name, courseHandicap: 0, gross, picks: { ...SIX },
+  return { name, courseHandicap: 0, gross, picks: { ...NINE },
            cart: cart == null ? undefined : cart } as PlayerCard;
 }
 

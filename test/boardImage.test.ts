@@ -274,3 +274,67 @@ test("the picture is named after the round and its date", () => {
   assert.equal(IMG.imageFilename("Sat/Sun 9am", "2026-08-14"),
     "Sat-Sun 9am 2026-08-14 leaderboard.png", "nothing a file system objects to");
 });
+
+/* ---- the minigame boards ride in the picture ----
+   The picture is the one that always arrives, so who won each contest goes in
+   it rather than being left to a link the men may never open. */
+
+const BOARDS = [{
+  name: "Watch the Birdie",
+  tieNote: "5 deep · 6 tied for 3rd, all shown",
+  rows: [
+    { rank: 1, name: "Alex", strokes: "−1.5", detail: "3 of 9 picks" },
+    { rank: 2, name: "Christiaan Bezuidenhout", strokes: "−1.0",
+      detail: "2 of 9 picks · won on most net birdies" },
+  ],
+}];
+const DUELS = [
+  "Wallach beat Teitelbaum by 4",
+  "Finkelstein named a man with a very long surname indeed — no full round, so it is void",
+];
+
+const said = (plan: any) => plan.ops.filter((o: any) => o.text).map((o: any) => o.text);
+
+test("the boards and the duels are drawn under the leaderboard", () => {
+  const plan = IMG.layout({ ...ROUND, boards: BOARDS, duels: DUELS }, { measure });
+  const text = said(plan);
+  assert.ok(text.includes("WATCH THE BIRDIE"), "the contest is headed");
+  assert.ok(text.some((t: string) => t.includes("tied for 3rd")), "and says the tie ran past the depth");
+  assert.ok(text.includes("Alex"));
+  assert.ok(text.includes("−1.5"));
+  assert.ok(text.includes("EVERY DUEL"));
+  assert.ok(text.includes("Wallach beat Teitelbaum by 4"));
+});
+
+test("a round with no boards is the picture it always was", () => {
+  // Nothing is drawn for them and nothing is reserved, so the old picture is
+  // byte-for-byte the old picture.
+  const without = IMG.layout(ROUND, { measure });
+  const withEmpty = IMG.layout({ ...ROUND, boards: [], duels: [] }, { measure });
+  assert.equal(without.height, withEmpty.height);
+  assert.deepEqual(without.ops, withEmpty.ops);
+});
+
+test("the picture grows to fit the boards rather than cropping them", () => {
+  const without = IMG.layout(ROUND, { measure });
+  const with_ = IMG.layout({ ...ROUND, boards: BOARDS, duels: DUELS }, { measure });
+  assert.ok(with_.height > without.height, "taller");
+  const lowest = Math.max(...with_.ops.map((o: any) => o.y + (o.h || 0)));
+  assert.ok(lowest <= with_.height, "and nothing is drawn past the bottom edge");
+});
+
+test("nothing on a board goes under the legibility floor", () => {
+  const plan = IMG.layout({ ...ROUND, boards: BOARDS, duels: DUELS }, { measure });
+  for (const op of plan.ops) {
+    if (op.text) assert.ok(op.size >= 18, JSON.stringify(op));
+  }
+});
+
+test("a long name and a long duel wrap rather than run off the edge", () => {
+  const plan = IMG.layout({ ...ROUND, boards: BOARDS, duels: DUELS }, { measure });
+  for (const op of plan.ops) {
+    if (!op.text || op.align === "right" || op.align === "center") continue;
+    assert.ok(op.x + measure(op.text, op.size) <= plan.width,
+      "runs off the edge: " + op.text);
+  }
+});

@@ -17,15 +17,12 @@
 
   /** The contests, in the order they are scored and shown. */
   /**
-   * The contests, in the order a card reads them.
+   * Every contest that has ever had a column, in the order a card reads them.
    *
-   * THIS IS A FRESH WORKBOOK. The zero base makes every past round
-   * incomparable, so the archive is kept as it stands and this file starts
-   * clean — which means the switched-off contests no longer need blank columns
-   * holding their place. Damage Control, Go Long and Get Shorty are gone from
-   * it. Bounce Back has a column of its own again — it is its own contest with
-   * its own switch, and burying it inside Triple Threat's figure meant a sheet
-   * could not tell a man who never blew up from one who blew up and recovered.
+   * THIS IS THE FULL LIST, NOT THE ROUND'S. Which of them actually get a column
+   * is decided by `columnsFor` below, from the rules the round was played
+   * under. Kept whole here so a round that carries a switched-off contest in
+   * its own rules still exports it.
    */
   const CONTEST_COLUMNS = [
     ["watchTheBirdie", "Watch the Birdie"],
@@ -38,7 +35,29 @@
     ["skins", "Skins"],
   ];
 
-  function headerRow() {
+  /**
+   * The columns THIS round gets.
+   *
+   * A CONTEST THAT IS NOT IN THE GAME HAS NO COLUMN AT ALL. It used to keep its
+   * heading and write an empty cell under it, which in a spreadsheet is
+   * indistinguishable from a contest that was played and scored a man nothing —
+   * and a column of blanks under "Six Pack" is worse than no column, because it
+   * invites whoever sorts on it to conclude the field all scored zero.
+   *
+   * `contests` is the round's RESOLVED rules, not the diff it stores. With none
+   * given the engine's defaults are used, which is right for every caller that
+   * has not overridden anything; with no engine loaded at all, every column is
+   * written, because guessing a round's rules from nothing is worse than a wide
+   * file.
+   */
+  function columnsFor(contests) {
+    const engine = globalThis.ClubhouseEngine;
+    const cfg = contests || (engine && engine.DEFAULT_CONTESTS) || null;
+    if (!cfg) return CONTEST_COLUMNS;
+    return CONTEST_COLUMNS.filter(([key]) => cfg[key] != null);
+  }
+
+  function headerRow(contests) {
     // The event's own columns lead every row. They repeat, which is the point:
     // several rounds can be piled into one sheet and still be told apart.
     const cols = ["Event", "Date", "Rules", "Format",
@@ -47,11 +66,13 @@
                   // only the organiser's own typing will do for that.
                   "Name", "Name as entered", "GHIN",
                   "Handicap index", "Tee", "Gender", "Group", "Flight",
-                  // The six picks, in slot order. Par 4s are split front and
-                  // back; the par 3s and par 5s float across the whole course.
-                  "Front par 4 pick", "Back par 4 pick",
-                  "Par 3 pick 1", "Par 3 pick 2",
+                  // The NINE picks, in slot order: two par 5s, three par 3s,
+                  // four par 4s. The same order the men write them in a text
+                  // message, and the same order the paste reads them — nine
+                  // bare numbers have nothing else to go on.
                   "Par 5 pick 1", "Par 5 pick 2",
+                  "Par 3 pick 1", "Par 3 pick 2", "Par 3 pick 3",
+                  "Par 4 pick 1", "Par 4 pick 2", "Par 4 pick 3", "Par 4 pick 4",
                   // Who he NAMED, spelled as he named him. Not to be confused
                   // with the "Hit List" column further right, which is what the
                   // pick paid — two columns of the same name in one sheet is a
@@ -64,7 +85,7 @@
     for (let h = 1; h <= HOLES; h++) cols.push("H" + h);
     for (let h = 1; h <= HOLES; h++) cols.push("N" + h);
     cols.push("Net", "Gross");
-    for (const [, label] of CONTEST_COLUMNS) cols.push(label);
+    for (const [, label] of columnsFor(contests)) cols.push(label);
     cols.push("Final");
     return cols;
   }
@@ -106,7 +127,13 @@
     const byName = new Map();
     (results || []).forEach((r) => { if (!byName.has(r.name)) byName.set(r.name, r); });
 
-    const lines = [csvRow(headerRow())];
+    /* The round's own rules decide the contest columns. Passed in by the app,
+       which is the only place the resolved config exists — the event stores a
+       DIFF, and a diff cannot say which contests are on. */
+    const contests = opts.contests || null;
+    const contestCols = columnsFor(contests);
+
+    const lines = [csvRow(headerRow(contests))];
     players.forEach((p) => {
       const shown = displayNameOf(p);
       const r = byName.get(shown) || null;
@@ -128,12 +155,15 @@
         p.gender || "",
         p.cart == null ? "" : p.cart,
         (p.flight || "").trim(),
-        p.p4f == null ? "" : p.p4f,
-        p.p4b == null ? "" : p.p4b,
-        p.p3a == null ? "" : p.p3a,
-        p.p3b == null ? "" : p.p3b,
         p.p5a == null ? "" : p.p5a,
         p.p5b == null ? "" : p.p5b,
+        p.p3a == null ? "" : p.p3a,
+        p.p3b == null ? "" : p.p3b,
+        p.p3c == null ? "" : p.p3c,
+        p.p4f == null ? "" : p.p4f,
+        p.p4b == null ? "" : p.p4b,
+        p.p4c == null ? "" : p.p4c,
+        p.p4d == null ? "" : p.p4d,
         p.hitList == null ? "" : p.hitList,
         r ? r.courseHandicap : "",
       ];
@@ -154,7 +184,7 @@
       }
       cells.push(r && r.net != null ? r.net : "");
       cells.push(r && r.gross != null ? r.gross : "");
-      for (const [key] of CONTEST_COLUMNS) {
+      for (const [key] of contestCols) {
         const c = r && r.contests ? r.contests[key] : null;
         cells.push(c ? c.strokes : "");
       }
@@ -187,7 +217,7 @@
       skinsOn: !(e.contests && "skins" in e.contests && e.contests.skins == null),
       players: (e.players || []).map((p) => [
         p.id, p.name, p.ghin, p.index, p.tee, p.gender, p.cart, p.flight,
-        p.p4f, p.p4b, p.p3a, p.p3b, p.p5a, p.p5b, p.hitList,
+        p.p5a, p.p5b, p.p3a, p.p3b, p.p3c, p.p4f, p.p4b, p.p4c, p.p4d, p.hitList,
       ]),
       scores: e.scores || {},
       handicaps: e.handicaps || {},
@@ -300,11 +330,13 @@
       p.gender == null ? "" : p.gender,
       p.cart == null ? null : p.cart,
       (p.flight || "").trim(),
-      // The two par 4 picks keep slots 7 and 8, where the two-pick form put
-      // them, so a code written by the old app still reads correctly here and a
-      // code written by this one still reads on a phone that has not updated —
-      // it will simply see the two picks it knows about. The four new slots are
-      // APPENDED past the end for the same reason.
+      // NOTHING EVER MOVES IN THIS ROW. The two par 4 picks keep slots 7 and 8,
+      // where the two-pick form put them, so a code written by the old app
+      // still reads correctly here and a code written by this one still reads
+      // on a phone that has not updated — it will simply see the picks it knows
+      // about. Every slot added since is APPENDED past the end for the same
+      // reason, which is why the reading order below looks nothing like the
+      // order a man writes his picks in.
       p.p4f == null ? null : p.p4f,
       p.p4b == null ? null : p.p4b,
       packHoles(scores[p.id]),
@@ -315,6 +347,13 @@
       p.p5b == null ? null : p.p5b,
       // Appended past the end, so a code written by an older app still reads.
       p.hitList == null ? null : p.hitList,
+      // The three slots the nine-pick game added, appended in their turn. A
+      // phone on the six-pick app reads a nine-pick round as the six it knows
+      // and scores it; a nine-pick app reads a six-pick round with these three
+      // empty, which is exactly what it was.
+      p.p3c == null ? null : p.p3c,
+      p.p4c == null ? null : p.p4c,
+      p.p4d == null ? null : p.p4d,
     ]));
 
     // What travels is the round itself. Which tab was open, and whether THIS
@@ -367,6 +406,9 @@
         p5a: row[13] == null ? null : row[13],
         p5b: row[14] == null ? null : row[14],
         hitList: row[15] == null ? "" : row[15],
+        p3c: row[16] == null ? null : row[16],
+        p4c: row[17] == null ? null : row[17],
+        p4d: row[18] == null ? null : row[18],
       });
       if (row[9]) scores[id] = unpackHoles(row[9]);
       if (row[10] != null) handicaps[id] = row[10];
@@ -497,7 +539,7 @@
 
   globalThis.ClubhouseExporter = {
     encodeEvent, decodeEvent, CODE_PREFIX,
-    eventToCsv, csvFilename, csvField, headerRow, CONTEST_COLUMNS,
+    eventToCsv, csvFilename, csvField, headerRow, CONTEST_COLUMNS, columnsFor,
     eventSignature, changedSinceExport,
   };
 })();

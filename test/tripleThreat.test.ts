@@ -22,11 +22,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { ABERDEEN_TEE_IV, DEFAULT_CONTESTS } from "../src/courseConfig.ts";
+import { ABERDEEN_TEE_IV, DEFAULT_CONTESTS, PARKED_CONTESTS } from "../src/courseConfig.ts";
 import { scorePlayer, type PlayerCard } from "../src/scoring.ts";
 
+/* SWITCHED ON FOR THIS FILE. They are off on the defaults now, so every case
+   below scores it explicitly rather than leaning on them. That it is off is
+   asserted once, and nowhere else — a file that quietly stopped exercising the
+   contest at all would still go green. */
+const PLAYED = { ...DEFAULT_CONTESTS, tripleThreat: PARKED_CONTESTS.tripleThreat, bounceBack: PARKED_CONTESTS.bounceBack };
+
 const PAR = ABERDEEN_TEE_IV.par;
-const SIX = { p4f: 2, p4b: 14, p3a: 3, p3b: 8, p5a: 7, p5b: 16 };
+const NINE = { p5a: 7, p5b: 16, p3a: 3, p3b: 8, p3c: 13, p4f: 2, p4b: 14, p4c: 1, p4d: 10 };
 
 function card(over: Record<number, number> = {}, opts: {
   courseHandicap?: number; unplayed?: number[]; pickedUp?: number[];
@@ -34,14 +40,17 @@ function card(over: Record<number, number> = {}, opts: {
   const gross = PAR.map((p, i) => p + (over[i + 1] || 0)) as (number | string | null)[];
   for (const h of opts.unplayed || []) gross[h - 1] = null;
   for (const h of opts.pickedUp || []) gross[h - 1] = "X";
-  return { name: "Test", courseHandicap: opts.courseHandicap ?? 0, gross, picks: { ...SIX } } as PlayerCard;
+  return { name: "Test", courseHandicap: opts.courseHandicap ?? 0, gross, picks: { ...NINE } } as PlayerCard;
 }
 const tt = (c: PlayerCard) =>
-  scorePlayer(c, ABERDEEN_TEE_IV, DEFAULT_CONTESTS).contests.tripleThreat!;
+  scorePlayer(c, ABERDEEN_TEE_IV, PLAYED).contests.tripleThreat!;
 
 test("the rate is one config value", () => {
-  assert.equal(DEFAULT_CONTESTS.tripleThreat!.perTriple, 0.5);
-  assert.equal((DEFAULT_CONTESTS.tripleThreat as any).perBounceBack, undefined,
+  assert.equal(PARKED_CONTESTS.tripleThreat.perTriple, 0.5);
+  assert.equal(DEFAULT_CONTESTS.tripleThreat, null, "off on the defaults, with a switch");
+  assert.equal(scorePlayer(card({ 1: 2 }), ABERDEEN_TEE_IV, DEFAULT_CONTESTS)
+    .contests.tripleThreat, undefined, "not in the game is not a zero");
+  assert.equal((PARKED_CONTESTS.tripleThreat as any).perBounceBack, undefined,
     "the recovery is Bounce Back's now, not a second value here");
 });
 
@@ -97,7 +106,7 @@ test("every blow-up is charged, however they fall", () => {
 
 test("switching Bounce Back off does not change what it charges", () => {
   const off = scorePlayer(card({ 1: 2 }), ABERDEEN_TEE_IV,
-    { ...DEFAULT_CONTESTS, bounceBack: null } as any);
+    { ...PLAYED, bounceBack: null } as any);
   assert.equal(off.contests.tripleThreat!.strokes, 0.5);
   assert.equal(off.contests.bounceBack, undefined);
 });
@@ -125,14 +134,14 @@ test("an unplayed hole is not a blow-up", () => {
 
 test("an empty card scores nothing", () => {
   const r = scorePlayer(
-    { name: "T", courseHandicap: 0, gross: PAR.map(() => null), picks: { ...SIX } } as any,
-    ABERDEEN_TEE_IV, DEFAULT_CONTESTS).contests.tripleThreat!;
+    { name: "T", courseHandicap: 0, gross: PAR.map(() => null), picks: { ...NINE } } as any,
+    ABERDEEN_TEE_IV, PLAYED).contests.tripleThreat!;
   assert.equal(r.strokes, 0);
   assert.equal(r.live, false);
 });
 
 test("switching it off leaves it off the card entirely", () => {
-  const r = scorePlayer(card(), ABERDEEN_TEE_IV, { ...DEFAULT_CONTESTS, tripleThreat: null } as any);
+  const r = scorePlayer(card(), ABERDEEN_TEE_IV, { ...PLAYED, tripleThreat: null } as any);
   assert.equal(r.contests.tripleThreat, undefined);
 });
 
@@ -143,7 +152,7 @@ test("the total is always a clean tenth", () => {
 
 test("it is switched off on its own, leaving Bounce Back running", () => {
   const r = scorePlayer(card({ 1: 2 }), ABERDEEN_TEE_IV,
-    { ...DEFAULT_CONTESTS, tripleThreat: null } as any);
+    { ...PLAYED, tripleThreat: null } as any);
   assert.equal(r.contests.tripleThreat, undefined);
   assert.equal(r.contests.bounceBack!.strokes, -1, "a recovery still pays");
 });

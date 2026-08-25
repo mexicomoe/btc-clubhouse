@@ -141,10 +141,10 @@ test("the one-man link parses back with holes and opponent intact", () => {
   const me = TEN[5];
   const back = FL.manFromUrl(FL.manLink(BASE, me.name, sixFor(me, TEN)));
   const chosen = back.man.six[0].name;          // he taps the first one
-  const message = `${me.name} — 2, 14, 3, 8, 7, 16\nHit List: ${chosen}`;
+  const message = `${me.name} — 7, 16, 3, 8, 13, 2, 14, 1, 10\nHit List: ${chosen}`;
   const { rows } = parseBirdiePicks(message, { names, slots: SLOTS });
   assert.deepEqual(rows[0].problems, []);
-  assert.deepEqual(rows[0].picks, { p4f: 2, p4b: 14, p3a: 3, p3b: 8, p5a: 7, p5b: 16 });
+  assert.deepEqual(rows[0].picks, { p5a: 7, p5b: 16, p3a: 3, p3b: 8, p3c: 13, p4f: 2, p4b: 14, p4c: 1, p4d: 10 });
   assert.equal(rows[0].hitList, chosen, "and the name he tapped comes back exactly");
 });
 
@@ -170,7 +170,7 @@ test("a pick naming a man who then drops out scores zero, not an error", () => {
   // the same thing seen earlier.
   const rows = E.computeLeaderboard([
     { name: "Marsden, Eli", courseHandicap: 0, handicapIndex: 18.7, hitList: "Gone, Man",
-      picks: { p4f: 2, p4b: 14, p3a: 3, p3b: 8, p5a: 7, p5b: 16 },
+      picks: { p5a: 7, p5b: 16, p3a: 3, p3b: 8, p3c: 13, p4f: 2, p4b: 14, p4c: 1, p4d: 10 },
       gross: ABERDEEN_TEE_IV.par.slice() },
   ], ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
   const c = rows[0].contests.hitList!;
@@ -184,7 +184,7 @@ test("a pick naming a man who then drops out scores zero, not an error", () => {
 test("a man with no reply scores nothing on the Hit List", () => {
   const rows = E.computeLeaderboard([
     { name: "Silent, Sam", courseHandicap: 0, handicapIndex: 18.7, hitList: "",
-      picks: { p4f: 2, p4b: 14, p3a: 3, p3b: 8, p5a: 7, p5b: 16 },
+      picks: { p5a: 7, p5b: 16, p3a: 3, p3b: 8, p3c: 13, p4f: 2, p4b: 14, p4c: 1, p4d: 10 },
       gross: ABERDEEN_TEE_IV.par.slice() },
   ], ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
   const c = rows[0].contests.hitList!;

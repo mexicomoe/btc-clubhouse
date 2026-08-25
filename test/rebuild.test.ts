@@ -1,16 +1,24 @@
 /**
- * THE REBUILD — the eleven tests the 15 August brief asks for, plus the
- * arithmetic each one rests on.
+ * THE REBUILD — the tests the 15 August brief asks for, plus the arithmetic
+ * each one rests on, RE-CUT for the four-contest game of 22 August.
  *
  * The base is ZERO. A man starts at 0 and the contests move him; the net total
  * no longer carries into the final. The measure is strokes under and over par,
  * and lowest wins.
+ *
+ * TWO CONFIGS RUN THROUGH THIS FILE and the difference between them matters.
+ * `score` uses the DEFAULTS — the four contests this club actually plays — and
+ * is what every "what does the board show" test asks. `scoreAll` switches the
+ * four that are off back on, and is what the sections below on Six Pack, Easy
+ * Street, Triple Threat and Bounce Back use: their code is left in place and
+ * has to keep working for the day one comes back, but a round on the defaults
+ * must not score them at all.
  */
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { ABERDEEN_TEE_IV, DEFAULT_CONTESTS } from "../src/courseConfig.ts";
+import { ABERDEEN_TEE_IV, DEFAULT_CONTESTS, PARKED_CONTESTS } from "../src/courseConfig.ts";
 import {
   scorePlayer, computeLeaderboard, birdiePickHoles, PICK_SLOTS, readPicks, nearestByIndex,
 } from "../src/scoring.ts";
@@ -18,30 +26,48 @@ import { skinsByGroup, skinValue, skinStrokes, skinsFormat, bestTwo } from "../s
 
 const C = ABERDEEN_TEE_IV;
 const PAR = C.par;
-/** The six slots, as a man would send them. */
-const SIX = { p4f: 2, p4b: 14, p3a: 3, p3b: 8, p5a: 7, p5b: 16 };
+/** The nine slots, in the order a man sends them: two par 5s, three 3s, four 4s. */
+const NINE = { p5a: 7, p5b: 16, p3a: 3, p3b: 8, p3c: 13, p4f: 2, p4b: 14, p4c: 1, p4d: 10 };
+/** Every contest switched on, for the four whose code is kept but not played. */
+const ALL = { ...DEFAULT_CONTESTS, ...PARKED_CONTESTS };
 
 /** A card that is level par off scratch unless told otherwise. */
 function card(over: Record<number, number> = {}, extra: Record<string, unknown> = {}) {
   const gross = PAR.map((par, i) => par + (over[i + 1] || 0));
-  return { name: "Test", courseHandicap: 0, picks: { ...SIX }, gross, ...extra };
+  return { name: "Test", courseHandicap: 0, picks: { ...NINE }, gross, ...extra };
 }
 const score = (c: any) => scorePlayer(c as any, C, DEFAULT_CONTESTS);
+/** The same card with the four parked contests switched back on. */
+const scoreAll = (c: any) => scorePlayer(c as any, C, ALL);
 
 /* ---- 1 · a full round scores to the documented total ---- */
 
 test("a level-par card off scratch scores exactly what the brief says", () => {
   const r = score(card());
-  // Nothing on any of the six picks, so the blank penalty bites.
+  // Nothing on any of the nine picks, so the blank penalty bites.
   assert.equal(r.contests.watchTheBirdie!.strokes, 0.5);
-  // The six left are par 24 and he made 24.
-  assert.equal(r.contests.sixPack!.strokes, 0);
   // 4, 5, 6 come to par 13, which is the −1 rung.
   assert.equal(r.contests.agonyAlley.strokes, -1);
-  // 11, 12, 13 are all net pars — three of three.
-  assert.equal(r.contests.easyStreet!.strokes, -1);
+  assert.equal(r.final, -0.5, "0.5 − 1 = −0.5");
+});
+
+test("a card settles on TWO contests and no more", () => {
+  // The whole of the cut, in one assertion. Six Pack and Easy Street are out of
+  // the game; Triple Threat and Bounce Back start off; the Hit List and Skins
+  // need a field. What is left on one card is two lines.
+  const r = score(card());
+  assert.deepEqual(Object.keys(r.contests), ["watchTheBirdie", "agonyAlley"]);
+  for (const key of ["sixPack", "easyStreet", "tripleThreat", "bounceBack"]) {
+    assert.equal((r.contests as any)[key], undefined, key + " — absent, not a zero");
+  }
+});
+
+test("the four that are off still score when a round switches them on", () => {
+  const r = scoreAll(card());
+  assert.equal(r.contests.sixPack!.strokes, 0, "the six left are par 24 and he made 24");
+  assert.equal(r.contests.easyStreet!.strokes, -1, "11, 12, 13 all net pars");
   assert.equal(r.contests.tripleThreat!.strokes, 0);
-  assert.equal(r.final, -1.5, "0.5 − 1 − 1 = −1.5");
+  assert.equal(r.contests.bounceBack!.strokes, 0);
 });
 
 test("the net total does not reach the final at all", () => {
@@ -51,62 +77,82 @@ test("the net total does not reach the final at all", () => {
   const a = score(card());
   const b = score(card({}, { courseHandicap: 18 }));
   assert.notEqual(a.net, b.net, "the nets differ, which is the point");
-  assert.equal(a.final, -1.5);
+  assert.equal(a.final, -0.5);
   assert.equal(typeof b.final, "number");
 });
 
 /* ---- 2 · Six Pack ---- */
 
-test("Six Pack is always six holes and always par 24, whatever the picks", () => {
+test("Six Pack is still six holes and still par 24 at nine picks", () => {
+  // THE ARITHMETIC SURVIVED THE CUT. Fifteen candidates less the nine he
+  // nominates leaves one par 5, one par 3 and four par 4s — par 24, exactly as
+  // twelve less six did. Every one of the 840 legal sets is tried.
   const legal = birdiePickHoles(C);
-  // Every combination of one par 4 a side and two par 3s and two par 5s.
+  const pick = (holes: number[], k: number): number[][] =>
+    k === 0 ? [[]]
+    : holes.flatMap((h, i) => pick(holes.slice(i + 1), k - 1).map((rest) => [h, ...rest]));
   let checked = 0;
-  for (const p4f of legal.p4f) for (const p4b of legal.p4b) {
-    for (let i = 0; i < legal.p3a.length; i++) for (let j = i + 1; j < legal.p3a.length; j++) {
-      for (let k = 0; k < legal.p5a.length; k++) for (let m = k + 1; m < legal.p5a.length; m++) {
-        const picks = { p4f, p4b, p3a: legal.p3a[i], p3b: legal.p3a[j],
-                        p5a: legal.p5a[k], p5b: legal.p5a[m] };
-        const r = score(card({}, { picks }));
+  for (const p5 of pick(legal.p5a, 2)) {
+    for (const p3 of pick(legal.p3a, 3)) {
+      for (const p4 of pick(legal.p4f, 4)) {
+        const picks = { p5a: p5[0], p5b: p5[1], p3a: p3[0], p3b: p3[1], p3c: p3[2],
+                        p4f: p4[0], p4b: p4[1], p4c: p4[2], p4d: p4[3] };
+        const r = scoreAll(card({}, { picks }));
         assert.equal(r.contests.sixPack!.strokes, 0, JSON.stringify(picks));
         assert.match(r.contests.sixPack!.detail, /par 24$/);
         checked++;
       }
     }
   }
-  assert.equal(checked, 3 * 3 * 3 * 3, "every legal set was tried");
+  assert.equal(checked, 840, "every legal set was tried");
 });
 
 test("Six Pack is raw net strokes to 24, up and down", () => {
-  // Holes 1, 9, 10, 15 are par 4s he did not pick; 17 the par 3; 18 the par 5.
-  assert.equal(score(card({ 1: 2 })).contests.sixPack!.strokes, 2);
-  assert.equal(score(card({ 1: 1, 9: 1, 17: 1 })).contests.sixPack!.strokes, 3);
+  // Holes 9, 11, 12, 15 are par 4s he did not pick; 17 the par 3; 18 the par 5.
+  assert.equal(scoreAll(card({ 9: 2 })).contests.sixPack!.strokes, 2);
+  assert.equal(scoreAll(card({ 9: 1, 11: 1, 17: 1 })).contests.sixPack!.strokes, 3);
   // A stroke on a leftover hole takes it back under.
-  const under = score(card({}, { courseHandicap: 4 }));
+  const under = scoreAll(card({}, { courseHandicap: 4 }));
   assert.ok(under.contests.sixPack!.strokes < 0, "strokes make the six left go under 24");
 });
 
-test("Six Pack needs the picks, or there is no “did not choose”", () => {
-  const r = score(card({}, { picks: undefined }));
+test("Six Pack needs ALL NINE picks, or there is no “did not choose”", () => {
+  const r = scoreAll(card({}, { picks: undefined }));
   assert.equal(r.contests.sixPack!.live, false);
   assert.equal(r.contests.sixPack!.strokes, 0);
+  // And a six-pick round stored under the old rules is short of three, which it
+  // says rather than scoring six leftovers against a par of 24.
+  const six = scoreAll(card({}, { picks: { p5a: 7, p5b: 16, p3a: 3, p3b: 8, p4f: 2, p4b: 14 } }));
+  assert.equal(six.contests.sixPack!.live, false);
+  assert.match(six.contests.sixPack!.detail, /needs all 9 picks/);
 });
 
 /* ---- 3 · Watch the Birdie ---- */
 
 test("a pick outside its slot list is refused, and the legal ones named", () => {
-  assert.throws(() => readPicks({ ...SIX, p3a: 13 }, C, "Ken"),
-    /hole 13 is not a legal first par 3 — 3, 8, 17/);
-  // 4 belongs to Agony Alley now and is nobody's candidate.
-  assert.throws(() => readPicks({ ...SIX, p5a: 4 }, C, "Ken"), /hole 4 is not a legal/);
+  // Hole 9 is a legal par 4 and no kind of par 3.
+  assert.throws(() => readPicks({ ...NINE, p3a: 9 }, C, "Ken"),
+    /hole 9 is not a legal first par 3 — 3, 8, 13, 17/);
+  // 4 belongs to Agony Alley and is nobody's candidate.
+  assert.throws(() => readPicks({ ...NINE, p5a: 4 }, C, "Ken"), /hole 4 is not a legal/);
 });
 
-test("the same hole in both par 3 slots is caught as a duplicate", () => {
-  // The two par 3 slots are offered the IDENTICAL three holes, so this is legal
+test("a tenth pick has no slot to go in", () => {
+  // There are nine keys and nothing reads a tenth, so an extra number is not
+  // half-applied — it is not applied at all. The paste is where a man is TOLD
+  // (see birdiePaste), and this is why it has nowhere to put it.
+  const read = readPicks({ ...NINE, p4e: 9 } as any, C, "Ken");
+  assert.equal(Object.keys(read).length, 9);
+  assert.equal((read as any).p4e, undefined);
+});
+
+test("the same hole in two par 3 slots is caught as a duplicate", () => {
+  // The three par 3 slots are offered the IDENTICAL four holes, so this is legal
   // for each slot on its own. Only the duplicate pass stands between a man and
   // being paid twice for one birdie.
-  assert.throws(() => readPicks({ ...SIX, p3a: 8, p3b: 8 }, C, "Ken"),
+  assert.throws(() => readPicks({ ...NINE, p3a: 8, p3b: 8 }, C, "Ken"),
     /hole 8 is nominated twice, as first par 3 and second par 3/);
-  assert.throws(() => readPicks({ ...SIX, p5a: 16, p5b: 16 }, C, "Ken"),
+  assert.throws(() => readPicks({ ...NINE, p5a: 16, p5b: 16 }, C, "Ken"),
     /hole 16 is nominated twice/);
 });
 
@@ -115,7 +161,7 @@ test("a net birdie pays 0.5 and a net eagle 1.5, never both", () => {
   assert.equal(score(card({ 2: -2 })).contests.watchTheBirdie!.strokes, -1.5);
 });
 
-test("nothing on any of the six costs half a stroke", () => {
+test("nothing on any of the nine costs half a stroke", () => {
   assert.equal(score(card()).contests.watchTheBirdie!.strokes, 0.5);
   assert.match(score(card()).contests.watchTheBirdie!.detail, /no net birdies/);
   // One birdie clears it entirely — the penalty is not charged alongside.
@@ -124,7 +170,7 @@ test("nothing on any of the six costs half a stroke", () => {
 
 test("holes 4 and 18 no longer pay double", () => {
   // 18 is still a legal par 5 pick; it simply pays what any other pick pays.
-  const r = score(card({ 18: -1 }, { picks: { ...SIX, p5b: 18 } }));
+  const r = score(card({ 18: -1 }, { picks: { ...NINE, p5b: 18 } }));
   assert.equal(r.contests.watchTheBirdie!.strokes, -0.5);
 });
 
@@ -133,14 +179,14 @@ test("holes 4 and 18 no longer pay double", () => {
 test("Easy Street counts net, so a gross bogey with a stroke is a par", () => {
   // Off 18 a man has a stroke on every hole, so gross bogeys on 11, 12 and 13
   // are three NET pars. On gross this scored nothing; on net it is the top rung.
-  const r = score(card({ 11: 1, 12: 1, 13: 1 }, { courseHandicap: 18 }));
+  const r = scoreAll(card({ 11: 1, 12: 1, 13: 1 }, { courseHandicap: 18 }));
   assert.equal(r.contests.easyStreet!.strokes, -1);
   assert.match(r.contests.easyStreet!.detail, /3 of 3 at net par or better/);
 });
 
 test("the Easy Street ladder is 2 / 1 / 0 / −1 by net pars made", () => {
   const at = (over: Record<number, number>) =>
-    score(card(over)).contests.easyStreet!.strokes;
+    scoreAll(card(over)).contests.easyStreet!.strokes;
   assert.equal(at({ 11: 1, 12: 1, 13: 1 }), 2, "no net pars");
   assert.equal(at({ 11: 1, 12: 1 }), 1, "one");
   assert.equal(at({ 11: 1 }), 0, "two");
@@ -155,40 +201,40 @@ test("Triple Threat fires on a net double, not a gross triple", () => {
   //
   // Off 18 a man has a stroke everywhere: a gross TRIPLE is a net double and
   // counts; a gross DOUBLE is only a net bogey and does not.
-  const triple = score(card({ 18: 3 }, { courseHandicap: 18 }));
+  const triple = scoreAll(card({ 18: 3 }, { courseHandicap: 18 }));
   assert.equal(triple.contests.tripleThreat!.strokes, 0.5);
-  const double = score(card({ 18: 2 }, { courseHandicap: 18 }));
+  const double = scoreAll(card({ 18: 2 }, { courseHandicap: 18 }));
   assert.equal(double.contests.tripleThreat!.strokes, 0);
 });
 
 test("off scratch a gross double IS the net double, and counts", () => {
-  assert.equal(score(card({ 18: 2 })).contests.tripleThreat!.strokes, 0.5);
+  assert.equal(scoreAll(card({ 18: 2 })).contests.tripleThreat!.strokes, 0.5);
 });
 
 test("Bounce Back pays 1.0, and only off a net double", () => {
   // TWO CONTESTS NOW, each with its own switch — but still the pair they were:
   // 0.5 charged for the blow-up, 1.0 paid for steadying the ship after it.
-  const r = score(card({ 1: 2 }));
+  const r = scoreAll(card({ 1: 2 }));
   assert.equal(r.contests.tripleThreat!.strokes, 0.5);
   assert.equal(r.contests.bounceBack!.strokes, -1);
   // A net BOGEY answered by a par pays nothing: there was no blow-up.
-  assert.equal(score(card({ 1: 1 })).contests.tripleThreat!.strokes, 0);
-  assert.equal(score(card({ 1: 1 })).contests.bounceBack!.strokes, 0);
+  assert.equal(scoreAll(card({ 1: 1 })).contests.tripleThreat!.strokes, 0);
+  assert.equal(scoreAll(card({ 1: 1 })).contests.bounceBack!.strokes, 0);
 });
 
 test("a blow-up on the 18th can only cost — there is no next hole", () => {
-  const r = score(card({ 18: 2 }));
+  const r = scoreAll(card({ 18: 2 }));
   assert.equal(r.contests.tripleThreat!.strokes, 0.5);
 });
 
 test("two net doubles running leave the first unanswered", () => {
-  const r = score(card({ 1: 2, 2: 2 }));
+  const r = scoreAll(card({ 1: 2, 2: 2 }));
   assert.equal(r.contests.tripleThreat!.strokes, 1, "both charged");
   assert.equal(r.contests.bounceBack!.strokes, -1, "only the second is answered");
 });
 
 test("a picked-up hole is a blow-up — it is a net double by definition", () => {
-  const r = score(card({}, { gross: PAR.map((p, i) => (i === 0 ? "X" : p)) }));
+  const r = scoreAll(card({}, { gross: PAR.map((p, i) => (i === 0 ? "X" : p)) }));
   assert.equal(r.contests.tripleThreat!.strokes, 0.5, "charged");
   assert.equal(r.contests.bounceBack!.strokes, -1, "and answered on hole 2");
 });
@@ -261,7 +307,7 @@ test("the field size decides the format", () => {
 function duel(mineIdx: number, theirsIdx: number, myOver: number, theirOver: number) {
   const mk = (name: string, index: number, over: number, target: string) => ({
     name, handicapIndex: index, courseHandicap: 0, hitList: target,
-    picks: { ...SIX }, gross: PAR.map((p, i) => p + (i === 0 ? over : 0)),
+    picks: { ...NINE }, gross: PAR.map((p, i) => p + (i === 0 ? over : 0)),
   });
   const rows = computeLeaderboard(
     [mk("Mine", mineIdx, myOver, "Theirs"), mk("Theirs", theirsIdx, theirOver, "Mine")] as any,
@@ -301,7 +347,7 @@ test("the band is decided by the OPPONENT, and 1.0 apart is still equal", () => 
 
 test("Hit List voids when the opponent has no complete round", () => {
   const mk = (name: string, holes: number, target: string) => ({
-    name, handicapIndex: 20, courseHandicap: 0, hitList: target, picks: { ...SIX },
+    name, handicapIndex: 20, courseHandicap: 0, hitList: target, picks: { ...NINE },
     gross: PAR.map((p, i) => (i < holes ? p : null)),
   });
   const rows = computeLeaderboard(
@@ -315,7 +361,7 @@ test("Hit List voids when the opponent has no complete round", () => {
 test("naming nobody, a stranger, or yourself all pay nothing", () => {
   const mk = (name: string, target: string) => ({
     name, handicapIndex: 20, courseHandicap: 0, hitList: target,
-    picks: { ...SIX }, gross: PAR.slice(),
+    picks: { ...NINE }, gross: PAR.slice(),
   });
   const rows = computeLeaderboard(
     [mk("A", ""), mk("B", "Nobody At All"), mk("C", "C")] as any, C, DEFAULT_CONTESTS);
@@ -348,7 +394,7 @@ test("an empty card is not scored and cannot lead the field", () => {
 
 test("a short card takes no place, however the numbers fall", () => {
   const mk = (name: string, holes: number) => ({
-    name, courseHandicap: 0, picks: { ...SIX },
+    name, courseHandicap: 0, picks: { ...NINE },
     gross: PAR.map((p, i) => (i < holes ? p : null)),
   });
   const rows = computeLeaderboard([mk("Short", 12), mk("Full", 18)] as any, C, DEFAULT_CONTESTS);

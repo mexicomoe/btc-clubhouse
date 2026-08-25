@@ -58,7 +58,7 @@ export interface BirdiePayout {
   /** What a net eagle or better pays. A hole pays this OR the birdie, never both. */
   eagle: number;
   /**
-   * What NOTHING on any of the six costs — the contest's only penalty side.
+   * What NOTHING on any of the nine costs — the contest's only penalty side.
    * Charged only once every pick has been played.
    */
   blank: number;
@@ -106,9 +106,21 @@ export interface BounceBackConfig {
 export interface SixPackConfig {
   /**
    * Always 24 at Aberdeen, and not by choice: the slot structure forces the
-   * leftovers to four par 4s, one par 3 and one par 5 for every player.
+   * leftovers to four par 4s, one par 3 and one par 5 for every player. Still
+   * 24 at nine picks — fifteen candidates less nine leaves the same six shapes
+   * that twelve less six did.
    */
   par: number;
+}
+
+/** How deep each minigame board runs. Not a contest; the boards' own setting. */
+export interface BoardsConfig {
+  /**
+   * How many men each contest's table shows. A FLOOR, never a ceiling: every
+   * man level with the last is shown as well, so a five-deep table runs to
+   * eight when six share third.
+   */
+  depth: number;
 }
 
 /** What one Hit List result pays. */
@@ -156,10 +168,27 @@ export interface ContestConfig {
   maxContestStrokes: number | null;
   /** Null switches Skins off; it then scores nothing and no group is read. */
   skins: SkinsConfig | null;
+  /** How deep the minigame boards run. Not a contest — never on a card. */
+  boards: BoardsConfig;
 }
 
 export const ABERDEEN_TEE_IV: CourseConfig = E.ABERDEEN_TEE_IV;
 export const DEFAULT_CONTESTS: ContestConfig = E.DEFAULT_CONTESTS;
+
+/**
+ * The values a switched-off contest comes back on at.
+ *
+ * Six Pack and Easy Street are cut from the game and Triple Threat and Bounce
+ * Back start off with a switch, so all four are `null` in DEFAULT_CONTESTS.
+ * These are the values each was last played on — what the rules screen restores
+ * when one is switched on, and what a test that still exercises one uses.
+ */
+export const PARKED_CONTESTS: {
+  sixPack: SixPackConfig;
+  easyStreet: Step[];
+  tripleThreat: TripleThreatConfig;
+  bounceBack: BounceBackConfig;
+} = E.PARKED_CONTESTS;
 
 /** Every Aberdeen tee: id → rating and slope for each gender. */
 export const ABERDEEN_TEES: Record<string, Record<Gender, TeeRating>> = E.ABERDEEN_TEES;

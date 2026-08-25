@@ -1,6 +1,10 @@
 # BEAT THE CROWD · CLUBHOUSE — BUILD BRIEF
 
-**For Claude Code. Version 1, 2026-07-30.**
+**Version 3, 2026-08-22.** Supersedes version 1 (30 July) and the 15 August rebuild.
+
+**This is now the specification of a built app, not a plan for one.** Everything below is what the code does. Where a decision was reversed, the old reasoning is kept and marked, because the reason a thing was tried is usually the reason it will be tried again.
+
+**What changed in version 3 — the cut to four contests.** The head pro read the rules and said the game was too complicated, and the numbers agreed with him: on Friday 21 August eight contests put seven men in **90% the same order** as the Stableford result. Four contests take the agreement with the net order from **89% down to 80%**. Watch the Birdie went from six picks to **nine**, and each contest gained a board of its own. See sections 2 and 4.
 
 ---
 
@@ -16,9 +20,9 @@ This is **not** the spectator game. Beat the Crowd has two products sharing one 
 
 **Nobody "plays" the Clubhouse game, and the app does not collect scores.** Golfers play golf. Scores are entered in **Golf Genius**, which the club already uses and which every player already knows. The app reads those scores in and shows what the contests did with them.
 
-**So this is a viewer, not a scorer.** Do not build hole-by-hole score entry — it would duplicate a system that already works and that nobody wants to use twice. The phone is a leaderboard.
+**So this is a viewer, not a scorer.** There is no hole-by-hole score entry — it would duplicate a system that already works and that nobody wants to use twice. The phone is a leaderboard.
 
-The one exception is **Watch the Birdie**, whose two hole picks are collected once before the round.
+Two things ARE collected before the round, and only two: a man's **nine Watch the Birdie holes** and the **one opponent he names on his Hit List**. Both arrive by text message, or through the pick sheet, and both are read into the app by pasting.
 
 ---
 
@@ -28,20 +32,26 @@ A single-page web app, installable to a phone home screen, that **works with no 
 
 **The audience is 70 and 80 year olds outdoors in Florida sunshine.** That is a hard design constraint, not a nicety:
 
-- Minimum 18px body text, 24px+ for scores
-- Tap targets no smaller than 48×48px
+- **Minimum 18px body text**, 24px+ for scores. Nothing renders below 18 anywhere, including inside the shared picture.
+- **Tap targets no smaller than 44px.** In practice nothing in the app is under 56.
 - Very high contrast; assume direct sun on a dim screen
 - No thin greys, no hairline type, no hover-dependent behaviour
+- **No sideways scrolling on any screen**
 - One thing per screen — the scorer is standing on a cart path
 
-**Not required for v1:** accounts, payments, a server, live sync between devices, Golf Genius integration.
+**Not required:** accounts, payments, a server, live sync between devices, Golf Genius integration.
+
+**There is no build step.** `engine.js` is the one implementation of the rules. The browser loads it with a classic `<script src>` so a double-clicked `file://` page works, where ES modules would be blocked; the TypeScript in `src/` imports it for its side effect and re-exports the API with types, so the tests run that exact code. **Never write a second copy of a rule.** `picks.html` kept its own hole table for a while and survived two rule changes only by being hand-edited twice; it now derives its boxes from the engine like everything else.
 
 ---
 
 ## 2. Scoring — complete and exact
 
 ### Setup per event
-Course par by hole, stroke index by hole, slope, course rating. Per player: name, handicap index, cart number, and their two Watch the Birdie hole picks.
+
+Per event: name, date, format, **handicap allowance**, and its own copy of the rules. Per player: name, handicap index, tee, sex, group (for skins), flight, **nine Watch the Birdie picks** and **one Hit List opponent**.
+
+**Nine tees and two stroke indexes.** Par is 72 from every Aberdeen tee and the holes do not move, so par and the Agony Alley stretch are shared. Rating and slope change with tee **and** sex, and the women play a different stroke index — which changes which holes receive strokes, and so changes every contest, not just the net total. A field can be spread across all of them in one round.
 
 **Course handicap** = `ROUND(index × slope ÷ 113 + (rating − par), 0)`
 *Verified against Golf Genius on 8 real players: exact match on all 8.*
@@ -50,7 +60,7 @@ Course par by hole, stroke index by hole, slope, course rating. Per player: name
 
 > **PLAYS OFF = ROUND(course handicap × allowance)**
 
-Two roundings, and the order is not interchangeable. It is not a small adjustment and it does not fall evenly: at 85% a 38 index off Tee IV goes from 33 shots to 28 while an 8 index off Tee I goes from 10 to 9. **It changes who wins.** Default 100%, set per event on the Setup screen, and show both figures wherever they differ — "CH 33 · plays off 28 at 85%".
+Two roundings, and the order is not interchangeable. It is not a small adjustment and it does not fall evenly: at 85% a 38 index off Tee IV goes from 33 shots to 28 while an 8 index off Tee I goes from 10 to 9. **It changes who wins.** Default 100%, set per event, and shown wherever the two figures differ — "CH 33 · plays off 28 at 85%".
 
 **Never apply it twice.** A course handicap printed on a Golf Genius card already has the event's allowance inside it. Use that figure exactly as it stands; cutting it again would take a man from 33 to 28 to 24 and cost him four more shots without a word.
 
@@ -64,161 +74,169 @@ Two roundings, and the order is not interchangeable. It is not a small adjustmen
 
 ### The final score
 
-> **FINAL = capped net score for the round − strokes earned in the contests**
-
-No arbitrary base number. Their net score is the anchor and contests reduce it. **Lowest wins.**
-
-**No floor by default.** The Tournament product protects a hard floor of 59; Clubhouse does not, because net scoring already keeps everyone near par. Make it a console setting — blank means no floor — so it can be switched on if a freak round ever prints something absurd. There is no maximum contest strokes, so nothing bounds a net 65 from below except what the contests can actually pay — measured at 5.6 across 111 real rounds.
-
-> **THERE IS NO CEILING. `maxContestStrokes` is null.**
+> **THE BASE IS ZERO. Every man starts at 0 and the contests move him from there.**
 >
-> It was 11.0, then 6.0, and is now gone. Nothing bounds a round from below except what the contests can actually pay.
+> **FINAL = strokes earned in the contests.** The net total does not carry into it at all.
+
+The measure is strokes under and over par, so a board reads **−5.2, −3.2, +1.1**, and a bare `4.0` would be read as a score rather than as four over. Lowest wins. Every value in the game is a multiple of **0.1** — no hundredths, they look wrong on a golf scoreboard.
+
+*This replaced `FINAL = net − strokes earned` on 15 August. On a net base the contests were a rounding error against a number in the seventies, and two men four strokes apart on the round could not be told apart by anything they had actually won.*
+
+**EIGHTEEN HOLES OR YOU ARE NOT SCORED.** A short card takes no final, no position, no skins and no place on anyone's Hit List; it is listed as not eligible with a reason. On a net base an unfinished card flattered itself because twelve holes of net total less than eighteen. On a zero base it scores near **nothing** — the contests simply never fire — so a man who never teed off would come out at exactly 0 and lead a field whose median round is −0.5. **He would win by walking in.** The rule survives the argument that produced it for a plainer reason: half a round is not a round.
+
+**There is no ceiling.** `maxContestStrokes` is null — the same signal Skins uses. On a zero base a man's final **is** his contest total, so a cap would be a cap on the score itself. The knob is left in the config so its absence stays a stated decision rather than a missing feature.
+
+**Ties are settled by the club's own match of cards**, and only genuinely level cards share a place: the back nine, then 13–18, then 16–18, then the 18th. The board says which — *"won on the back nine"*. Every contest pays in halves and tenths across a range of about six strokes, so equal finals are the norm rather than the exception.
+
+**Every contest is scored on ONE player's card**, with two exceptions that need the field and are settled across it: the **Hit List** (it needs the opponent's card) and **Skins**. Team size, team format and blinds are otherwise irrelevant — the group can be playing best-two-net, best-three-on-easy-holes or nothing at all and it makes no difference.
+
+### The four contests
+
+All thresholds live in a config object, never in code. **They travel with the event**: the round stores a *diff* against the defaults, the diff rides inside the event code, and a round scored in March still scores the same way in August.
+
+> **WHY FOUR AND NOT EIGHT.** Measured across 135 real rounds at Aberdeen, most of the eight were repeating the net score rather than adding to it:
 >
-> **At the current values, across 111 real rounds:** median 2.1, 90th 6.2, best 8.4, worst **−4.3**. Twenty cards of 111 — **18%** — finish worse than their net, because Agony Alley and Easy Street can both charge. Within a single field the best Clubhouse round beats the worst by **10.5 strokes on average, 11.6 at most**, against a net spread of 16 to 26 in the same fields. The contests are therefore about **half** as powerful as the net score itself.
+> | | How much it repeats the net score |
+> |---|---|
+> | Six Pack | +0.69 |
+> | Triple Threat | +0.67 |
+> | Agony Alley | +0.62 |
+> | Hit List | +0.57 |
+> | Watch the Birdie | +0.39 |
+> | Easy Street | +0.38 |
 >
-> Null means no cap, the same signal Skins uses. The knob is left in the config rather than deleted, so putting a ceiling back is a one-line edit and its absence is a stated decision rather than a missing feature.
->
-> **What the ceiling was covering up is still true.** The four ladders were each calibrated on its own and they are **correlated** — a strong net round clears several top rungs at once. Cutting every value shrinks the symptom without touching the cause. That still wants its own calibration pass.
+> Eight contests put seven men in 90% the same order as the Stableford result. Cutting to four takes the agreement with the net order from **89% to 80%**, and narrows the field's spread from 10.0 strokes to **6.3** — which is the cut doing what it was for. A game a club pro cannot follow in under a minute is not a game the club will play.
 
-**Every contest is scored on ONE player's card.** Team size, team format and blinds are irrelevant to Clubhouse — the group can be playing best-two-net, best-three-on-easy-holes or nothing at all and it makes no difference. Cart Skins is the only team element in the product. Do not build team aggregation.
+---
 
-### The six contests
+**1 · Watch the Birdie** — **nine** holes nominated before the round, settled one by one.
 
-All thresholds must live in a config object, not in code. They are calibrated from a small sample and *will* change.
+> `net birdie −0.5 · net eagle −1.5 · nothing on any of the nine +0.5`
 
-**Every value in the game is a multiple of 0.1.** No hundredths — they look wrong on a golf scoreboard. If a proposed threshold produces 0.75, round it to a tenth rather than allowing the third decimal in.
+A hole pays the **best single result on it**: a net eagle pays the eagle rate and does not also collect the birdie underneath it. **A net par pays nothing.**
 
-**1 · Watch the Birdie** — **six** holes nominated before the round: a par 3, a par 4 and a par 5 on each nine.
-`net birdie −0.8 · net eagle −1.5`, per nominated hole. **Holes 4 and 18 pay double** — 1.6 and 3.0.
+**The blank is the contest's only penalty side.** Without it, nominating holes was free and could only ever help. It is charged only once every pick has been **played** — a man cannot be charged for failing to birdie a hole he never stood on.
 
-Hole 4 was measured over 111 rounds as the worst par 5 to nominate by a distance: hole 7 was worth 2.3× it, so nobody rational picked 4 and its slot was a formality. Doubling makes the choice a choice. Hole 18 was already the best of its pair; doubling it makes 18 the pick of the back nine.
+**Nine picks in three slots: two par 5s of three, three par 3s of four, four par 4s of eight.** 840 possible sets, and every slot is a real choice.
 
-A hole pays the **best single result on it**. A net eagle pays 1.0 and does not also collect the 0.5 underneath it. A net par pays nothing.
+| Slot | Legal at Aberdeen | Pick |
+|---|---|---|
+| Par 5 | 7, 16, 18 | **two of three** |
+| Par 3 | 3, 8, 13, 17 | **three of four** |
+| Par 4 | 1, 2, 9, 10, 11, 12, 14, 15 | **four of eight** |
 
-Paid **per pick**, not by counting them, so a hard hole can later be made worth more than an easy one without touching code. An unplayed nominated hole scores 0. Works on a partial round.
+**Front and back no longer matter to any slot.** The par 4s were split one a side when six of them remained; with Easy Street out of the game there are eight, and dividing them again would only take choices away.
 
-The legal holes are derived from the course's par and its barred list, never hardcoded:
+**Only Agony Alley's three holes are barred.** Rob's reason for barring the stretch rather than sharing it: no man at Aberdeen would nominate 4 or 5 in any case, so offering them offers nothing. **Twelve of the eighteen are now in play** — Agony Alley's three and the nine a man picks.
 
-| Slot | Aberdeen |
-|---|---|
-| front par 3 | 3, 8 |
-| front par 4 | 1, 2, 9 |
-| front par 5 | 4, 7 |
-| back par 3 | 13, 17 |
-| back par 4 | 10, 14, 15 |
-| back par 5 | 16, 18 |
+The legal holes are derived from the course's par and its barred list, **never hardcoded**. The validation rule is by **par, not by slot**: every par must keep MORE holes than it has picks. Three par 3s drawn from three holes leaves every slot with three to choose from and the man with no choice at all — the old per-slot rule passed that without a word.
 
-**Holes 5, 6, 11 and 12 are barred.** 5 and 6 are Agony Alley's par 4s. Hole 4 is an Agony Alley hole too and stays legal, because the front nine has only two par 5s and barring it would leave hole 7 as the only one — a slot with one legal hole in it is not a choice. Hole 13 stays for the same reason. **The rule is that every slot keeps at least two holes in it.**
+**THE VALUES DID NOT MOVE WHEN THE COUNT DID**, and that was tested rather than assumed. At these rates the contest repeats the net score at **+0.48**, the least of any of the four, and fires on **86% of rounds** against 74% at six picks. Birdie at −0.4 with a +0.8 blank comes in at +0.58.
 
-Reject a hole outside its slot's list, by name. Reject the same hole nominated twice — and say *that*, not "not a legal front par 4", because the six lists never overlap so a duplicate is always illegal for one of them and the duplicate is what the man actually did.
+**Nothing is paid for a net par**, also tested: paying 0.2 for one takes the repetition of the net score from +0.51 to **+0.73**. Net pars are common — four a round across nine picks — so counting them is close to counting how well a man played, which is the net score's job and not this one's.
 
-**Six net eagles is 6.0. That ceiling is arithmetic, not a target** — do not tune against it. Across both calibration rounds the best card takes 1.5 and the field averages 0.7.
+*The doubling on holes 4 and 18 is gone. It was printed on the card and changed nobody's behaviour — 8 of 10 still took hole 7 and 9 of 10 still took 16 — so it was paying extra for choices men were making anyway.*
 
-**Picks arrive by text**, one man a line: `Ridgeway, Ken — 8, 2, 4, 13, 14, 16`. Six bare numbers, always in slot order. Nothing in the line says which is which, so the order is the whole of the format and any other count of numbers is refused rather than guessed at. A block of those lines is pasted in together and read back before anything is applied. **A name is matched, never guessed** — and the first-name-plus-initial rule is accepted only when the line was written that way, or a misspelled surname would reduce to its first letter and write silently to the wrong man's card.
+**Every slot of a par is handed the identical list**, so no hole falls in one slot alone. It used to be true that every hole fell in at most one slot, which is why nominating a hole twice was *also* illegal for one of them and either check caught it. **That is no longer so, and the duplicate pass is now the only thing** standing between a man and being paid twice for one birdie. It runs first, and its message says *"hole 8 is nominated twice"* rather than *"not a legal first par 3"* — which is a baffling thing to be told about a line that plainly says 8 twice.
+
+**Picks arrive by text**, one man a line:
+
+```
+Ridgeway, Ken — 7, 16, 3, 8, 13, 1, 2, 9, 10
+```
+
+**Nine bare numbers, always in slot order: two par 5s, three par 3s, four par 4s.** Nothing in the line says which is which, so **the order is the whole of the format** and any other count of numbers is refused rather than guessed at. A block of those lines is pasted in together and read back before anything is applied. **A name is matched, never guessed** — and the first-name-plus-initial rule is accepted only when the line was written that way, or a misspelled surname would reduce to its first letter and write silently to the wrong man's card.
 
 **Picks can be DRAWN for a man who never sent his in — a toggle, off by default.** Watch the Birdie is a contest of nerve: a man says in advance which holes he fancies, and a drawn set is not a choice. What drawing stops is an empty contest reading as a bad round on the board, which is a different thing and worth fixing.
 
-The draw takes one legal hole per slot at random from the same lists the form offers, so a drawn set is indistinguishable from a chosen one *by the rules* — every hole legal, the bar list respected, no hole twice.
+The draw takes one legal hole per slot at random from the same lists the form offers, **without replacement**, so a drawn set is indistinguishable from a chosen one *by the rules*. It happens **once, when the scores go in**, and is written to the player — drawing afresh on every render would give a man different holes each time the board was looked at, which is not a game. A man who chose even one slot is left alone: a half-filled card is still a choice.
 
-It happens **once, when the scores go in**, and is written to the player. Drawing afresh on every render would give a man different holes each time the board was looked at, which is not a game. A man who chose even one slot is left alone: a half-filled card is still a choice.
+**The board always says which.** A drawn man's row reads *"picks drawn"* beside his net. The mark survives an edit to anything else — a corrected tee does not mean he chose his holes — and goes the moment a pick itself is changed, because then it is his.
 
-**The board always says which.** A drawn man's row reads *"picks drawn"* beside his net, and his own screen says his holes were drawn rather than chosen. The mark survives an edit to anything else — a corrected tee does not mean he chose his holes — and goes the moment a pick itself is changed, because then it is his.
+> **NOTHING NEEDED MIGRATING WHEN SIX BECAME NINE.** Six of the nine slot keys ARE the old keys — `p4f` and `p4b` were the front and back par 4 and are now simply the first and second, so a hole stored under the old rules is still a legal par 4. Every round already on a phone and every event code already messaged to somebody reads correctly, arriving with three empty slots. A code written by the new app still reads on a phone that has not updated: the three new slots are **appended past the end** of the player row, so an old reader sees the six it knows about.
+>
+> *A round stored with the original two-pick form also still opens: front and back were both par 4s, so they become par 4 slots. A pick on a hole since barred is **dropped rather than refused** — it was chosen under the old rules and there is nothing to guess at, and refusing would take a played round off a man's phone. Hole 13 travels the other way: barred while Easy Street owned it, and legal again now.*
 
-*A round stored with the two-pick form still opens: front and back were both par 4s, so they become the par 4 slots. A pick on a hole since barred is dropped rather than refused — it was chosen under the old rules and there is nothing to guess at.*
+---
 
-*Replaced Call Your Number, which rewarded hitting a predicted number rather than playing well — a man could profit from a bad score.*
+**2 · Agony Alley** — the net total across the course's hardest stretch, holes **4, 5, 6** at Aberdeen, par 13.
 
-**2 · Agony Alley** — net total across the course's hardest stretch (holes 4-5-6 at Aberdeen, par 13).
-`≤12 → −3.8 · 13 → −2.3 · 14 → −0.8 · 15 → 0 · 16 → +1.5 · 17+ → +2.3`
-**The only contest that can add strokes.** Stretch holes are per-course config. Requires all stretch holes played.
+> `≤12 → −2.0 · 13 → −1.0 · 14–15 → 0 · 16 → +1.0 · 17+ → +2.0`
 
-**3 · Damage Control — SWITCHED OFF.** Triple Threat replaced it, together with Bounce Back. Count of net doubles or worse.
-`0 → −2.0 · 1 → −1.0 · 2 → −0.5 · 3+ → 0`
-The fairest contest in the set — correlation with handicap is +0.05. Works on a partial round.
+Requires all three holes played — the contest can penalise, and a man must not be charged for holes he never stood on. Stretch holes are per-course config. Structure unchanged since version 1; the values were rescaled when the base moved to zero.
 
-**4 · Easy Street** — pars or better on holes **11, 12, 13**, counted on **GROSS**.
-`no par → +0.8 · one → 0 · two or more → −0.8`
+*Players believe 12 and 13 are unreachable. They are wrong — 12% of rounds clear 12 and 26% clear 13.*
 
-**Par or better counts as ONE.** A birdie is a par for this purpose, so a lone birdie is a count of one and pays nothing, and a birdie beside a par is two rather than three. Three pays the same as two.
+---
 
-**The only hole contest graded on gross.** Every other one runs on net, where a high handicap receives strokes; here he does not, so the contest runs mildly against him — r = +0.24 with index over 111 rounds. That is the design, not an accident of it. It is also why dropping Go Long and Get Shorty (r = −0.29, and pure credit — neither could ever penalise) moved the six-contest bundle from r = −0.02 to r = +0.13, and every FINAL up by about **0.8 strokes**.
+**3 · Hit List** — before the round each man privately names **one opponent** and backs himself to post the better 18-hole net score.
 
-**All three holes must be played.** The contest can penalise, and a man must not be charged +0.5 for failing to par holes he never stood on — the same reason Agony Alley waits for its stretch. A picked-up hole IS played, and is not a par.
+> | | he wins | they tie | he loses |
+> |---|---|---|---|
+> | Against a **lower** index (a better player) | −1.1 | −0.2 | +0.3 |
+> | Against an **equal** index (within 1.0) | −0.9 | +0.1 | +0.3 |
+> | Against a **higher** index | −0.7 | +0.1 | +0.5 |
 
-*Replaced Go Long and Get Shorty, which it succeeds outright.*
+**PRICED BY THE OPPONENT'S BAND**, because head-to-head net is not a coin flip once a man chooses his opponent. Across all in-field pairings it is 46.6% win / 46.6% loss / 6.7% tie — but backing yourself against a **higher** index wins 54% and against a **lower** index only 39%. Flat pricing would make picking the weakest man on the list the only sane move.
 
-**5 · Triple Threat** — a gross triple bogey or worse, and the answer to it.
-`gross triple or worse → +0.5 · a **bounce back** off it, a net par or better on the very next hole → −0.9`
+At the prices above, picking the better player returns **−0.20** on average and picking the weaker **−0.09**. Backing yourself against the good player is the better bet, but only just: a real choice rather than an obvious one.
 
-**The second half keeps the name of the contest it absorbed.** Bounce Back used to stand on its own and 31% of its scores were already being paid twice — a gross triple is usually a net bogey and a net par usually satisfies both. It is one contest now, and the half that answers the damage is still called what it always was. A card reads *"2 triples, 1 bounce-back"*.
+**A man has to enter it.** `drawMissing` is false and is meant to stay false. Drawing missing *picks* is a different matter — choosing holes affects nobody else. Naming an opponent puts another man in it, and a drawn opponent would collect the reward for a gamble the player never took. **If it works when he ignores it, he learns he never needs to reply.**
 
-*The bounce back used to be exactly twice the penalty. Scaling by 1.5 took 0.45 to 0.5 and left 0.9 alone, so it is now 1.8× — two triples with one bounce back comes to a tenth against the man rather than nothing.*
+**The opponents offered are the players nearest his own index** — the Setup screen offers eight, the texted invitation carries six. A short field offers everybody. A man with no index has nobody to be near, and a man who did not finish is off every list because the pick would be void anyway.
 
-**It replaced Damage Control and Bounce Back**, which are now null. It is the same idea as both in one contest: the gross triple is the damage and the net par on the next hole is the bounce back, scored as one event rather than two that overlapped — 31% of Triple Threat's recoveries were already paying Bounce Back for the same two holes. Their ladders and graders stay in the code; null means not scored, not shown, not exported, and their CSV columns stay writing blank.
+**It is settled across the whole field, not inside a flight.** A man may name anyone in the round, which is what the picking screen already offers him; an engine that then refused a cross-flight opponent would be disagreeing with the screen that suggested him. It voids if either card is short — and the board says **whose**, because "void" reads as an excuse when it was the player himself who walked in.
 
-> **It does not carry their weight, and that is measured, not guessed.** Over 111 real rounds Damage Control paid −0.58 a round and Bounce Back −0.31, together **−0.89**. Triple Threat pays **+0.02** — it penalises 29 rounds, rewards 34 and leaves 48 alone. Switching the two off therefore takes about nine tenths of a stroke of credit off every card and puts nothing back.
+---
 
-**One flat rate for everybody**, no handicap bands. Over 111 rounds three of forty men would have qualified for a high-handicap tier, and they made *fewer* triples than the band below them — a tier catching three men on a reconstructed index is not a tier.
+**4 · Skins** — **the format is decided by the size of the field, not by a switch.**
 
-The two halves are read differently on purpose: **the damage is gross, the recovery is net.** Steadying the ship is what is being asked for, and a 24-handicap should not have to match a scratch card to do it.
+| Field | Format |
+|---|---|
+| under 8 | no skins at all |
+| 8 to 15 | **Cart Skins** — grouped by cart |
+| 16 or more | **Team Skins** — grouped by team |
 
-**A picked-up hole is never a triple.** It shows a gross of par + 4 and would otherwise clear the bar, which would mean a Stableford round charging a man for the one thing Stableford tells him to do.
+One engine either way; only the membership changes. The app calls it a **group** throughout for that reason. Skins can still be switched off for a round, under the rules with every other contest.
 
-A triple on the 18th can only cost — there is no next hole. Consecutive triples leave the first without a bounce back.
+> **A GROUP'S SCORE ON A HOLE IS ITS BEST TWO NET BALLS, added. Not the average.**
+>
+> Averaging punished bigger groups badly. Measured over 33 real groups, a pair won **1.62×** a fair share, a threesome 1.07× and a foursome **0.85×** — a threesome took 25% more than a foursome, because skins go to the lowest score and averaging fewer balls produces more extreme ones. Best two cuts the spread to **1.12×**: every group contributes exactly two scores whatever its size.
+>
+> **A man on his own counts his ball twice.** Left with one ball against everyone else's two he took 0.22× a fair share — he was not playing the same contest. Counting it twice gives 1.06×.
 
-*Overlaps Bounce Back by design: 31% of Triple Threat recoveries also score a bounce-back, the same two holes paying twice.*
+Lowest group score wins the hole. **A tied hole is not won by anybody and NOTHING CARRIES OVER.** Ignore any player who did not play that hole.
 
-**6 · Bounce Back — SWITCHED OFF.** Triple Threat replaced it, together with Damage Control. A net bogey or worse, answered by a **net birdie or better** on the very next hole.
-`3+ → −1.5 · 2 → −1.0 · 1 → −0.5 · 0 → 0`
-Consecutive holes only. Both must be played.
+**A FIXED POT of 4.0, divided among however many skins were actually won**, so the whole contest is worth the same every week whatever falls — a typical 11 skins makes one worth about 0.36, a lean 7 makes it 0.57. It can no longer outgrow the other contests in a big field, which is what the old per-skin value with a cap on top was there to stop.
 
-*Retuned.* It used to need a net **double** to recover from, which made it punish good play: the fewer net doubles a man made the fewer chances he got, so a round without one could not score it at all. Ten of sixty-three real rounds were shut out and the correlation with making net doubles was **+0.69** — the opposite of what Damage Control rewards, in the same six-contest set. On the same sixty-three rounds the rule above shuts nobody out, **30% clear two or more**, and the handicap correlation falls to **−0.09**.
+**With a floor: a skin is never worth less than 0.4.** One skin takes the whole 4.0, four are worth 1.0 each, and at ten the division reaches the floor and stops there — eleven skins are still 0.4 each, and so are eighteen. **Above ten the pot is therefore not fixed**: eighteen skins pay out 7.2 between them rather than 4.0. That is deliberate. A hole won is a hole won, and on a busy day the men should not each find their skins quietly worth less than the round before.
 
-**Go Long and Get Shorty are switched off.** Easy Street replaces both. The ladders and the grader stay in the code — they were calibrated and may come back — but null in the config means not scored, not shown, not exported. Their CSV columns stay too, writing blank: the archive workbook already holds rounds under them, and a column that disappears shifts every one to its right. The two new contests are appended after Skins, so only `Final` moves — column 64 to 66.
+The per-skin figure is rounded to a **hundredth** before it multiplies up, because it is printed on the Skins tab and a man checking five skins against it must reach the number the board paid him. Totals are then in tenths like everything else. **Every player in a winning group takes the full per-skin amount**; it is not divided among them.
 
-  · *Go Long, retired* — net vs par across the par 5s. `≤−1 → −1.5 · 0 → −1.0 · +1 → −0.5 · +2 or worse → 0`
-  · *Get Shorty, retired* — net vs par across the par 3s. `≤−2 → −1.5 · −1 → −1.0 · 0 → −0.5 · +1 or worse → 0`
+*Jay's league already plays low net best 2 balls, so the format is familiar.*
 
-**7 · Skins** — see the skins section. A skin is worth `1.2 × groups ÷ 18`, capped at **3.8**.
+**One group out on its own wins nothing.** Skins is group against group, and a group with nobody to beat would take every hole by default.
 
-### Skins — by cart or by team
+### Kept in the code, not in the game
 
-**One engine, two groupings. A setting decides which.**
+Null means **not scored, not shown, not exported** — absent from the card entirely, never a zero, which would read as *"he scored nothing on it"*.
 
-| Grouping | Members | When |
+| | Status | Value if switched on |
 |---|---|---|
-| **Team** | 3 or 4 players | **The common case.** The club plays team matches whenever there are 3+ teams. |
-| **Cart** | 2 players, sometimes 1 | Less often. Build it, but it is not the default. |
+| **Six Pack** | **Cut.** No switch on the rules screen. | the leftover holes against par 24 |
+| **Easy Street** | **Cut.** No switch on the rules screen. | `0 net pars → +2 · 1 → +1 · 2 → 0 · 3 → −1` |
+| **Triple Threat** | **Off by default, with a switch.** Kept for testing later in the year. | +0.5 a net double bogey |
+| **Bounce Back** | **Off by default, with a switch.** | −1.0 a net par or better on the hole straight after one |
+| **Damage Control** | Retired. Triple Threat absorbed it. | — |
+| **Go Long / Get Shorty** | Retired. Easy Street replaced them. | — |
 
-One field on the player carries whichever it is, and the app labels it **Group**.
+**Six Pack's arithmetic survived the cut**, which is why its par is still 24: fifteen candidate holes less the nine a man nominates leaves one par 5, one par 3 and four par 4s, exactly as twelve less six did. It was the worst offender in the table above at +0.69, and it was structurally coupled to Watch the Birdie — it *was* the holes a man did not pick.
 
-The logic is identical either way — only the membership changes. Do not write two implementations.
+**Easy Street's three holes are worth more back in Watch the Birdie than they were as a contest.** Barring 11, 12 and 13 was what forced the par 4 slots down to six holes; giving them back is what makes the par 4 slot eight deep and the par 3 slot four, and every slot a real choice.
 
-**A cart's score on a hole is the AVERAGE of its players' net scores, not the total.** This matters: totals break completely with uneven groups — in testing, a three-man team beat four-man teams on all 18 holes. Averaging is self-correcting.
+**A contest that is off by default has no values in `DEFAULT_CONTESTS` to restore.** They live in `PARKED_CONTESTS` — what the rules screen puts back when one is switched on, at exactly what it was last played on, so turning Triple Threat on in November scores the round it would have scored in August.
 
-Lowest cart average wins the hole. **Tied holes carry over** — the next hole is worth two skins, then three, and so on. Ignore any player who didn't play that hole.
-
-**An odd man rides alone. Do not build a blind partner for him.** Tested over 3,000 simulated rounds: riding alone wins 1.13× what a two-man cart wins — near enough fair. Every blind tested made it *worse*, because a constant partner strips out the variance that wins skins. A flat net-bogey blind was catastrophic at 0.14×.
-
-**A three-man team needs no blind either.** Averaging already handles it. The club uses a blind in its own best-two-ball match; that is a different game and nothing to do with this.
-
-**Skins needs an ON/OFF switch in the console.** Some rounds the groups won't divide sensibly and the organiser will want to skip it.
-
-**Skins now scores into FINAL.** Previously it sat outside the total, which made it a sideshow.
-
-> **a skin is worth `1.2 × groups ÷ 18`, to the hundredth**
-
-So −0.13 a skin over two groups, −0.27 over four, −0.40 over six, −0.80 over twelve: worth *less* in a small field and more in a large one.
-
-That is the value at which an **even share of the eighteen on offer is worth 1.2 whatever the size of the field**. Over two groups an even share is nine skins; over twelve it is one and a half. It is the flatness that makes the figure defensible: a group that does its fair share is worth the same to the day whether four are out or twelve.
-
-The per-skin figure is rounded to a hundredth *before* it multiplies up, because it is printed on the Skins tab and a man checking five skins against it must reach the number the board paid him. Totals are then in tenths like everything else.
-
-**Capped at 2.5 — the same as Agony Alley's most.** This is the one figure that cannot be reasoned out from a fair share, because *the winner is never on a fair share*. The best group's haul barely moves with the field: over twenty thousand shuffles of the club's own cards it is six or seven skins over four groups and six or seven over twelve, because more groups both split the eighteen finer and give more chances for one group to run hot, and the two cancel. So the winner's pay would climb with the field even though a fair share's does not — 1.3 at four groups, 3.2 at twelve, against Agony Alley's hardest-earned 2.5. The cap holds Skins level with the other contests.
-
-Where it bites, by field size: **never** at two or three groups (a rout of all eighteen pays 1.6 and 2.3); **14 skins** at four; 10 at six; 7 at eight; 5 at twelve. At the sizes this club plays it is slack — 14 skins is past the 99th percentile of anything in the record — so winning more still pays more all the way up. In a very large field it binds on the ordinary winner, which is the point.
-
-**A "group" is whatever the round is played in** — carts of two some weeks, teams of four others. One engine either way; only the membership changes. The app calls it a **group** throughout for that reason.
+*Historical values, for whoever brings one back: Damage Control counted net doubles or worse (`0 → −2.0 · 1 → −1.0 · 2 → −0.5 · 3+ → 0`) and was the fairest contest in the set at r = +0.05 with handicap. Go Long ran net vs par across the par 5s and Get Shorty across the par 3s; both were pure credit — neither could ever penalise — and together ran r = −0.29 with index.*
 
 ---
 
@@ -226,51 +244,97 @@ Where it bites, by field size: **never** at two or three groups (a rout of all e
 
 | Case | Behaviour |
 |---|---|
-| Player quits after 12 holes | Everything still scores. A contest that can't be judged returns 0 and says why — Agony Alley needs its stretch holes, Go Long and Get Shorty need their par 5s and par 3s, and an unplayed Watch the Birdie pick simply doesn't pay. |
-| Nine-hole event | Same. Show which contests are live. |
-| One-man cart | Averaging handles it. No blind, no special case — measured at 1.13× fair. |
+| Player quits after 12 holes | Everything still scores and is shown, but he takes **no final and no position** — eighteen holes or you are not eligible. A contest that cannot be judged returns 0 and says why. |
+| A man picks up | Golf Genius prints `X`. Scores **net double**, set directly so it holds at every handicap. The hole still counts as played, so an X'd card is a full round and can win. Shown as X, never as the par + 4 filled in behind it. |
 | A hole scored worse than net double | Capped to net double before anything else runs. |
-| Odd number of players | Organiser assigns cart numbers; a cart of one is legal. |
 | A hole not yet played | Blank, never zero. Zero is a score. |
-| A player picks up | Golf Genius prints `X`. Scores **net double**, set directly so it holds at every handicap. The hole still counts as played, so an X'd card is a full round and can win. Shown as X, never as the par + 4 filled in behind it. |
-| Score typed wrong | Every entry must be editable at any time, and everything recomputes. |
-| Two players tie | Show the tie. Do not invent a tiebreak in v1. |
+| An unplayed Watch the Birdie pick | Pays nothing, and **stops the blank penalty being charged** until every pick has been played. |
+| Odd number of players | A group of one is legal and counts its ball twice. |
+| Under 8 players | No skins. The tab says so rather than showing an empty table. |
+| One group out on its own | No skins — there is nobody to play against. |
+| A man names nobody on his Hit List | Scores nothing, and is **not on the Hit List board at all** — he is not last in it, he is not in it. |
+| A man names somebody who did not finish | Void, and the table says it was the *other* man's card that was short. |
+| Two players tie | The card match settles it: back nine, 13–18, 16–18, the 18th. Genuinely level cards **share the place** and the board says so. |
+| A pick on a hole barred after he chose it | Dropped, not refused. The card says *"6 of 9 picks"* rather than claiming nine. |
+| Score typed wrong | Every entry is editable at any time and everything recomputes from the scores already stored. No card is ever re-entered. |
 
 ---
 
 ## 4. Screens
 
-**Setup** — organised by how often a thing is touched, not by how it was built. Every feature added to this screen wanted a place at the top of it, and unchecked that makes a wall of controls to scroll past to reach the one job the screen is actually for.
+**Leaders — this is the product.** Final score, sorted, biggest type on the screen. Tap a player for his contest breakdown.
 
-*Always out:* the two figures checked first — **how many players, and whether the cards have come in** — then the player list, **+ Add player** and **Paste a list of players**.
+Below the leaderboard, **a board of its own for each contest in play**, and then every Hit List duel in the round.
+
+> **THIS IS WHAT CUTTING TO FOUR BUYS.** With eight contests the screen had room for the final and nothing else, and a contest was a number in a column on a detail screen nobody opened. With four there is room to say who won each one — so a man who finished eleventh overall can still have taken Agony Alley, and hear about it in the bar rather than never.
+
+**Each board is ranked on the contest, not on the final**, and tied on the contest's own terms. `placeField` settles the round on a match of cards, which says nothing about who played hole 4 better.
+
+| Board | Tiebreak, in order |
+|---|---|
+| Watch the Birdie | most net birdies, then the eagle |
+| Agony Alley | best net on hole 4, then hole 5, then hole 6 |
+| Hit List | the **higher** handicap index wins, then the bigger margin |
+| Team Skins | none — it is already shown hole by hole on its own tab |
+
+The board names what separated them — *"won on hole 4"* — and hangs it on the man who **won**. Written the other way round it reads as an accusation.
+
+*The Hit List's higher-index rule is the opposite of a golfer's instinct and is meant to be: two men who both beat their man are separated by which of them had less business doing it. A man with no index recorded is treated as the lowest, because a missing figure must not win a tie.*
+
+*At the current values "then the eagle" can never fire — a birdie is −0.5 and an eagle −1.5, so two men level on strokes and level on birdies are level on eagles too. It is in the documented order because the values are adjustable.*
+
+**THE DEPTH IS A FLOOR, NEVER A CEILING.** Five by default, adjustable on the rules screen because **five means something different at eight players than at eighty**. Every man level with the last one shown is shown as well, and the board says so — *"5 deep · 6 tied for 3rd, all shown"*. Cutting a tie off at five looks broken, and ties are the norm: on an average round **2.5 men share the top of Agony Alley, 2.8 the Hit List and 4.3 Team Skins**.
+
+**The boards see the whole field**, before any flight filter. Flights divide the placings and the card match and nothing else — the contests are graded against fixed thresholds and Skins and the Hit List are settled field-wide.
+
+**The Hit List results table is separate from its top five, and is the whole table rather than a cut of it.**
+
+```
+Wallach beat Teitelbaum by 4
+Finkelstein beat Smith by 2
+Rob lost to Teitelbaum by 1
+```
+
+**This is the most repeatable thing in the game** — a sentence a man says in the bar — and it is **the reveal**: nobody knows who named whom until it is published. Biggest margin first, because it is read aloud and the heaviest beating is the one worth leading with. **Two men who named each other make two lines**; they are two separate bets, priced separately by each man's band, and one can be void while the other stands. Duels that never came off are still listed, with the reason.
+
+**Setup** — organised by how often a thing is touched, not by how it was built.
+
+*Always out:* **how many players, and whether the cards have come in** — then the player list, **+ Add player**, **Paste a list of players**, **Open the pick sheet**, **Paste birdie picks** and **Set the Hit List**.
 
 *Folded away,* shut on arrival and remembering whatever was left open (a property of the device, not of the event, so it never travels in an event code):
 
-- **Event settings** — which event, name, date, format, handicap allowance, skins on or off.
-- **Move this event** — export a CSV, copy, paste, open a .btc file, delete.
-- **About** — the build line and enough to answer "is it me or is it the phone?" over a telephone.
+- **Event settings** — which event, name, date, format, handicap allowance
+- **The rules** — every contest value this round is played under
+- **The roster** — the men who play, round after round
+- **Send the invitations** — one message a man
+- **Move this event** — export a CSV, copy, paste, open a `.btc` file, delete
+- **About** — the build line and enough to answer "is it me or is it the phone?" over a telephone
 
 Each shut heading carries a line saying what is inside, so the allowance and the skins switch — both of which move every man's score — can be read without opening anything.
 
-*A player row shows name, handicap index and tee, and nothing else.* Group, flight, picks, GHIN and sex all live in the player's own form, one tap away. At twenty-four rows every extra word costs a line. Offer only the legal par 4s for each nine so an invalid pick cannot be entered. Course handicap displays as it's computed — the played figure where a card supplied one, labelled as played. Editable at any point.
+*A player row shows name, handicap index and tee, and nothing else.* Group, flight, picks, GHIN and sex live in the player's own form, one tap away. At twenty-four rows every extra word costs a line.
 
-**Colour helps the eye find things and is never the signal.** The three headings are tinted so they can be found by shape and place; a row with something missing is tinted amber with an amber bar — *and says the word "missing" followed by what is missing*. A man who cannot tell the tint from white in Florida sun loses nothing.
+**Colour helps the eye find things and is never the signal.** A row with something missing is tinted amber with an amber bar — *and says the word "missing" followed by what is missing*. A man who cannot tell the tint from white in Florida sun loses nothing.
 
-**Import scores** — a paste box. See section 10 for the exact format. Show what was parsed before committing anything, so a bad paste is caught immediately. Re-pasting replaces the round; it never merges.
+**The rules** — every contest value, with the default beside anything that has moved. **It says why the cut contests are off**, or in November somebody will wonder. A round not on the defaults is marked on the board, in the shared link and in the export, naming what was changed.
 
-Partial rounds must import cleanly — blanks mean not played, and blank is never zero.
+**Import** — a paste box. See section 10. Show what was parsed before committing anything. Re-pasting replaces the round; it never merges.
 
-**Leaderboard — this is the product.** Final score, sorted, biggest type on the screen. Tap a player for his contest breakdown. Readable at arm's length in direct sun by someone wearing reading glasses.
+**Skins** — totals by group, then hole by hole. A hole nobody won says so.
 
-**Cart Skins** — skins by cart, carryovers visible. A hole worth four skins should look like it.
+**The pick sheet** (`picks.html`) — three boxes, nine taps, a name, and one button that opens Messages with the line already written. It is the only page a player ever sees. Its boxes are **built from the engine's slot table**, never typed out.
 
 ---
 
 ## 5. Data and storage
 
-Local storage on the device. One event at a time in v1. An export button (JSON or CSV) so a round can be sent on — that export is also how calibration data gets collected, so include gross scores, handicaps, stroke index and course details.
+Local storage on the device, **several events at once** — the club plays Friday and Saturday. Each keeps its own players, scores, flights and **its own rules**.
 
-No server, no accounts, no sync. Those come later if the product proves out.
+> **THE SETTINGS LIVE IN THE EVENT, NOT IN BROWSER STORAGE.** That was the sticking point: browser storage means the laptop and the phone disagree and there is no server to reconcile them. In the event it is free — the event code already carries a round between devices, so the rules go with it, and a round scored in March still scores the same way in August because it carries the rules it was played under.
+>
+> **What is stored is a DIFF, not a copy.** A full config is 648 characters of JSON and would add **860** to an event code; one changed contest adds **40**. A round on the defaults stores nothing at all.
+
+**Moving an event between devices** is a `BTCCLUB1:` code — one unbroken line, pasteable into a message. Player rows are **positional and nothing in them ever moves**: every field added since has been appended past the end, so a code written by this app still reads on a phone that has not updated, and a code written by an older one still reads here. Eight players is about 1,200 characters, twenty-four about 3,500.
 
 ### Sharing a finished round
 
@@ -278,105 +342,104 @@ Until this existed, the result of a round was the organiser reading numbers alou
 
 > ⚠️ **THE LINK DOES NOT SURVIVE iOS MESSAGES, AND CANNOT BE MADE TO.**
 >
-> Measured on the club's own phone with a ladder of valid links at known lengths: **154, 159, 190 and 219 characters arrived first time. 250 and 299 each failed once and arrived only on a second attempt. 350 failed twice.** The break sits between 299 and 350 and the band from 250 up is *flaky* — sometimes it goes, sometimes it doesn't.
+> Measured on the club's own phone with a ladder of valid links at known lengths: **154, 159, 190 and 219 characters arrived first time. 250 and 299 each failed once and arrived only on a second attempt. 350 failed twice.** The break sits between 299 and 350 and the band from 250 up is *flaky*.
 >
-> A ten-man round is about 750 characters. Deflate would take it to roughly 480; dropping the contest breakdown entirely takes it to about 380; both together, about 310. **Every one of those is still inside the unreliable band, and a link that works on the second try is not good enough for the men.**
->
-> Three things were tried and none of it was the cause: the marker's colon (it looked like a URI scheme), percent-encoding of the fragment, and the `#` itself. Moving to a query string did not fix it either. It is length.
+> A ten-man round cannot get under 250 while still carrying the contest breakdown. Three things were tried and none was the cause: the marker's colon, percent-encoding of the fragment, and the `#` itself. **It is length.**
 
-**1 · Send the board as a picture.** The leaderboard drawn onto a canvas and handed to the share sheet as a PNG. **An image has no length limit in any messenger**, so this is the one that always arrives, and it is what a man texts. It carries the board and nothing else — there is nothing to tap into, so no per-player breakdown.
+**1 · Send the board as a picture.** The leaderboard drawn onto a canvas and handed to the share sheet as a PNG. **An image has no length limit in any messenger**, so this is the one that always arrives, and it is what a man texts. **It carries the minigame boards and every duel as well** — those go in the picture rather than being left to a link the men may never open.
 
-**2 · Copy the link, for e-mail.** Unchanged, and it still carries everything: every contest value, every placing, tappable. E-mail has never had the problem.
+**2 · Copy the link, for e-mail.** It carries the per-player breakdown a picture cannot. E-mail has never had the problem.
 
-The picture is laid out in `boardimage.js` as a list of drawing operations that touch no canvas, so the whole arrangement is testable without a browser. Its palette and type sizes are lifted from `clubhouse.css` — a canvas has no cascade, so they are repeated, and a test holds the two copies together. Nothing in it is drawn below the **18-point floor**: a long name shrinks to the floor, then loses its surname to an initial, then is clipped rather than allowed to run into the final beside it.
+The picture is laid out in `boardimage.js` as a list of drawing operations that touch no canvas, so the whole arrangement is testable without a browser. Its palette and type sizes are lifted from `clubhouse.css` — a canvas has no cascade, so they are repeated, and a test holds the two copies together. Nothing is drawn below the **18-point floor**: a long name shrinks to the floor, then loses its surname to an initial, then is clipped rather than allowed to run into the final beside it.
 
-**There is no server. The round travels inside the link**, in a query string after `?r=`.
+**Results, not a round.** The event code carries SETUP and the far end scores it again. That is wrong for a shared link three times over: it needs the engine on a page that must never reach it; it would rescore against the *reader's* settings, so a link would change its numbers whenever a threshold moved; and it costs the eighteen holes nobody reads on a phone. So the finished figures travel — **already settled, including the placing and the phrase that broke any tie** — because the far end has no cards to run a card match on and must not guess at one.
 
-**Results, not a round.** The event code of section 5 carries SETUP and the far end scores it again. That is wrong here three times over: it needs the engine present on a page that must never reach it; it would rescore against the *reader's* settings, so a link would change its numbers whenever a threshold moved; and it costs the eighteen holes nobody reads on a phone. So the finished figures travel — name, course handicap, gross, net, what each contest paid, final — **already settled, including the placing and the phrase that broke any tie**, because the far end has no cards to run a card match on and must not guess at one.
+**The contest list in a shared link is addressed by INDEX, so it may only ever be APPENDED to.** Reordering it would silently re-label every contest on every link already sent. The cut contests keep their slots; a new link simply never references them.
 
 **`results.html` is read-only by construction, not by a flag.** It loads `display.js` and `results.js` and nothing else — no engine, no importer, no exporter, no storage. There is nothing on the page to score with and no route into setup, whatever anyone does to the address. It shares `clubhouse.css` and `display.js` with the app so the two cannot drift apart and look like different products.
 
-> ⚠️ **A shared link is OBFUSCATED, NOT ENCRYPTED.**
->
-> Nothing is legible in the address bar — the payload is base64, so a forwarded text gives away no member names at a glance. But anyone who pastes it into a decoder has the names and scores back in seconds. **Treat a shared link as public.**
->
-> That is the right trade here: it is a golf leaderboard, the same names and scores are already on the club's Golf Genius portal, and a password to type would defeat the one thing the link is for.
-
-**Size.** The payload is delimited text rather than JSON — JSON spends a quote on every name and cost four players off the top of the field. Strokes travel as tenths, as whole numbers. The last three fields of a row are written as nothing when they say the ordinary thing and then cut off the end.
-
-The ceiling is **2,000 characters for the whole URL**. That is not a browser limit — Safari and Chrome take fragments of 64 KB — but the point at which a messaging app stops agreeing where a link ends. The payload is base64**url** (`A–Z a–z 0–9 - _`) because a `+` or `/` is exactly where that goes wrong.
+> ⚠️ **A shared link is OBFUSCATED, NOT ENCRYPTED.** Anyone who pastes it into a decoder has the names and scores back in seconds. **Treat a shared link as public.** That is the right trade: it is a golf leaderboard, the same names and scores are already on the club's Golf Genius portal, and a password to type would defeat the one thing the link is for.
 
 > ⚠️ **THE ROUND RIDES IN A QUERY STRING, NOT A FRAGMENT — and that was forced.**
 >
-> It began in the fragment, where nothing is sent to a server. A link sent by e-mail worked; the same link sent by text did not.
+> It began in the fragment, where nothing is sent to a server. A link sent by e-mail worked; the same link sent by text did not. The marker `BTCR1:` has the exact shape of a **URI scheme**, which lets a link detector end the `https` URL at the `#`; it became `BTCR1_`, which nothing percent-encodes. **It was not enough. iOS Messages ends the link at the hash, whatever follows it.**
 >
-> The first suspect was the marker's colon. `BTCR1:` has the exact shape of a **URI scheme**, which lets a link detector end the `https` URL at the `#` and drop the rest as a second unknown-scheme URI; and a sender that percent-encodes writes `BTCR1%3A`, which a literal marker match no longer finds. The marker became `BTCR1_` — an underscore is in the base64url alphabet, is not a scheme separator, and nothing percent-encodes it.
->
-> **It was not enough.** The message arrives in two pieces — the address on one line, everything from the `#` on the next — and only the address is tappable. **iOS Messages ends the link at the hash, whatever follows it.** So there is no hash in the link any more.
->
-> **The cost was accepted deliberately.** A query string IS sent to the server, so every shared round — every member's name and every score — now appears in GitHub Pages' request logs. That is the price of the link working at all, and it is the second reason to treat a shared link as public. Length did not decide it: a query string is two characters longer than a fragment and 24 players still comes to about 1,750.
+> **The cost was accepted deliberately.** A query string IS sent to the server, so every shared round appears in GitHub Pages' request logs. That is the price of the link working at all, and the second reason to treat a shared link as public.
 
-The payload must stay one unbroken run of `[A-Za-z0-9_-]`. **Do not put a colon, a slash, a dot, a hash or an ampersand in a link that has to survive a messenger.**
+The payload must stay one unbroken run of `[A-Za-z0-9_-]`. **Do not put a colon, a slash, a dot, a hash or an ampersand in a link that has to survive a messenger.** It is base64**url** for that reason. The ceiling is **2,000 characters** for the whole URL — not a browser limit, but the point at which a messaging app stops agreeing where a link ends. **Above it the button says so and refuses**, naming the length and the limit; a truncated link is worse than no link, because it looks like it worked.
 
-The reader stays defensive about the rest of the trip: it percent-decodes first, accepts the old `BTCR1:` and `BTCR1%3A` markers, and still reads a **fragment** — links made before the move are already in people's messages, and on a phone that does not mangle them they work perfectly.
-
-| Field | Real names, real scores |
-|---|---|
-| 8 players | **680** characters — 34% of the limit |
-| 15 players | **1,160** — 58% |
-| 24 players (the app's maximum) | **1,788** — 89% |
-
-Worst case — every contest paying, so no value is a short "0" — the ceiling is **23 players at a 14-character average name**, 24 at 12 characters, 21 at 19. **Above it the button says so and refuses**, naming the length and the limit, rather than handing over an address that will arrive cut in half. A truncated link is worse than no link, because it looks like it worked.
-
-**No compression, deliberately.** Deflate would roughly halve these figures, but `CompressionStream` is needed at *both* ends and a man on an older phone would tap the link and get nothing. Plain base64 works on anything with a browser.
+**No compression, deliberately.** Deflate would roughly halve the figures, but `CompressionStream` is needed at *both* ends and a man on an older phone would tap the link and get nothing.
 
 **A wrong or truncated link fails with a sentence**, never an empty leaderboard — which a man would read as "nobody scored" and repeat in the bar.
 
+### The roster and the invitations
+
+The roster outlives a round: the men who play, week after week, with their index, tee, GHIN and mobile number. A round is built by picking from it rather than typing sixteen men in again.
+
+**One invitation a man**, carrying his own name and his own six Hit List opponents and nothing else — because a man's opponents are the six nearest *his* index, and a page with no idea who is playing cannot work that out. The screen tracks who has been sent one, and says **"his six have CHANGED — send again"** when the field moves under him.
+
+**It is a snapshot.** The field is baked in when the link is made. Men who join or drop out afterwards are not in it, so the page carries the date it was made and says so.
+
 ---
 
-## 6. What already exists
+## 6. What exists
 
-- **A TypeScript scoring engine**, 44 tests passing, built for the Tournament product. Shares the concepts: hole-by-hole scoring, category bars, a graded stretch ladder. Some is reusable; the club net-scoring logic is new.
-- **A scoring spreadsheet** (`BtC_Clubhouse_Scoring.xlsx`) implementing every rule above and verified against real scores. **Treat it as the reference implementation.** If the app and the spreadsheet disagree, the spreadsheet is right until proven otherwise.
-- **Calibration data**: one round, Aberdeen, Tee IV, 16 players, indexes 20.8–38.1, 19 December 2026.
+| File | What it is |
+|---|---|
+| `engine.js` | **The one implementation of every rule.** Course config, handicaps, all contests, skins, the Hit List, the card match, the minigame boards. |
+| `importer.js` | The Golf Genius paste parser, the roster paste, the birdie-picks paste |
+| `exporter.js` | The CSV, the event code, the export signature |
+| `results.js` | The shared-link payload |
+| `fieldlink.js` | The field and the one-man invitation, packed into a link |
+| `boardimage.js` | The leaderboard as a picture |
+| `display.js` | Formatting and text measurement shared by the app and the shared view. **Knows how to score nothing.** |
+| `leaderboard.html` | The app |
+| `picks.html` | The pick sheet a player sees |
+| `results.html` | The read-only shared view |
+| `src/*.ts` | Typed re-exports of the above, so the tests run the exact code the browser loads |
+| `test/*.test.ts` | **589 tests.** `npm test` |
+
+**A scoring spreadsheet** (`BtC_Clubhouse_Scoring.xlsx`) implements the version-1 rules and was the reference implementation up to the 15 August rebuild. **It is now historical** — it does not know the zero base, nine picks, the Hit List or the pot. The engine and its tests are the reference now.
 
 ---
 
 ## 7. What is not decided
 
-- **Thresholds are provisional.** One round, one tee, no single-digit handicaps, no women. They will move. Keep them in config and make them easy to change.
-- **Whether six contests is too many.** The likely launch set is three — Agony Alley, Damage Control, Watch the Birdie. Build all six; make it trivial to switch them off.
-- **Flights.** The club plays in flights and off different tees. Not yet designed.
-- **Scrambles.** Charity events are usually scrambles with no individual hole scores. Team-level scoring is sketched, not specified. This is the one place team aggregation would ever be needed.
+- **Whether four is the right four.** Agony Alley repeats the net score at +0.62 and the Hit List at +0.57 — higher than Watch the Birdie's +0.48. Four was chosen for what a club pro can follow, not for the correlation table alone. Watch what happens over a few Saturdays.
+- **Whether Triple Threat and Bounce Back come back.** They are parked, not deleted, and switching one on is one tap. Test them late in the year against a season of cards rather than 135 rounds.
+- **The Hit List has two knobs and one screen.** `offers` (how many the Setup screen lists) is editable; `offer` (how many ride in a texted invitation) is not. They can disagree, and nothing says so.
+- **Scrambles.** Charity events are usually scrambles with no individual hole scores. Sketched in `Scramble_Design.md`, not specified. The one place team aggregation would ever be needed.
+- **Single-digit handicaps and women's tees** are still thin in the data. Both are supported in full; neither is well calibrated.
 
 ---
 
-## 8. Build order
+## 8. Working on it
 
-1. Config, course setup, handicap and net-score maths — **test against the spreadsheet before anything else**
-2. Score entry screen
-3. Leaderboard with the six contests
-4. Cart skins
-5. Export
-6. Offline and installability
+There is no build step and no bundler. `npm test` runs everything.
 
-**First milestone:** load the 19 December Aberdeen round and produce results matching the spreadsheet exactly — including the one player whose net is capped from 77 to 76. Nothing else counts until that passes.
+**The one rule: `engine.js` is the single source.** A page derives from it — `E.PICK_SLOTS`, `E.birdiePickHoles`, `E.DEFAULT_CONTESTS` — and never restates a value. Recalibrating a threshold is a one-line edit that reaches the leaderboard, the export, the shared link and the tests at once.
+
+**To preview:** serve the directory (`python3 -m http.server`) and open `leaderboard.html`. It also works from a double-clicked file, which is why the engine is a classic script rather than a module.
+
+**Two whole classes of bug do not show up in the tests**, and both have bitten: a contest switched **off** on a screen that then reaches into its null config, and a value box whose "the default was…" reference is null. **Drive the actual app after changing the rules screen.**
+
+---
 
 ## 9. The reference numbers
 
-The eight lowest-index players from 19 December, scored by the spreadsheet. Any build must reproduce these.
+The eight lowest-index players from **19 December**, Aberdeen, Tee IV. Any build must reproduce these.
 
-**The course, which you cannot derive from any data file — Aberdeen Golf & Country Club, Tee IV:**
+**The course, which you cannot derive from any data file:**
 
 ```
 par by hole    4 4 3 5 4 4 5 3 4 4 4 4 3 4 4 5 3 5     (total 72)
-stroke index    9  5 17 1 3 7 13 15 11  6 10  8 16 14  4 12 18  2   (Golf Genius, men)
+stroke index   9  5 17  1  3  7 13 15 11  6 10  8 16 14  4 12 18  2   (Golf Genius, men)
 slope 117 · course rating 65.3 · Agony Alley = holes 4, 5, 6
 ```
 
 **The stroke index is essential and appears in no export.** Net *totals* come out right whatever index you assume — a 19-handicap gets 19 strokes wherever they fall — but every contest depends on *which* holes receive them. **Matching net totals with mismatched contests means the stroke index is wrong.** That is the single most likely failure in this build.
 
-**Use Golf Genius's allocation, not the printed card.** The two disagree on ten holes, and Golf Genius's is the one that computes the net actually posted against these rounds. The switch was measured across the club's cards: the contests are unmoved — same clear rates, correlations within 0.02 — and of the sixteen reference finals only one moves at all (Finn, section 11). The women play a different allocation again:
+**Use Golf Genius's allocation, not the printed card.** The two disagree on ten holes, and Golf Genius's is the one that computes the net actually posted. The switch was measured across the club's cards: the contests are unmoved — same clear rates, correlations within 0.02. The women play a different allocation again:
 
 ```
 men      9  5 17  1  3  7 13 15 11   6 10  8 16 14  4 12 18  2
@@ -385,35 +448,34 @@ women    9 11 17  1  3  7  5 15 13   4 12 16 18  8  6 10 14  2
 
 **Source data:** `Hole by Hole Excel Export -- Spreadsheet Composer.xlsx`. Hole columns are **gross**. Do not use the TGIF file for these eight — it is a different round, different players, and its hole columns are net.
 
-| Player | Index | Course hcp | Gross | **Picks** | Net (capped) | Strokes off | FINAL |
+**A single card settles on exactly two contests** — the Hit List and Skins need a field, so neither appears here. **Both halves are pinned beside the final**, which is a stronger test than the old one: a card whose final came out right by two errors cancelling would now have to get both halves right as well.
+
+| Player | Index | CH | Gross | Net | Watch the Birdie | Agony Alley | **FINAL** |
 |---|---|---|---|---|---|---|---|
-| Abe Whitfield | 25.2 | 19 | 92 | 3,1,4,13,10,16 | 73 | 4.70 | **68.30** |
-| Ben Castellan | 24.8 | 19 | 93 | 8,2,7,17,14,18 | 74 | 4.20 | **69.80** |
-| Cy Ashford | 24.0 | 18 | 93 | 3,9,4,13,15,16 | 75 | 1.60 | **73.40** |
-| Dan Pemberton | 26.4 | 21 | 95 | 8,1,7,17,10,18 | 74 | 1.80 | **72.20** |
-| Gus Thornbury | 25.4 | 20 | 97 | 8,9,7,17,15,18 | 76 | 4.30 | **71.70** |
-| Eli Marsden | 23.6 | 18 | 92 | 3,2,4,13,14,16 | 74 | 0.40 | **73.60** |
-| Hal Brightwater | 25.1 | 19 | 95 | 3,1,4,13,10,16 | 76 | -2.80 | **78.80** |
-| Ike Calloway | 20.8 | 15 | 94 | 8,2,7,17,14,18 | 79 | 0.40 | **78.60** |
+| Abe Whitfield | 25.2 | 19 | 92 | 73 | −0.5 | −1.0 | **−1.5** |
+| Ben Castellan | 24.8 | 19 | 93 | 74 | −1.0 | −2.0 | **−3.0** |
+| Cy Ashford | 24.0 | 18 | 93 | 75 | −1.0 | 0.0 | **−1.0** |
+| Dan Pemberton | 26.4 | 21 | 95 | 74 | −2.5 | 0.0 | **−2.5** |
+| Eli Marsden | 23.6 | 18 | 92 | 74 | −2.5 | 0.0 | **−2.5** |
+| Gus Thornbury | 25.4 | 20 | 97 | 76 | −1.0 | −1.0 | **−2.0** |
+| Hal Brightwater | 25.1 | 19 | 95 | 76 | −0.5 | +1.0 | **+0.5** |
+| Ike Calloway | 20.8 | 15 | 94 | 79 | +0.5 | 0.0 | **+0.5** |
 
-**The picks are an input, not something you can compute** — and the ones above are invented. See the warning in section 11: the club recorded no Watch the Birdie picks for this round, so these are demo values and every FINAL in the table depends on them. Watch the Birdie paid: Abe −0.9 · Gus −0.9 · Dan −0.6 · Ben −0.3 · Cy −0.3 · Eli −0.3 · Ike −0.3, and nothing to Hal. **Hal finishes 1.10 strokes WORSE than his net** — the contests can now cost a man more than they pay him.
+> ⚠️ **The picks are an input, not something you can compute, and the ones used here are invented.** The contest postdates this round, so the club recorded none. They were assigned **mechanically** — each of the nine slots walking its own legal holes in finishing order — and were not chosen to produce any result. Change a single pick and the finals move. See `test/scoring.test.ts`.
 
-**Chip and Grady finish level on 80.20 in section 11** — a tie settled by the card match of section 8.
+**The gross, the handicaps and the net are untouched by any rule change** and are still the real December figures. That is the point of pinning them: they were the same before the cut and are the same after it.
+
+- **Gus Thornbury is the cap test:** his uncapped net is 77, capped to 76.
+- **Ike Calloway has the lowest handicap in the group and finishes last.** That is the game working, not a bug.
+- **Ike is also the blank test:** no net birdie on any of his nine, so +0.5.
 
 **Cart assignments for the skins check:** 1, 1, 2, 2, 3, 3, 4, 4 in the order Ike, Eli, Cy, Ben, Hal, Abe, Gus, Dan.
-
-Gus Thornbury is the test case for the cap: his uncapped net is 77.
-Hal Brightwater is the test case for the penalty: **+1.0** on Agony Alley.
-Ike Calloway has the lowest handicap in the group and finishes last — that is the game working, not a bug.
-
-Cart Skins with carts 1-1-2-2-3-3-4-4 in that order: **4, 5, 2, 7** — eighteen skins, all accounted for.
-
 
 ---
 
 ## 10. The Golf Genius export — the real format
 
-The organiser downloads the event leaderboard from Golf Genius. It arrives as a **legacy `.xls`** (OLE2, not modern xlsx — `SheetJS` reads both; `openpyxl` does not). It contains several sheets; the one to read is the low-net leaderboard, named something like **"Holes season - low net"**.
+The organiser downloads the event leaderboard from Golf Genius. It arrives as a **legacy `.xls`** (OLE2, not modern xlsx — SheetJS reads both; openpyxl does not). Read the low-net leaderboard sheet, named something like **"Holes season - low net"**.
 
 **Layout, verified against a real 18-player export:**
 
@@ -433,89 +495,101 @@ The organiser downloads the event leaderboard from Golf Genius. It arrives as a 
 
 Verified: Sid Ferndale's 18 holes sum to 72, which matches the Net column. His Total column reads 90, and 90 − 18 (his handicap) = 72.
 
-**What this means for the build:**
-
-- **No stroke index is needed.** Golf Genius has already applied the strokes. Do not recompute them and do not subtract twice.
-- **Par by hole is still needed** — every contest measures net against par, and the net double bogey cap is par + 2.
+- **No stroke index is needed** for a net paste. Golf Genius has already applied the strokes. Do not recompute them and do not subtract twice.
+- **Par by hole is still needed** — every contest measures net against par, and the cap is par + 2.
 - **Gross comes from the Total column**, and it is the figure to reconcile against Golf Genius.
-- **The export carries no Watch the Birdie picks.** They are a setup input and must be married to the imported card by player name.
+- **The export carries no picks and no Hit List.** Both are setup inputs, married to the imported card by player name.
 - A net 1 on a par 3 is a net 1, **not a hole in one.**
 
 ### Preferred input
 
-**Paste, not file upload.** The organiser selects the player rows in the open spreadsheet and copies — that puts tab-separated text on the clipboard, which is trivial to parse and needs no `.xls` reader in the browser. Accept a file drop as a convenience later; do not build it first.
+**Paste, not file upload.** The organiser selects the player rows in the open spreadsheet and copies — that puts tab-separated text on the clipboard, which is trivial to parse and needs no `.xls` reader in the browser.
 
 ### Parsing rules
 
-- Split the handicap out of the name with a trailing-parenthesis match; keep the name for display and the number for reference only.
+- Split the handicap out of the name with a trailing-parenthesis match; keep the name for display and the number for reference.
 - Ignore the Out, In and Net columns; recompute everything from the 18 hole values so a bad export is caught rather than trusted.
-- **A blank cell means the hole was not played. An `X` does not.** Golf Genius prints X where a man picked up; that hole **was** played and scores **net double** — what picking up means. Any mark that isn't a number reads the same way. Set the net directly, do not reach it through an imputed gross: a 38 index off Tee I is a course handicap of 47, which is three shots on half the card, and par + 4 less three shots comes in *under* net double and credits a bogey for picking up. A gross of par + 4 is still filled in, but only so the round has a gross total to show.
+- **A blank cell means the hole was not played. An `X` does not.** Golf Genius prints X where a man picked up; that hole **was** played and scores **net double**. Set the net directly, do not reach it through an imputed gross: a 38 index off Tee I is a course handicap of 47, which is three shots on half the card, and par + 4 less three shots comes in *under* net double and credits a bogey for picking up. A gross of par + 4 is still filled in, but only so the round has a gross total to show.
 - **A picked-up hole counts towards the eighteen.** A man who X'd three holes went round and can win; walking in after twelve is a different thing and is not eligible. Getting this wrong quietly disqualifies him.
-- Show an X as an X, never as the par + 4 that was filled in, or somebody will read it as a score he made.
-- A card with an X on it cannot be summed against Out/In/Total, so gross and net cannot be told apart by arithmetic — the organiser is asked which the columns are rather than the paste being called broken.
-- Sheet 1 of the same file holds Golf Genius's own skins result — a free cross-check on the Cart Skins maths.
-
+- Show an X as an X, never as the par + 4 filled in behind it.
+- A card with an X on it cannot be summed against Out/In/Total, so gross and net cannot be told apart by arithmetic — **the organiser is asked which the columns are** rather than the paste being called broken.
+- Sheet 1 of the same file holds Golf Genius's own skins result — a free cross-check.
 
 ---
 
 ## 11. A second test round — 31 July, real scores
 
-Eight cards from the club, handicaps 14 to 34 — a far wider spread than section 9. **Use this as a second test.** An engine that reproduces both has been proven on independent data.
+Eight cards from the club, handicaps 14 to 34 — a far wider spread than section 9. **An engine that reproduces both has been proven on independent data.** This is also the round the app opens on before anything has been entered.
 
 Same course (Aberdeen, Tee IV). Hole-by-hole **gross**:
 
 ```
 Hole      1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18
 Par       4  4  3  5  4  4  5  3  4  4  4  4  3  4  4  5  3  5
-Alex       5  5  3  6  5  5  6  3  5  7  5  5  4  4  6  6  3  7
+Alex      5  5  3  6  5  5  6  3  5  7  5  5  4  4  6  6  3  7
 Boyd      6  5  4  7  6  5  7  4  5  6  6  5  4  5  7  4  4  6
-Chip     6  5  4  8  6  5  5  4  5  5  6  3  5  6  6  5  4  6
-Dex      5  5  4  6  6  6  7  3  5  4  4  6  3  6  6  6  6  5
-Emmet      6  5  3  7  7  6  5  3  5  4  5  5  3  5  6  7  3  6
+Chip      6  5  4  8  6  5  5  4  5  5  6  3  5  6  6  5  4  6
+Dex       5  5  4  6  6  6  7  3  5  4  4  6  3  6  6  6  6  5
+Emmet     6  5  3  7  7  6  5  3  5  4  5  5  3  5  6  7  3  6
 Finn      5  6  6  7  5  4  7  4  7  6  7  5  3  5  5  6  4  7
 Grady     7  6  4  9  7  7  7  5  5  6  7  7  3  8  6  7  3  9
 Hoyt      7  5  4  8  8  4  8  4  6  5  6  7  4  7  5  5  4  6
 ```
 
-| Player | Course hcp | Gross | Picks | Net (capped) | Strokes off | FINAL |
+**As one card at a time** (`test/round2.test.ts`) — Watch the Birdie and Agony Alley only:
+
+| Player | CH | Gross | Net | Watch the Birdie | Agony Alley | **FINAL** |
 |---|---|---|---|---|---|---|
-| Dex | 23 | 93 | 3,1,4,13,10,16 | 70 | 6.70 | **63.30** |
-| Alex | 18 | 90 | 8,2,7,17,14,18 | 72 | 4.30 | **67.70** |
-| Finn | 26 | 99 | 3,9,4,13,15,16 | 73 | 6.60 | **66.40** |
-| Boyd | 21 | 96 | 8,1,7,17,10,18 | 75 | 3.50 | **71.50** |
-| Emmet | 14 | 91 | 3,2,4,13,14,16 | 77 | -2.80 | **79.80** |
-| Chip | 15 | 94 | 8,9,7,17,15,18 | 79 | -1.20 | **80.20** |
-| Grady | 34 | 113 | 3,1,4,13,10,16 | 79 | -1.20 | **80.20** |
-| Hoyt | 20 | 103 | 8,2,7,17,14,18 | 82 | 2.30 | **79.70** |
+| Dex | 23 | 93 | 70 | −2.0 | −1.0 | **−3.0** |
+| Alex | 18 | 90 | 72 | −1.0 | −1.0 | **−2.0** |
+| Finn | 26 | 99 | 73 | −1.0 | −2.0 | **−3.0** |
+| Boyd | 21 | 96 | 75 | −0.5 | −1.0 | **−1.5** |
+| Emmet | 14 | 91 | 77 | −0.5 | +2.0 | **+1.5** |
+| Chip | 15 | 94 | 79 | −2.0 | +1.0 | **−1.0** |
+| Grady | 34 | 113 | 79 | −2.0 | +2.0 | **0.0** |
+| Hoyt | 20 | 103 | 82 | −1.0 | 0.0 | **−1.0** |
 
-> ⚠️ **The Watch the Birdie picks above are invented, and every FINAL in this table depends on them.**
->
-> The contest postdates both reference rounds, so the club recorded no picks for either. These were assigned mechanically — each of the six slots rotating through its own legal holes in finishing order — and were **not** chosen to produce any particular result.
->
-> Change a single pick and the finals move, and so can the order. **Get the real picks before treating any number here as a reference.** The same warning applies to the section 9 table.
+**As a field**, with carts 1,1,2,2,3,3,4,4 in the order Alex, Boyd, Chip, Dex, Emmet, Finn, Grady, Hoyt, and each man naming his cart partner on his Hit List — this is the board the app opens on (`test/engineParity.test.ts`):
 
-**Cart skins** with carts 1,1,2,2,3,3,4,4 in the order Alex, Boyd, Chip, Dex, Emmet, Finn, Grady, Hoyt: **6, 9, 1, 2** — eighteen, all accounted for.
+| | Player | CH | Net | WTB | Agony | Hit List | Skins | **FINAL** |
+|---|---|---|---|---|---|---|---|---|
+| 1 | Alex | 18 | 72 | −1.5 | −1.0 | −0.7 | −2.0 | **−5.2** |
+| 2 | Finn | 26 | 73 | −1.5 | −2.0 | −1.1 | −0.4 | **−5.0** |
+| 3 | Dex | 23 | 70 | −1.0 | −1.0 | −1.1 | −1.2 | **−4.3** |
+| 4 | Boyd | 21 | 75 | −0.5 | −1.0 | +0.3 | −2.0 | **−3.2** |
+| 5 | Hoyt | 20 | 82 | −0.5 | 0.0 | +0.5 | −0.4 | **−0.4** |
+| 6 | Chip | 15 | 79 | −0.5 | +1.0 | +0.5 | −1.2 | **−0.2** |
+| 7 | Grady | 34 | 79 | −0.5 | +2.0 | −1.1 | −0.4 | **0.0** |
+| 8 | Emmet | 14 | 77 | −1.0 | +2.0 | +0.5 | −0.4 | **+1.1** |
+
+*The two tables use different picks — the per-card one walks the slots mechanically, the field one uses the seed round's stored picks — so the finals differ. Both are pinned.*
+
+> ⚠️ **The Watch the Birdie picks are invented, and every FINAL depends on them.** The contest postdates both reference rounds. **Get the real picks before treating any number here as a reference.**
+
+**Skins** (best two net balls, carts of two): **5, 3, 1, 1** — ten skins won, eight holes tied and not won by anybody. *Under the old group-average rule these four carts produced 6, 9, 1, 2 and won all eighteen holes between them.*
 
 ### Why this round is a better test than section 9
 
 - **Handicaps 14 to 34.** Section 9 spans only 15 to 21.
-- **Three players take an Agony Alley penalty** — Chip +1.0, Emmet +1.5, Grady +1.5. Section 9 has one.
-- **Finn scored 10 on Agony Alley**, three under par, hitting the top rung. Nothing in section 9 does.
-- **Grady's 113 and Chip's 94 come out level on net, both 79.** Nineteen shots of gross difference vanish into the handicap and the contests decide the order. That net parity is the property worth pinning; which of the two finishes ahead depends on the Birdie picks, and under the invented picks above it is Chip. Under the old Call Your Number it was Grady.
+- **Three players take an Agony Alley penalty.** Section 9 has one.
+- **Finn hits the top rung** of Agony Alley. Nothing in section 9 does.
+- **Grady's 113 and Chip's 94 come out level on net, both 79.** Nineteen shots of gross difference vanish into the handicap and the contests decide the order. **That net parity is the property worth pinning**; which of the two finishes ahead depends on the picks.
+- **The spread narrowed from 10.0 strokes to 6.3 when the game was cut to four** — the same eight cards, unchanged. That is the cut doing exactly what it was for.
 
-Note these values use the ladders as they stand today, including the retuned **Bounce Back** (`3+ → −1.5 · 2 → −1.0 · 1 → −0.5 · 0 → 0`), which removed the last 0.75 from the game. **Others remain under review** — see section 12 — so re-run this table whenever a threshold changes rather than trusting the numbers above.
+> ⚠️ **AN EVENT SAVED BEFORE 22 AUGUST RE-OPENS SCORED UNDER THE FOUR.** A round stores only a *diff* against the defaults, so a round played on the old defaults has nothing stored, and its Six Pack and Easy Street lines are simply gone when it is opened again. Consistent with the fresh-workbook decision, but it means past rounds on the phone will not match the numbers written down at the time. **To score an old round the old way, switch the contests back on for that event under The rules** — the parked values are unchanged from when they were played.
 
 ---
 
 ## 12. Under review — do not change yet
 
-Forty-two player-rounds from two groups at one course. Enough to have found these, not enough to fix them. **Keep every threshold in config so a recalibration is a data edit, not a code change.**
+**Keep every threshold in config so a recalibration is a data edit, not a code change.**
 
 | Contest | Issue | Likely change |
 |---|---|---|
-| **Watch the Birdie** | New, and uncalibrated — no round has been played with real picks. Only 5 of the 16 reference cards would have been paid anything, so −1.0 a pick may be too stingy, or the picks too hard. | Collect real picks for one round before touching the value. |
-| **Damage Control** | Zero net doubles fires 19% (about right) but everything from 3 up collapses to nothing, and 24% of rounds land there. | Spread to `0 → −2.0 · 1 → −1.5 · 2 → −1.0 · 3 → −0.5 · 4+ → 0` |
-| **Agony Alley** | Players believe 12 and 13 are unreachable. **They are wrong** — 12% clear 12, 26% clear 13. | No change |
-| **Go Long / Get Shorty** | Aberdeen rates all four par 5s among its five hardest holes and all four par 3s among its four easiest. Go Long is stroke-starved for high handicaps; Get Shorty is stroke-rich. | Course-specific. Watch, don't fix. |
+| **Watch the Birdie** | Nine picks and 840 sets are new. Fires on 86% of rounds, which is high — the blank may now be doing less work than it was designed for. | Watch one Saturday before touching a value. |
+| **Agony Alley** | Repeats the net score at +0.62, higher than Watch the Birdie. It survived the cut on the strength of being the contest men talk about, not on the table. | Watch. If it needs cutting, the stretch is the thing to move, not the ladder. |
+| **Hit List** | +0.57, and it is the one contest a man must enter. Take-up is the number to watch, not the correlation. | Nothing until a few rounds have run with real names. |
+| **Skins** | The floor makes the pot elastic above ten skins. Deliberate, but it means a busy day pays out nearly twice a lean one. | Watch what a full Saturday field actually produces. |
+| **The board depth** | Five is a guess at a field of eight to sixteen. | It is a setting. Move it on the day rather than in the code. |
 
-**Missing from the data entirely:** single-digit handicaps, a second tee, and women's tees. All three are being sought.
+**Missing from the data entirely:** a proper sample of single-digit handicaps, a second tee played in anger, and women's tees. All three are supported and none is calibrated.

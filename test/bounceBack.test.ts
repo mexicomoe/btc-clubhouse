@@ -15,11 +15,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { ABERDEEN_TEE_IV, DEFAULT_CONTESTS } from "../src/courseConfig.ts";
+import { ABERDEEN_TEE_IV, DEFAULT_CONTESTS, PARKED_CONTESTS } from "../src/courseConfig.ts";
 import { scorePlayer, type PlayerCard } from "../src/scoring.ts";
 
+/* SWITCHED ON FOR THIS FILE. They are off on the defaults now, so every case
+   below scores it explicitly rather than leaning on them. That it is off is
+   asserted once, and nowhere else — a file that quietly stopped exercising the
+   contest at all would still go green. */
+const PLAYED = { ...DEFAULT_CONTESTS, tripleThreat: PARKED_CONTESTS.tripleThreat, bounceBack: PARKED_CONTESTS.bounceBack };
+
 const PAR = ABERDEEN_TEE_IV.par;
-const SIX = { p4f: 2, p4b: 14, p3a: 3, p3b: 8, p5a: 7, p5b: 16 };
+const NINE = { p5a: 7, p5b: 16, p3a: 3, p3b: 8, p3c: 13, p4f: 2, p4b: 14, p4c: 1, p4d: 10 };
 
 function card(over: Record<number, number> = {}, opts: {
   courseHandicap?: number; unplayed?: number[]; pickedUp?: number[];
@@ -27,13 +33,19 @@ function card(over: Record<number, number> = {}, opts: {
   const gross = PAR.map((p, i) => p + (over[i + 1] || 0)) as (number | string | null)[];
   for (const h of opts.unplayed || []) gross[h - 1] = null;
   for (const h of opts.pickedUp || []) gross[h - 1] = "X";
-  return { name: "Test", courseHandicap: opts.courseHandicap ?? 0, gross, picks: { ...SIX } } as PlayerCard;
+  return { name: "Test", courseHandicap: opts.courseHandicap ?? 0, gross, picks: { ...NINE } } as PlayerCard;
 }
 const bb = (c: PlayerCard) =>
-  scorePlayer(c, ABERDEEN_TEE_IV, DEFAULT_CONTESTS).contests.bounceBack!;
+  scorePlayer(c, ABERDEEN_TEE_IV, PLAYED).contests.bounceBack!;
 
 test("the rate is one config value", () => {
-  assert.equal(DEFAULT_CONTESTS.bounceBack!.perBounceBack, -1.0);
+  assert.equal(PARKED_CONTESTS.bounceBack.perBounceBack, -1.0);
+});
+
+test("it is off on the defaults, and comes back on at that rate", () => {
+  assert.equal(DEFAULT_CONTESTS.bounceBack, null);
+  assert.equal(scorePlayer(card({ 1: 2 }), ABERDEEN_TEE_IV, DEFAULT_CONTESTS)
+    .contests.bounceBack, undefined, "not in the game is not a zero");
 });
 
 /* ---- when it fires ---- */
@@ -94,8 +106,8 @@ test("an unplayed hole after a blow-up is not a recovery", () => {
 
 test("an empty card scores nothing", () => {
   const r = scorePlayer(
-    { name: "T", courseHandicap: 0, gross: PAR.map(() => null), picks: { ...SIX } } as any,
-    ABERDEEN_TEE_IV, DEFAULT_CONTESTS).contests.bounceBack!;
+    { name: "T", courseHandicap: 0, gross: PAR.map(() => null), picks: { ...NINE } } as any,
+    ABERDEEN_TEE_IV, PLAYED).contests.bounceBack!;
   assert.equal(r.strokes, 0);
   assert.equal(r.live, false);
 });
@@ -106,21 +118,21 @@ test("it pays even when Triple Threat is switched off", () => {
   // The blow-up still happened. Whether the round charges for it is a separate
   // question, and this is what makes the two switches genuinely separate.
   const r = scorePlayer(card({ 1: 2 }), ABERDEEN_TEE_IV,
-    { ...DEFAULT_CONTESTS, tripleThreat: null } as any);
+    { ...PLAYED, tripleThreat: null } as any);
   assert.equal(r.contests.tripleThreat, undefined);
   assert.equal(r.contests.bounceBack!.strokes, -1);
 });
 
 test("switching it off leaves Triple Threat charging as before", () => {
   const r = scorePlayer(card({ 1: 2 }), ABERDEEN_TEE_IV,
-    { ...DEFAULT_CONTESTS, bounceBack: null } as any);
+    { ...PLAYED, bounceBack: null } as any);
   assert.equal(r.contests.bounceBack, undefined);
   assert.equal(r.contests.tripleThreat!.strokes, 0.5);
 });
 
 test("both off leaves neither on the card", () => {
   const r = scorePlayer(card({ 1: 2 }), ABERDEEN_TEE_IV,
-    { ...DEFAULT_CONTESTS, tripleThreat: null, bounceBack: null } as any);
+    { ...PLAYED, tripleThreat: null, bounceBack: null } as any);
   assert.equal(r.contests.tripleThreat, undefined);
   assert.equal(r.contests.bounceBack, undefined);
 });
@@ -128,7 +140,7 @@ test("both off leaves neither on the card", () => {
 test("together they are the pair they always were", () => {
   // Charged 0.5, paid 1.0 — a man who steadies the ship comes out ahead, which
   // is the shape the two were designed with and splitting them did not change.
-  const r = scorePlayer(card({ 1: 2 }), ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
+  const r = scorePlayer(card({ 1: 2 }), ABERDEEN_TEE_IV, PLAYED);
   const both = r.contests.tripleThreat!.strokes + r.contests.bounceBack!.strokes;
   assert.equal(Math.round(both * 10) / 10, -0.5);
 });

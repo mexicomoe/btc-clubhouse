@@ -130,22 +130,24 @@ test("a contest never pays for holes that were not played", () => {
   const empty = scorePlayer(card("Empty", 0), ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
   const nine = scorePlayer(card("Front nine only", 9), ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
 
-  // Agony Alley needs 4–6; Easy Street needs 11–13; Watch the Birdie needs the
-  // nominated hole to have been played. Easy Street is the one that matters
-  // most here: it can PENALISE, and a front-nine card must not be charged +0.5
-  // for failing to par three holes it never reached.
+  // Agony Alley needs 4–6, and Watch the Birdie needs the nominated hole to have
+  // been played. WATCH THE BIRDIE IS THE ONE THAT MATTERS HERE: it can PENALISE
+  // — half a stroke for no net birdie on any of the nine — and a front-nine
+  // card must not be charged it for nine holes it never reached.
   for (const r of [empty, nine]) {
     if (r.holesPlayed === 0) {
       assert.equal(r.contests.agonyAlley.live, false, "no stretch on an empty card");
     }
-    assert.equal(r.contests.easyStreet.live, false, "11–13 were not played");
-    assert.equal(r.contests.easyStreet.strokes, 0, "and nothing is charged for them");
+    assert.equal(r.contests.watchTheBirdie.strokes, 0,
+      "the blank penalty is not charged while a pick is unplayed");
   }
-  // Go Long and Get Shorty are switched off, so they are not on the card at all
-  // — absent, not a zero, which would read as "he scored nothing on them".
+  // The contests that are switched off are not on the card at all — absent, not
+  // a zero, which would read as "he scored nothing on them".
   for (const r of [empty, nine]) {
-    assert.equal(r.contests.goLong, undefined);
-    assert.equal(r.contests.getShorty, undefined);
+    for (const key of ["goLong", "getShorty", "sixPack", "easyStreet",
+                       "tripleThreat", "bounceBack"]) {
+      assert.equal((r.contests as any)[key], undefined, key);
+    }
   }
   // The front-nine card DID play 4–6, so Agony Alley is live for it.
   assert.equal(nine.contests.agonyAlley.live, true);

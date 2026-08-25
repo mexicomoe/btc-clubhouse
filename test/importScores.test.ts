@@ -65,8 +65,8 @@ test("December import feeds the engine and reproduces section 9", () => {
   const order = ["Abe Whitfield", "Ben Castellan", "Cy Ashford", "Dan Pemberton",
                  "Eli Marsden", "Gus Thornbury", "Hal Brightwater", "Ike Calloway"];
   const legal = birdiePickHoles(ABERDEEN_TEE_IV);
-  // Stepped around what is taken — the two par 3 slots share a list of three,
-  // and so do the par 5s, so the same index in every slot repeats a hole.
+  // Stepped around what is taken — every slot of a par shares one list, so the
+  // same index in every slot would repeat a hole.
   const picks: Record<string, BirdiePicks> = Object.fromEntries(order.map((name, i) => {
     const taken: number[] = [];
     const set: Record<string, number> = {};
@@ -79,8 +79,8 @@ test("December import feeds the engine and reproduces section 9", () => {
   }));
   // Zero base: strokes under and over par, not net scores in the seventies.
   const expectedFinal: Record<string, number> = {
-    "Abe Whitfield": -0.5, "Ben Castellan": -1.5, "Cy Ashford": -0.5, "Dan Pemberton": -2,
-    "Eli Marsden": -1.5, "Gus Thornbury": 0.5, "Hal Brightwater": 1.5, "Ike Calloway": 1.5,
+    "Abe Whitfield": -1.5, "Ben Castellan": -3, "Cy Ashford": -1, "Dan Pemberton": -2.5,
+    "Eli Marsden": -2.5, "Gus Thornbury": -2, "Hal Brightwater": 0.5, "Ike Calloway": 0.5,
   };
 
   const { cards } = parseScores(read("december_demo.tsv"));

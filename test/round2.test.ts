@@ -6,13 +6,18 @@
  * data. Section 11 gives the course handicap directly, so the cards carry it
  * rather than a handicap index.
  *
- * These use the current ladders, including the retuned Bounce Back (section 12):
- * 3+/2/1 → −1.5/−1.0/−0.5. Nothing here is computed by the test.
+ * RE-CUT FOR FOUR CONTESTS, like section 9. A single card settles on Watch the
+ * Birdie and Agony Alley and nothing else — Six Pack and Easy Street are out of
+ * the game, Triple Threat and Bounce Back start switched off, and the Hit List
+ * and Skins need a field. Both halves are pinned beside the final.
  *
- * Call Your Number is gone; Watch the Birdie has replaced it. As in section 9,
- * the club recorded no picks for this round — the contest postdates it — so the
- * picks below are demo inputs rotating through the legal par 4s (front 1, 2, 5,
- * 6, 9 · back 10, 11, 12, 14, 15). Real picks would move these finals.
+ * THE GROSS AND THE NET DID NOT MOVE. They are the same real figures they were
+ * under eight contests, which is what makes this round worth keeping: the cut
+ * changed what the engine makes of these cards and nothing about the cards.
+ *
+ * As in section 9, the club recorded no picks for this round — the contest
+ * postdates it — so the picks are demo inputs from the same mechanical
+ * rotation. Real picks would move these finals.
  */
 
 import { test } from "node:test";
@@ -28,14 +33,16 @@ interface Reference {
   courseHandicap: number;
   gross: number;
   net: number;
+  watchTheBirdie: number;
+  agonyAlley: number;
   final: number;
 }
 
 /** The same mechanical rotation as section 9 — see the note there. */
 function picks(i: number): BirdiePicks {
   const legal = birdiePickHoles(ABERDEEN_TEE_IV);
-  // Stepped around what is taken: the two par 3 slots are handed the identical
-  // three holes and so are the par 5s.
+  // Stepped around what is taken: every slot of a par is handed the identical
+  // list, so walking them all by one index would nominate a hole twice.
   const taken: number[] = [];
   const out: Record<string, number> = {};
   for (const s of PICK_SLOTS) {
@@ -46,23 +53,24 @@ function picks(i: number): BirdiePicks {
   return out as BirdiePicks;
 }
 
-// name | course hcp | picks | 18 gross | expected: gross, net, final
+// name | course hcp | picks | 18 gross | expected: gross, net, WTB, Agony, final
 const REFERENCE: Reference[] = [
-  ref("Dex",   23, picks(0), [5,5,4,6,6,6,7,3,5,4,4,6,3,6,6,6,6,5], 93, 70, -2.5),
-  ref("Alex",  18, picks(1), [5,5,3,6,5,5,6,3,5,7,5,5,4,4,6,6,3,7], 90, 72, -2.0),
-  ref("Finn",  26, picks(2), [5,6,6,7,5,4,7,4,7,6,7,5,3,5,5,6,4,7], 99, 73, -4.0),
-  ref("Boyd",  21, picks(3), [6,5,4,7,6,5,7,4,5,6,6,5,4,5,7,4,4,6], 96, 75, -2.0),
-  ref("Emmet", 14, picks(4), [6,5,3,7,7,6,5,3,5,4,5,5,3,5,6,7,3,6], 91, 77, 2.0),
-  ref("Chip",  15, picks(5), [6,5,4,8,6,5,5,4,5,5,6,3,5,6,6,5,4,6], 94, 79, 4.5),
-  ref("Grady", 34, picks(6), [7,6,4,9,7,7,7,5,5,6,7,7,3,8,6,7,3,9], 113,79, 6.0),
-  ref("Hoyt",  20, picks(7), [7,5,4,8,8,4,8,4,6,5,6,7,4,7,5,5,4,6], 103,82, 2.5),
+  ref("Dex",   23, picks(0), [5,5,4,6,6,6,7,3,5,4,4,6,3,6,6,6,6,5], 93, 70, -2.0, -1.0, -3.0),
+  ref("Alex",  18, picks(1), [5,5,3,6,5,5,6,3,5,7,5,5,4,4,6,6,3,7], 90, 72, -1.0, -1.0, -2.0),
+  ref("Finn",  26, picks(2), [5,6,6,7,5,4,7,4,7,6,7,5,3,5,5,6,4,7], 99, 73, -1.0, -2.0, -3.0),
+  ref("Boyd",  21, picks(3), [6,5,4,7,6,5,7,4,5,6,6,5,4,5,7,4,4,6], 96, 75, -0.5, -1.0, -1.5),
+  ref("Emmet", 14, picks(4), [6,5,3,7,7,6,5,3,5,4,5,5,3,5,6,7,3,6], 91, 77, -0.5,  2.0,  1.5),
+  ref("Chip",  15, picks(5), [6,5,4,8,6,5,5,4,5,5,6,3,5,6,6,5,4,6], 94, 79, -2.0,  1.0, -1.0),
+  ref("Grady", 34, picks(6), [7,6,4,9,7,7,7,5,5,6,7,7,3,8,6,7,3,9], 113,79, -2.0,  2.0,  0.0),
+  ref("Hoyt",  20, picks(7), [7,5,4,8,8,4,8,4,6,5,6,7,4,7,5,5,4,6], 103,82, -1.0,  0.0, -1.0),
 ];
 
 function ref(
   name: string, courseHandicap: number, picks: BirdiePicks, gross: number[],
-  grossTotal: number, net: number, final: number,
+  grossTotal: number, net: number, watchTheBirdie: number, agonyAlley: number, final: number,
 ): Reference {
-  return { card: { name, courseHandicap, picks, gross }, courseHandicap, gross: grossTotal, net, final };
+  return { card: { name, courseHandicap, picks, gross }, courseHandicap,
+           gross: grossTotal, net, watchTheBirdie, agonyAlley, final };
 }
 
 for (const r of REFERENCE) {
@@ -71,6 +79,9 @@ for (const r of REFERENCE) {
     assert.equal(result.courseHandicap, r.courseHandicap, "course handicap");
     assert.equal(result.gross, r.gross, "gross total");
     assert.equal(result.net, r.net, "capped net");
+    assert.equal(result.contests.watchTheBirdie.strokes, r.watchTheBirdie, "Watch the Birdie");
+    assert.equal(result.contests.agonyAlley.strokes, r.agonyAlley, "Agony Alley");
+    assert.equal(r.watchTheBirdie + r.agonyAlley, r.final, "the two halves ARE the final");
     assert.equal(result.final, r.final, "FINAL");
     // ON A ZERO BASE THESE ARE THE SAME NUMBER. The contests no longer come off
     // a net total, so what a man earned IS what he finished on. They used to
@@ -81,8 +92,7 @@ for (const r of REFERENCE) {
 
 // The point the brief calls out: nineteen shots of gross difference disappear
 // into the handicap, and the contests — not the gross — decide who finishes
-// ahead. Which of the two edges it IS pick-dependent (under Call Your Number
-// Grady led; with these demo Birdie picks Chip does), so this pins the net
+// ahead. Which of the two edges it IS pick-dependent, so this pins the net
 // parity, which no choice of picks can move.
 test("section 11 · a 113 and a 94 come out level on net", () => {
   const grady = scorePlayer(REFERENCE.find((r) => r.card.name === "Grady")!.card, ABERDEEN_TEE_IV, DEFAULT_CONTESTS);

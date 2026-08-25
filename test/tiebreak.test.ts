@@ -43,9 +43,11 @@ test("all three finish on the same final", () => {
   for (const c of [EVEN, BACK_NINE, LAST_SIX]) {
     const r = scorePlayer(c, ABERDEEN_TEE_IV, DEFAULT_CONTESTS);
     assert.equal(r.net, 72, `${c.name} net`);
-    // Base zero, and no picks on these cards: Agony Alley and Easy Street each
-    // pay 1 on a level-par round and nothing else fires.
-    assert.equal(r.final, -2, `${c.name} final — the tie these tests exist to break`);
+    // Base zero, and NO PICKS on these cards, so Watch the Birdie is not scored
+    // at all — not even the blank penalty, which a man who nominated nothing
+    // cannot be charged. Agony Alley pays 1 on a level-par round and it is the
+    // only thing that fires.
+    assert.equal(r.final, -1, `${c.name} final — the tie these tests exist to break`);
   }
 });
 

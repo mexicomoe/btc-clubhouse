@@ -23,12 +23,18 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { ABERDEEN_TEE_IV, DEFAULT_CONTESTS } from "../src/courseConfig.ts";
+import { ABERDEEN_TEE_IV, DEFAULT_CONTESTS, PARKED_CONTESTS } from "../src/courseConfig.ts";
 import { scorePlayer, type PlayerCard } from "../src/scoring.ts";
+
+/* SWITCHED ON FOR THIS FILE. It is off on the defaults now, so every case
+   below scores it explicitly rather than leaning on them. That it is off is
+   asserted once, and nowhere else — a file that quietly stopped exercising the
+   contest at all would still go green. */
+const PLAYED = { ...DEFAULT_CONTESTS, easyStreet: PARKED_CONTESTS.easyStreet };
 
 const PAR = ABERDEEN_TEE_IV.par;
 const HOLES = ABERDEEN_TEE_IV.easyStreetHoles;
-const SIX = { p4f: 2, p4b: 14, p3a: 3, p3b: 8, p5a: 7, p5b: 16 };
+const NINE = { p5a: 7, p5b: 16, p3a: 3, p3b: 8, p3c: 13, p4f: 2, p4b: 14, p4c: 1, p4d: 10 };
 
 function card(opts: {
   over?: Record<number, number>;
@@ -39,10 +45,10 @@ function card(opts: {
   const gross = PAR.map((p, i) => p + ((opts.over || {})[i + 1] || 0)) as (number | string | null)[];
   for (const h of opts.unplayed || []) gross[h - 1] = null;
   for (const h of opts.pickedUp || []) gross[h - 1] = "X";
-  return { name: "Test", courseHandicap: opts.courseHandicap ?? 0, gross, picks: { ...SIX } } as PlayerCard;
+  return { name: "Test", courseHandicap: opts.courseHandicap ?? 0, gross, picks: { ...NINE } } as PlayerCard;
 }
 const easy = (c: PlayerCard) =>
-  scorePlayer(c, ABERDEEN_TEE_IV, DEFAULT_CONTESTS).contests.easyStreet!;
+  scorePlayer(c, ABERDEEN_TEE_IV, PLAYED).contests.easyStreet!;
 
 test("the three holes come off the course, not the contest", () => {
   assert.deepEqual(HOLES, [11, 12, 13]);
@@ -128,12 +134,13 @@ test("a picked-up hole is played, and is not a net par", () => {
 });
 
 test("switching Easy Street off leaves it off the card entirely", () => {
-  const r = scorePlayer(card(), ABERDEEN_TEE_IV, { ...DEFAULT_CONTESTS, easyStreet: null } as any);
+  const r = scorePlayer(card(), ABERDEEN_TEE_IV, { ...PLAYED, easyStreet: null } as any);
   assert.equal(r.contests.easyStreet, undefined);
 });
 
 test("the ladder in the config is the one the brief published", () => {
-  assert.deepEqual(DEFAULT_CONTESTS.easyStreet, [
+  assert.equal(DEFAULT_CONTESTS.easyStreet, null, "cut from the game, code left in place");
+  assert.deepEqual(PARKED_CONTESTS.easyStreet, [
     { threshold: 0, strokes: 2 },
     { threshold: 1, strokes: 1 },
     { threshold: 2, strokes: 0 },

@@ -21,6 +21,7 @@
   <div id="boardFlights"></div>
   <div id="rows"></div>
   <div id="boardEmpty"></div>
+  <div id="boards"></div>
   <div id="shareBox"></div>
 </section>
 
@@ -193,14 +194,21 @@ const D  = window.ClubhouseDisplay;
 /* The display helpers live in display.js so results.html can use the same ones.
    Pulled onto locals here so every call site below reads exactly as it did. */
 const { esc, fmtFinal, fmtStrokes, fitText, abbreviate, fitName, niceDate,
-        MONTHS, CONTEST_NAMES } = D;
+        MONTHS, CONTEST_NAMES, duelSentence } = D;
 
-/* The order a card reads down the screen. Six Pack sits directly under Watch
-   the Birdie because they are two halves of the same twelve holes — the six he
-   chose and the six he did not — and reading them apart makes neither clear. */
+/* The order a card reads down the screen. FOUR OF THESE ARE IN THE GAME —
+   Watch the Birdie, Agony Alley, the Hit List and Skins. The rest are switched
+   off and keep their place in the order for the day one comes back; Six Pack
+   still sits directly under Watch the Birdie, because if it ever returns they
+   are two halves of the same fifteen holes and reading them apart makes
+   neither clear. */
 const CONTEST_ORDER = ["watchTheBirdie","sixPack","agonyAlley","easyStreet",
                        "tripleThreat","hitList","damageControl","goLong",
                        "getShorty","bounceBack","skins"];
+
+/* Which contests get a board of their own, in the order they are shown. The
+   same order as the card, filtered to what is actually in the game. */
+function boardContests(){ return contestsInPlay(); }
 
 /**
  * The contests this club actually plays. A contest switched off in the engine's
@@ -322,9 +330,14 @@ function normalisePlayer(p){
   const out = Object.assign({}, p);
   const legal = E.birdiePickHoles(courseOf(out));
   // Where a slot's holes may have come from, oldest form last. The par 3s and
-  // par 5s used to be split front and back; f3/b3 become the two par 3 slots
-  // and f5/b5 the two par 5s, and the par 4 slots reach all the way back to the
-  // original two-pick `front`/`back` pair.
+  // par 5s used to be split front and back; f3/b3 become the first two par 3
+  // slots and f5/b5 the two par 5s, and the first two par 4 slots reach all the
+  // way back to the original two-pick `front`/`back` pair.
+  //
+  // THE THREE SLOTS THE NINE-PICK GAME ADDED HAVE NO OLDER FORM, and want none:
+  // p3c, p4c and p4d never existed before, so a round stored under the six-pick
+  // rules simply arrives with them empty. That is the whole of the migration,
+  // and it is why the other six keys were left alone rather than renamed.
   const was = {
     p4f: [out.f4, out.front],
     p4b: [out.b4, out.back],
@@ -334,9 +347,11 @@ function normalisePlayer(p){
   E.PICK_SLOTS.forEach(sl => {
     let v = out[sl.key];
     if(v == null) for(const older of (was[sl.key] || [])){ if(older != null){ v = older; break; } }
-    // A pick on a hole since barred is DROPPED, not refused. Holes 4 and 13
-    // were legal under the old slots and are not now; the man shows as missing
-    // that slot, which is true, rather than losing his round to an error.
+    // A pick on a hole since barred is DROPPED, not refused. Hole 4 was legal
+    // under the oldest slots and is not now; the man shows as missing that
+    // slot, which is true, rather than losing his round to an error. (Hole 13
+    // travels the other way — barred for Easy Street, and legal again now that
+    // Easy Street is out of the game.)
     out[sl.key] = (v != null && legal[sl.key].indexOf(v) !== -1) ? v : null;
   });
   ["front","back","f3","f4","f5","b3","b4","b5"].forEach(k => { delete out[k]; });
@@ -494,6 +509,11 @@ function exportEvent(){
   const csv = XP.eventToCsv(state, results, {
     displayNameOf: displayName,
     holesOf: (p) => scoresFor(p),
+    // THE ROUND'S OWN RULES, resolved. The event stores a diff, and a diff
+    // cannot say which contests are on — without this the file would carry a
+    // column for every contest that ever had one, blank under the ones not
+    // played, which reads as a field that all scored zero.
+    contests: contestConfig(),
   });
   const name = XP.csvFilename(state.name, state.date);
   downloadFile(name, csv, "text/csv;charset=utf-8");
@@ -692,7 +712,9 @@ function blankPlayer(){
   return { id: "p" + (state.nextId++), name: "", ghin: "", index: null,
            tee: state.lastTee || "IV", gender: "M",
            cart: null, team: "", flight: "", hitList: "",
-           p4f: null, p4b: null, p3a: null, p3b: null, p5a: null, p5b: null };
+           // Every slot the engine has, so a new man is the right shape without
+           // this list having to be kept in step by hand.
+           ...Object.fromEntries(E.PICK_SLOTS.map(sl => [sl.key, null])) };
 }
 /**
  * The thresholds this round is scored on. The only thing the organiser can
@@ -846,7 +868,7 @@ function cardOf(p){
     // The man he named on his Hit List, by the name shown on the board — which
     // is what `applyHitList` matches on, so the two must be the same string.
     hitList: (p.hitList || "").trim(),
-    // Placings and Skins are settled inside a flight; the six contests ignore it.
+    // Placings and Skins are settled inside a flight; the contests ignore it.
     flight: (p.flight || "").trim(),
     gross: scoresFor(p),
     // Whatever slots he has filled. A man with none simply doesn't score the
@@ -945,6 +967,13 @@ function renderBoard(){
 
   // One leaderboard per flight. The picker only appears when the field is
   // actually divided — an undivided round looks exactly as it always did.
+  /* THE MINIGAME BOARDS SEE THE WHOLE FIELD, before the flight filter below.
+     Flights divide the placings and the card match and nothing else — the
+     contests are graded against fixed thresholds, and Skins and the Hit List
+     are settled field-wide by the engine. A contest board cut to a flight
+     would disagree with the figure on the man's own card. */
+  const fieldResults = results;
+
   const flights = E.sortFlights([...new Set(results.map(r => r.flight || ""))]);
   if(!flights.includes(state.flight)) state.flight = flights[0];
   drawFlightPicker("boardFlights", flights, state.flight, (f) => {
@@ -992,8 +1021,73 @@ function renderBoard(){
     rowsEl.appendChild(b);
   });
   drawHouseRules();
+  drawBoards(fieldResults);
   drawShare(results);
   fitBoardNames();
+}
+
+/* ---------- the minigame boards ----------
+   A table of its own for each contest, and every duel in the round.
+
+   THIS IS WHAT CUTTING TO FOUR BUYS. With eight contests the screen had room
+   for the final and nothing else, and a contest was a number in a column on a
+   detail screen nobody opened. With four there is room to say who won each one
+   — so a man who came eleventh overall can still have taken Agony Alley, and
+   hear about it in the bar rather than never.
+
+   The depth comes from the round's own rules and is a FLOOR: every man level
+   with the last one shown is shown as well. */
+
+/** How deep the boards run in this round. */
+function boardDepth(){
+  const cfg = contestConfig().boards;
+  return cfg && cfg.depth != null ? cfg.depth : 5;
+}
+
+function drawBoards(results){
+  const box = document.getElementById("boards");
+  if(!box) return;
+  const scored = results.filter(r => r.eligible);
+  if(scored.length === 0){ box.innerHTML = ""; return; }
+
+  const depth = boardDepth();
+  let html = "";
+
+  for(const key of boardContests()){
+    const board = E.contestBoard(results, key, { depth });
+    if(board.rows.length === 0) continue;
+    html += `<div class="section-label">${esc(CONTEST_NAMES[key] || key)}` +
+      (board.tieNote ? `<span class="mgnote">${esc(board.tieNote)}</span>` : ``) +
+      `</div>`;
+    html += board.rows.map(row => {
+      // What he did, not just what it paid — "3 net birdies" is the sentence a
+      // man repeats, and the strokes on their own are not.
+      const said = [row.detail, row.wonBy ? "won on " + row.wonBy : ""].filter(Boolean).join(" · ");
+      return `<button class="mg${row.rank === 1 ? " leader" : ""}" data-who="${esc(row.name)}">` +
+        `<span class="mgr">${row.rank}</span>` +
+        `<span class="mgw"><span class="mgn">${esc(row.name)}</span>` +
+        `<span class="mgd">${esc(said)}</span></span>` +
+        `<span class="mgs">${fmtStrokes(row.strokes)}</span></button>`;
+    }).join("");
+  }
+
+  /* ---- every duel, with the margin ----
+     Separate from the top five above it, and the whole table rather than a cut
+     of it: nobody knows who named whom until it is published, so this IS the
+     reveal. Two men who named each other make two lines — they are two
+     separate bets and one can be void while the other stands. */
+  if(contestConfig().hitList != null){
+    const duels = E.hitListDuels(results);
+    if(duels.length){
+      html += `<div class="section-label">Every duel</div>`;
+      html += duels.map(d =>
+        `<div class="duel${d.settled ? "" : " quiet"}">${esc(duelSentence(d))}</div>`).join("");
+    }
+  }
+
+  box.innerHTML = html;
+  box.querySelectorAll("button.mg").forEach(b =>
+    b.addEventListener("click", () => showPlayer(b.dataset.who)));
 }
 
 /* ---------- one link, texted to the group ----------
@@ -1092,6 +1186,24 @@ function boardImageRound(results){
       rank: r.rank, tieNote: tieNote(r),
       eligible: r.eligible !== false, holesPlayed: r.holesPlayed,
     })),
+    /* THE BOARDS RIDE IN THE PICTURE. The picture is the one that always
+       arrives — the link is flaky through iOS Messages from 250 characters up —
+       so who won each contest goes in it rather than being left to a link the
+       men may never open. The strokes are formatted HERE, because the image
+       builder knows nothing about golf and must not learn. */
+    boards: boardContests().map(key => {
+      const board = E.contestBoard(results, key, { depth: boardDepth() });
+      return {
+        name: CONTEST_NAMES[key] || key,
+        tieNote: board.tieNote,
+        rows: board.rows.map(row => ({
+          rank: row.rank, name: row.name, strokes: fmtStrokes(row.strokes),
+          detail: [row.detail, row.wonBy ? "won on " + row.wonBy : ""].filter(Boolean).join(" · "),
+        })),
+      };
+    }).filter(b => b.rows.length),
+    duels: contestConfig().hitList == null ? []
+      : E.hitListDuels(results).map(duelSentence),
   };
 }
 
@@ -1918,9 +2030,9 @@ function showPicksBox(){
     `<div class="field"><label for="picksPaste">One player a line</label>
        <textarea id="picksPaste" spellcheck="false" autocorrect="off"
          autocapitalize="off" autocomplete="off"
-         placeholder="Ridgeway, Ken — 8, 2, 4, 13, 14, 16"></textarea>
+         placeholder="Ridgeway, Ken — 7, 16, 3, 8, 13, 1, 2, 10, 14"></textarea>
        <div class="cd" style="margin-top:10px;font-size:18px;font-weight:700">
-         Six numbers in this order: ${esc(order)}</div></div>
+         ${E.PICK_SLOTS.length} numbers in this order: ${esc(order)}</div></div>
      <div style="padding:0 0 12px"><button class="big solid" id="picksRead">Show what this contains</button></div>
      <div id="picksOut"></div>`;
   document.getElementById("picksRead").addEventListener("click", readPicksPaste);
@@ -2109,6 +2221,13 @@ function renderSettings(){
   if(!draft) draft = JSON.parse(JSON.stringify(contestConfig()));
   const D = E.DEFAULT_CONTESTS;
   const on = (key) => draft[key] != null;
+  /* WHAT "THE DEFAULT" MEANS FOR A CONTEST THAT IS OFF BY DEFAULT. Every value
+     box shows what it was set to and what the default is beside it, and for
+     Triple Threat and Bounce Back the default is NULL — there is no number
+     there to show. Reaching into it threw the moment either was switched on,
+     which took the whole rules screen down. The parked values are the honest
+     answer: they are what the contest comes back on at. */
+  const dflt = (key) => (D[key] != null ? D[key] : E.PARKED_CONTESTS[key]);
   const sw = (key, label) => `<div class="field"><span class="flab">${esc(label)}</span>` +
     `<div class="seg" data-onoff="${key}">` +
       `<button type="button" data-v="1" aria-pressed="${on(key)}">On</button>` +
@@ -2120,6 +2239,24 @@ function renderSettings(){
     round scored today still scores the same way next year. A new event starts
     from the defaults.</div>`;
 
+  /* WHY FOUR. The head pro read the rules and said the game was too
+     complicated, and the numbers agreed with him: on 21 August seven men came
+     out in 90% the same order as the Stableford result. This note is here so
+     that in November, when somebody wonders where Six Pack went, the screen
+     answers instead of Rob. */
+  h += `<div class="note"><b>Four contests, not eight.</b><br>
+    Measured over 135 rounds, most of the eight were repeating the net score
+    rather than adding to it — Six Pack at +0.69, Triple Threat +0.67, Easy
+    Street +0.38. Eight contests put seven men in <b>90% the same order</b> as
+    the Stableford result. Four takes the agreement with the net order from
+    <b>89% down to 80%</b>.<br>
+    <b>Six Pack and Easy Street are out of the game</b>, the same way Go Long
+    and Get Shorty are — the code is still there, but they have no switch here.
+    Easy Street's holes 11, 12 and 13 went back to Watch the Birdie, which is
+    what makes its par 4 slot eight holes deep.<br>
+    <b>Triple Threat and Bounce Back start off and can be switched on</b> below.
+    They are kept for testing later in the year rather than deleted.</div>`;
+
   if(rulesChanged()){
     h += `<div class="note warn"><b>This round is not on the default rules.</b><br>
       Changed: ${esc(changedRulesNote())}. Every board, shared link and export
@@ -2129,27 +2266,33 @@ function renderSettings(){
   /* Watch the Birdie */
   h += `<div class="section-label">Watch the Birdie</div>` + sw("watchTheBirdie", "In the game");
   if(on("watchTheBirdie")){
+    h += `<div class="note"><b>Nine picks now, not six: two par 5s of three,
+      three par 3s of four, four par 4s of eight.</b> 840 possible sets, and
+      every slot a real choice. The values did not move with the count — at
+      these rates the contest repeats the net score at +0.48, the least of any
+      of the four, and fires on 86% of rounds against 74% at six.<br>
+      <b>A net par pays nothing, deliberately.</b> Paying 0.2 for one takes the
+      repetition of the net score from +0.51 to +0.73: four net pars a round is
+      close to counting how well a man played, which is the net score's job.</div>`;
     h += numField("Net birdie", "watchTheBirdie.birdie", draft.watchTheBirdie.birdie, D.watchTheBirdie.birdie) +
       numField("Net eagle", "watchTheBirdie.eagle", draft.watchTheBirdie.eagle, D.watchTheBirdie.eagle) +
-      numField("Nothing on any of the six", "watchTheBirdie.blank", draft.watchTheBirdie.blank, D.watchTheBirdie.blank) +
+      numField("Nothing on any of the nine", "watchTheBirdie.blank", draft.watchTheBirdie.blank, D.watchTheBirdie.blank) +
       `<div class="field"><label for="s_barred">Holes that may not be picked</label>` +
       `<input id="s_barred" data-barred="1" type="text" inputmode="numeric"
          value="${esc((draft.watchTheBirdie.barred || E.ABERDEEN_TEE_IV.barredPicks).join(", "))}">` +
       `<div class="cd" style="margin-top:8px;font-size:18px;font-weight:700">
-         Default <b>${E.ABERDEEN_TEE_IV.barredPicks.join(", ")}</b> — Agony Alley's three and
-         Easy Street's three. Every slot must keep at least two holes to choose from.</div></div>`;
+         Default <b>${E.ABERDEEN_TEE_IV.barredPicks.join(", ")}</b> — Agony Alley's three, and
+         nothing else now that Easy Street is out of the game. No man at Aberdeen would
+         nominate 4 or 5 in any case, so offering them offers nothing.<br>
+         Every par must keep MORE holes than it has picks: four par 3s for three picks
+         is a choice, three for three is a formality.</div></div>`;
   }
   h += resetFor("watchTheBirdie");
 
-  /* Six Pack */
-  h += `<div class="section-label">Six Pack</div>` + sw("sixPack", "In the game") +
-    `<div class="note">Nothing to set. It is the six candidate holes a man did NOT
-      pick, scored as raw net strokes against their par of 24 — and the par is
-      forced by the slots rather than chosen, so there is no number here to move.</div>`;
-
-  /* Agony Alley and Easy Street — ladders */
-  for(const [key, label, unit] of [["agonyAlley", "Agony Alley", "Net total on 4, 5, 6"],
-                                   ["easyStreet", "Easy Street", "Net pars on 11, 12, 13"]]){
+  /* Agony Alley — the one ladder left in the game. Easy Street's is still
+     graded by the engine, but it has no switch here: it is out, the way Go Long
+     and Get Shorty are out. */
+  for(const [key, label, unit] of [["agonyAlley", "Agony Alley", "Net total on 4, 5, 6"]]){
     h += `<div class="section-label">${label}</div>` + sw(key, "In the game");
     if(on(key)){
       h += `<div class="cd" style="padding:0 14px 10px;font-size:18px;font-weight:700">${unit}.</div>`;
@@ -2191,11 +2334,16 @@ function renderSettings(){
     h += resetFor(key);
   }
 
-  /* Triple Threat */
+  /* Triple Threat — off by default, kept for testing later in the year */
   h += `<div class="section-label">Triple Threat</div>` + sw("tripleThreat", "In the game");
+  if(!on("tripleThreat")){
+    h += `<div class="note"><b>Off by default.</b> It repeated the net score at
+      +0.67, second only to Six Pack. Kept for testing later in the year rather
+      than deleted — switch it on and it scores at the values it always did.</div>`;
+  }
   if(on("tripleThreat")){
     h += numField("Each net double bogey", "tripleThreat.perTriple",
-      draft.tripleThreat.perTriple, D.tripleThreat.perTriple);
+      draft.tripleThreat.perTriple, dflt("tripleThreat").perTriple);
   }
   h += resetFor("tripleThreat");
 
@@ -2203,12 +2351,14 @@ function renderSettings(){
   h += `<div class="section-label">Bounce Back</div>` + sw("bounceBack", "In the game");
   if(on("bounceBack")){
     h += numField("Each net par or better on the hole after a net double",
-      "bounceBack.perBounceBack", draft.bounceBack.perBounceBack, D.bounceBack.perBounceBack);
+      "bounceBack.perBounceBack", draft.bounceBack.perBounceBack, dflt("bounceBack").perBounceBack);
   }
   h += `<div class="note">It fires on the hole <b>immediately after</b> a net double
     bogey and nowhere else. That link is the contest and is not adjustable — but the
     two switches are independent, so a round can charge for blow-ups without paying
-    for recoveries, or the other way about.</div>` + resetFor("bounceBack");
+    for recoveries, or the other way about.` +
+    (on("bounceBack") ? `` : `<br><b>Off by default</b>, on the same terms as Triple
+      Threat — kept for testing rather than deleted.`) + `</div>` + resetFor("bounceBack");
 
   /* Skins */
   h += `<div class="section-label">Skins</div>` + sw("skins", "In the game");
@@ -2236,6 +2386,20 @@ function renderSettings(){
     }
   }
   h += resetFor("hitList");
+
+  /* The minigame boards. NOT A CONTEST — it pays nothing and appears on no
+     card — but it is a rule of the round and belongs where the rules are. */
+  h += `<div class="section-label">The minigame boards</div>` +
+    numField("Men shown on each board", "boards.depth", draft.boards.depth, D.boards.depth, {step:1}) +
+    `<div class="note">Each contest gets a table of its own on the Leaders screen,
+      so a man who finished eleventh overall can still have won something.<br>
+      <b>Five means something different at eight players than at eighty</b>, which is
+      why it is a setting rather than a number in the code.<br>
+      The depth is a <b>floor, never a ceiling</b>: every man level with the last one
+      shown is shown as well. If six share third place all six appear and the board
+      says so — cutting a tie off at five looks broken, and ties are common here.
+      On an average round 2.5 men share the top of Agony Alley, 2.8 the Hit List and
+      4.3 Team Skins.</div>` + resetFor("boards");
 
   h += `<div class="pad">` +
     `<button class="big solid" id="setSave">Save and rescore</button>` +
@@ -2292,10 +2456,15 @@ function wireSettings(){
     seg.querySelectorAll("button").forEach(b =>
       b.addEventListener("click", () => {
         const key = seg.dataset.onoff;
-        // Switching a contest back on restores it from the DEFAULTS, not from
-        // whatever it was before — there is nothing left of it to restore.
+        /* Switching a contest back on restores it from the DEFAULTS, not from
+           whatever it was before — there is nothing left of it to restore.
+           A CONTEST THAT IS OFF ON THE DEFAULTS has no values there to restore
+           either, and restoring null would leave the switch doing nothing at
+           all. Those come back at the values they were last played on, which
+           the engine parks for exactly this. */
         draft[key] = b.dataset.v === "1"
-          ? JSON.parse(JSON.stringify(E.DEFAULT_CONTESTS[key]))
+          ? JSON.parse(JSON.stringify(E.DEFAULT_CONTESTS[key] != null
+              ? E.DEFAULT_CONTESTS[key] : E.PARKED_CONTESTS[key]))
           : null;
         renderSettings();
       })));
@@ -2597,7 +2766,8 @@ function inviteLink(p){
 }
 
 function inviteText(p){
-  return "Beat the Crowd, " + niceDate(state.date) + ". Pick your six holes and " +
+  return "Beat the Crowd, " + niceDate(state.date) + ". Pick your " +
+    E.PICK_SLOTS.length + " holes and " +
     "your Hit List man here: " + inviteLink(p);
 }
 
