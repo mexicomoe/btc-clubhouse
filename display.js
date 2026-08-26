@@ -110,8 +110,32 @@
       }
     }
 
+    /**
+     * The order a list of men is read in: SURNAME, then first name.
+     *
+     * Names are stored canonically as "First Last", so the surname is the last
+     * word. Sorting on the whole string put Abe Whitfield and Al Brightman both
+     * under A, which is not a list anybody scans down. A single-word name sorts
+     * on itself.
+     *
+     * HERE rather than in the app because it is a rule about reading names,
+     * which is what this file is for — and because the roster is shown in two
+     * places and the same forty men in two orders on two screens is its own
+     * kind of wrong.
+     */
+    function surnameKey(name){
+      const parts = String(name == null ? "" : name).trim().split(/\s+/).filter(Boolean);
+      if(parts.length === 0) return "";
+      const last = parts.length > 1 ? parts[parts.length - 1] : parts[0];
+      return (last + " " + parts.slice(0, -1).join(" ")).trim().toLowerCase();
+    }
+    /** Comparator for anything with a `name`. */
+    function bySurname(a, b){
+      return surnameKey(a && a.name).localeCompare(surnameKey(b && b.name));
+    }
+
     globalThis.ClubhouseDisplay = {
       esc, fmtFinal, fmtStrokes, fitText, abbreviate, fitName, niceDate,
-      MONTHS, CONTEST_NAMES, duelSentence,
+      MONTHS, CONTEST_NAMES, duelSentence, surnameKey, bySurname,
     };
 })();

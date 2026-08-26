@@ -298,6 +298,34 @@
   #foldMove  > summary { background: var(--tint-move); }
   #foldAbout > summary { background: var(--tint-about); }
 
+  /* A ROSTER MAN, as a row to tap. Full width, because a man picking eight
+     names off a list of forty is doing it fast and must not miss. */
+  button.pickman {
+    display: flex; align-items: center; gap: 12px; width: 100%;
+    min-height: 60px; padding: 12px 18px;
+    font: inherit; text-align: left; cursor: pointer;
+    background: var(--paper); color: var(--ink);
+    border: 0; border-bottom: 2px solid var(--ink);
+  }
+  button.pickman:active { background: var(--ink); color: var(--paper); }
+  button.pickman .pmw { flex: 1 1 auto; min-width: 0; }
+  button.pickman .pmn {
+    display: block; font-size: 21px; font-weight: 800; line-height: 1.15;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  button.pickman .pmd { display: block; font-size: 18px; font-weight: 700; margin-top: 3px; }
+  /* The mark is a SHAPE and a WORD, never colour alone. */
+  button.pickman .pmt { flex: 0 0 auto; font-size: 22px; font-weight: 800; }
+  button.pickman.in { background: var(--tint-event); }
+  button.pickman.in .pmt { font-size: 18px; letter-spacing: .5px; }
+  button.pickman.in:active { background: var(--ink); }
+  /* Full round: everybody not already in is out of reach, and says so above.
+     The TEXT stays full-strength black — a man who cannot be tapped still has
+     to be readable in Florida sun. Only the + fades. */
+  button.pickman[disabled] { background: var(--wash); cursor: default; }
+  button.pickman[disabled] .pmt { opacity: .35; }
+  button.pickman:focus-visible { outline: 3px solid var(--gold); outline-offset: -3px; }
+
   /* THE LEADERS SECTIONS. The same fold as Setup's, and deliberately so — one
      accordion to learn, not two. They carry `.lead` rather than `.step` so the
      two never close each other: opening Agony Alley must not shut "Paste birdie

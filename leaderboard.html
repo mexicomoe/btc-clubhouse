@@ -126,6 +126,13 @@
     <summary><span><span class="fname">Add player</span>
       <span class="fsub" id="foldAddSub"></span></span></summary>
     <div class="pad"><button class="big solid" id="addBtn">+ Add a player</button></div>
+    <!-- THE ROSTER, HERE, rather than a round trip to the gear and back. Rob
+         runs two or three events a week and every one starts by building a
+         lineup from the same regular men; the gear is for things touched once a
+         month. The roster SCREEN stays where it is, for adding a new man and
+         correcting an index. This is a way in, not a relocation. -->
+    <div class="section-label" id="rosterPickHead">From the roster</div>
+    <div id="rosterPick"></div>
     <div class="section-label">Paste a list of players</div>
     <div id="rosterBox"></div>
   </details>
@@ -206,7 +213,7 @@ const D  = window.ClubhouseDisplay;
 /* The display helpers live in display.js so results.html can use the same ones.
    Pulled onto locals here so every call site below reads exactly as it did. */
 const { esc, fmtFinal, fmtStrokes, fitText, abbreviate, fitName, niceDate,
-        MONTHS, CONTEST_NAMES, duelSentence } = D;
+        MONTHS, CONTEST_NAMES, duelSentence, bySurname } = D;
 
 /* The order a card reads down the screen. FOUR OF THESE ARE IN THE GAME —
    Watch the Birdie, Agony Alley, the Hit List and Skins. The rest are switched
@@ -285,10 +292,59 @@ function playerFromRoster(m){
 
 /** Is he already in this round? By roster id where there is one, else by name. */
 function inField(m){
-  return state.players.some(p =>
-    (p.rosterId && p.rosterId === m.id) ||
-    IMP.normaliseName(p.name || "") === IMP.normaliseName(m.name || ""));
+  return !!playerFor(m);
 }
+
+/** The player in THIS round who is that roster man, or null. */
+function playerFor(m){
+  return state.players.find(p =>
+    (p.rosterId && p.rosterId === m.id) ||
+    IMP.normaliseName(p.name || "") === IMP.normaliseName(m.name || "")) || null;
+}
+
+/**
+ * Put a roster man in the round. ONE IMPLEMENTATION, called by the roster
+ * screen and by the list inside Add player — the mapping of a saved man onto a
+ * player is `playerFromRoster` and neither screen may grow a second copy of it.
+ *
+ * Returns false when the field is full, so a caller can say so rather than
+ * looking as though the tap did nothing.
+ */
+function addFromRoster(m){
+  if(state.players.length >= MAX_PLAYERS) return false;
+  if(inField(m)) return false;
+  state.players.push(playerFromRoster(m));
+  save();
+  return true;
+}
+
+/**
+ * Take him out again — the same tap, the other way.
+ *
+ * SILENTLY WHEN THERE IS NOTHING TO LOSE, and never otherwise. Un-tapping a
+ * name you have just tapped should not put a dialog up; losing a card, a set of
+ * picks or a Hit List opponent without one is a different matter entirely.
+ */
+function hasWork(p){
+  return scoresFor(p).some(v => v != null) ||
+         E.PICK_SLOTS.some(sl => p[sl.key] != null) ||
+         (p.hitList || "").trim() !== "";
+}
+
+function removeFromRound(p){
+  if(hasWork(p) && !window.confirm(
+      "Take " + (p.name || "him") + " out of the round?\n\n" +
+      "His scores, picks and Hit List pick go with him.")) return false;
+  state.players = state.players.filter(x => x.id !== p.id);
+  delete state.scores[p.id];
+  delete state.handicaps[p.id];
+  save();
+  return true;
+}
+
+/* The order both roster lists are read in — surname, then first name. It lives
+   in display.js with the other rules about reading a name, and both this list
+   and the roster screen use it, so the same men are never in two orders. */
 
 function addToRoster(fields){
   const roster = rosterMen();
@@ -1630,6 +1686,7 @@ function renderSetup(){
   drawMoveBox();
   drawAbout();
   drawFoldSubs();
+  refreshFieldBoxes();
   fitBoardNames();
 }
 
@@ -1652,8 +1709,9 @@ function wireFolds(){
      has to ask for it. Built on open rather than up front so twenty-four
      players are not laid out five times over on a screen nobody has opened. */
   const build = {
-    // Add player carries the paste box too — both are "get the men in".
-    foldAdd: showRosterBox,
+    // Add player carries the roster tap-list and the paste box too — all three
+    // are "get the men in".
+    foldAdd: () => { drawRosterPick(); showRosterBox(); },
     foldPicks: showPicksBox,
     foldHitList: showHitListBox,
   };
@@ -2043,6 +2101,81 @@ function drawMissingPicks(){
    him, the same way a paste of scores is. */
 
 let rosterPreview = null;
+
+/**
+ * The roster, as a list to tap, inside Add player.
+ *
+ * BUILDING A LINEUP IS TAPPING EIGHT NAMES. Tapping again takes him out. A man
+ * already in the round says so and cannot be tapped in twice — which is what
+ * `rosterId` is for, and why `saveEditing` must stop throwing it away.
+ *
+ * His index and tee are COPIED, never linked. Correcting one for a round does
+ * not touch the roster, and that is the whole reason the roster is worth having.
+ */
+function drawRosterPick(){
+  const box = document.getElementById("rosterPick");
+  if(!box) return;
+  const men = rosterMen().slice().sort(bySurname);
+  const full = state.players.length >= MAX_PLAYERS;
+
+  if(men.length === 0){
+    // A PLAIN LINE, not a blank space. An empty box reads as a thing that has
+    // not loaded rather than a list nobody has filled in yet.
+    box.innerHTML = `<div class="note">Nobody on the roster yet. Type a man in
+      above and say yes to saving him, or add the men who play every week under
+      <b>⚙ Settings › The roster</b>. After that, building a field is tapping
+      names.</div>`;
+    return;
+  }
+
+  box.innerHTML =
+    `<div class="note">Tap a man to put him in this round; tap him again to take
+      him out. His index and tee come with him — correcting one <b>for a round</b>
+      never changes him on the roster.</div>` +
+    (full ? `<div class="note warn">This round is full at ${MAX_PLAYERS} players.
+      Take somebody out before adding another.</div>` : ``) +
+    men.map((m, i) => {
+      const here = playerFor(m);
+      const bits = [m.index == null ? "no index" : "idx " + E.formatHandicapIndex(m.index),
+                    "Tee " + (m.tee || "IV")];
+      // A man with no index can be tapped in, but he cannot be scored until he
+      // has one — so the row says it rather than the Setup list saying it later.
+      return `<button class="pickman${here ? " in" : ""}" data-man="${i}"` +
+        (!here && full ? " disabled" : "") + `>` +
+        `<span class="pmw"><span class="pmn">${esc(m.name || "(no name)")}</span>` +
+        `<span class="pmd">${esc(bits.join(" · "))}</span></span>` +
+        `<span class="pmt">${here ? "IN" : "+"}</span></button>`;
+    }).join("");
+
+  box.querySelectorAll("[data-man]").forEach(b =>
+    b.addEventListener("click", () => {
+      const m = men[Number(b.dataset.man)];
+      const here = playerFor(m);
+      const moved = here ? removeFromRound(here) : addFromRoster(m);
+      if(!moved) return;
+      drawRosterPick(); renderSetup(); renderBoard();
+    }));
+}
+
+/**
+ * Rebuild the open step boxes that LIST THE FIELD, after the field moves.
+ *
+ * A fold's contents are built when it is opened and not touched again, which
+ * was harmless while men only ever arrived from another screen. Now they arrive
+ * on THIS screen, a tap at a time — so an open "Set the Hit List" would go on
+ * saying "needs at least two players" while eight of them appeared above it.
+ *
+ * Called from `renderSetup`, which runs after every way the field can change —
+ * a tap on the list here, an Add on the roster screen, a pasted tee sheet, a
+ * man saved or removed on the edit screen.
+ *
+ * ONLY THE HIT LIST. The other two step boxes hold a textarea, and rebuilding
+ * one would throw away a paste a man was halfway through.
+ */
+function refreshFieldBoxes(){
+  const hit = document.getElementById("foldHitList");
+  if(hit && hit.open) showHitListBox();
+}
 
 function showRosterBox(){
   document.getElementById("rosterBox").innerHTML =
@@ -2763,7 +2896,10 @@ function renderRoster(){
     roster.length === 0 ? "Nobody saved yet" :
     roster.length + " men · " + roster.filter(m => inField(m)).length + " in this round";
 
-  const rows = roster.map((m, i) => {
+  // The same order as the list inside Add player — one comparator, so the same
+  // forty men are not in two orders on two screens.
+  const shown = roster.slice().sort(bySurname);
+  const rows = shown.map((m, i) => {
     const here = inField(m);
     const bits = [m.index == null ? "no index" : "idx " + E.formatHandicapIndex(m.index),
                   "Tee " + (m.tee || "IV")];
@@ -2795,21 +2931,19 @@ function renderRoster(){
 
   box.querySelectorAll("[data-add]").forEach(b =>
     b.addEventListener("click", () => {
-      if(state.players.length >= MAX_PLAYERS) return;
-      state.players.push(playerFromRoster(roster[Number(b.dataset.add)]));
-      state.nextId = state.nextId;   // blankPlayer already advanced it
-      save(); renderRoster(); renderSetup(); renderBoard();
+      if(!addFromRoster(shown[Number(b.dataset.add)])) return;
+      renderRoster(); renderSetup(); renderBoard();
     }));
   box.querySelectorAll("[data-edit]").forEach(b =>
-    b.addEventListener("click", () => editRosterMan(Number(b.dataset.edit))));
+    b.addEventListener("click", () =>
+      // Indexed against the roster as STORED, because that is what the editor
+      // writes back into; the rows above are a sorted view of it.
+      editRosterMan(roster.indexOf(shown[Number(b.dataset.edit)]))));
 
   const all = document.getElementById("rosterAddAll");
   if(all) all.addEventListener("click", () => {
-    for(const m of roster){
-      if(state.players.length >= MAX_PLAYERS) break;
-      if(!inField(m)) state.players.push(playerFromRoster(m));
-    }
-    save(); renderRoster(); renderSetup(); renderBoard();
+    for(const m of shown) if(!addFromRoster(m) && state.players.length >= MAX_PLAYERS) break;
+    renderRoster(); renderSetup(); renderBoard();
   });
   document.getElementById("rosterNew").addEventListener("click", () => {
     addToRoster({ name: "" });
@@ -3145,6 +3279,12 @@ function editPlayer(id){
   const found = state.players.find(p => p.id === id);
   editing = found ? Object.assign({}, found) : blankPlayer();
   editing.isNew = !found;
+  /* A NEW MAN IS OFFERED THE ROSTER, and the offer starts ON. The men in this
+     club are regulars — a man typed in this week is a man wanted next week —
+     and the cost of getting it wrong is one tap on the roster screen, against
+     the cost of getting it right by hand every fortnight. It is a visible
+     switch, not a silent side effect. */
+  editing.alsoRoster = !found;
   drawEdit();
   show("edit");
 }
@@ -3162,7 +3302,20 @@ function drawEdit(){
   document.getElementById("editBody").innerHTML =
     `<div class="field"><label for="fName">Name</label>
       <input type="text" id="fName" autocomplete="off" autocapitalize="words" value="${esc(p.name)}"></div>
-
+` +
+    /* THE ROSTER OFFER, for a man being typed in. Only for a new man and only
+       when the roster has not got him: for anybody else it would be a switch
+       that does nothing, which teaches a man to ignore switches. */
+    (p.isNew ? `<div class="field"><span class="flab">Save him to the roster</span>
+      <div class="seg" id="fRosterSeg">
+        <button type="button" data-v="1" aria-pressed="${!!p.alsoRoster}">Yes</button>
+        <button type="button" data-v="0" aria-pressed="${!p.alsoRoster}">No</button>
+      </div>
+      <div class="cd" style="margin-top:10px;font-size:18px;font-weight:700">
+        The roster outlives a round, so next week he is a name to tap rather than
+        a man to type again. His index and tee are COPIED into this round —
+        correcting one here never changes him on the roster.</div></div>` : ``) +
+    `
      <div class="field"><label for="fGhin">GHIN</label>
       <input type="text" id="fGhin" inputmode="numeric" autocomplete="off"
         placeholder="leave blank if you don't have it" value="${esc(p.ghin || "")}"></div>
@@ -3207,8 +3360,9 @@ function drawEdit(){
         <select id="fPick_${sl.key}" aria-label="${esc(sl.label)} pick">${pickOpts(legal[sl.key], p[sl.key])}</select>
       </div>`).join("")}
       <div class="cd" style="margin-top:10px;font-size:18px;font-weight:700">
-        A par 3, a par 4 and a par 5 on each nine. Each one pays 0.5 for a net
-        birdie and 1.0 for a net eagle.</div></div>
+        Two par 5s, three par 3s and four par 4s. Each one pays 0.5 for a net
+        birdie and 1.5 for a net eagle, and nothing on any of the nine costs
+        0.5.</div></div>
 
      <div id="fErr" class="err"></div>
      <div class="pad">
@@ -3231,6 +3385,13 @@ function drawEdit(){
   refreshCh();
 
   $("fName").addEventListener("input", e => { editing.name = e.target.value; });
+  const rosterSeg = document.getElementById("fRosterSeg");
+  if(rosterSeg) rosterSeg.querySelectorAll("button").forEach(b =>
+    b.addEventListener("click", () => {
+      editing.alsoRoster = b.dataset.v === "1";
+      rosterSeg.querySelectorAll("button").forEach(o =>
+        o.setAttribute("aria-pressed", String(o.dataset.v === b.dataset.v)));
+    }));
   $("fGhin").addEventListener("input", e => { editing.ghin = e.target.value; });
   $("fIndex").addEventListener("input", e => {
     // Keep exactly what was typed, so a rejected entry is never wiped from under
@@ -3286,9 +3447,23 @@ function saveEditing(){
   err.textContent = "";
 
   p.name = p.name.trim();
-  const rec = { id: p.id, name: p.name, ghin: (p.ghin || "").trim(),
+  /* CARRIED, NOT REBUILT. This used to be a fresh object of exactly the fields
+     the form owns, assigned over the man — so everything else about him was
+     dropped on any save. Correcting an index wiped his TEAM (which is on this
+     very form and so could never be set at all), his HIT LIST opponent, and his
+     ROSTER LINK, silently and every time.
+     The link is the one that bites now: without it a man tapped in from the
+     roster stops being marked "in" the moment his index is corrected, and can
+     be tapped in a second time. */
+  const keep = state.players.find(x => x.id === p.id) || {};
+  const rec = Object.assign({}, keep, {
+                id: p.id, name: p.name, ghin: (p.ghin || "").trim(),
                 index: p.index, tee: p.tee, gender: p.gender,
-                cart: p.cart, flight: (p.flight || "").trim() };
+                cart: p.cart, team: (p.team || "").trim(),
+                flight: (p.flight || "").trim() });
+  // `rosterId` rides along in `keep`, and a man typed in by hand has none —
+  // until the offer below puts him in the roster and gives him one.
+  if(p.rosterId) rec.rosterId = p.rosterId;
   E.PICK_SLOTS.forEach(sl => { rec[sl.key] = p[sl.key] == null ? null : p[sl.key]; });
   // The tee just used becomes the one the next man starts on.
   if(rec.tee) state.lastTee = rec.tee;
@@ -3303,6 +3478,21 @@ function saveEditing(){
   if(was && was.picksAuto && !picksMoved) rec.picksAuto = true;
 
   if(at === -1) state.players.push(rec); else state.players[at] = rec;
+
+  /* A NEW MAN GOES IN THE ROSTER TOO, if the offer was left on. Typing a man in
+     is the path for somebody the roster does not have, and the next event will
+     want him just as much as this one — so the alternative is typing him again
+     in a fortnight. Only ever ADDS: a man already saved is matched by name and
+     left exactly as he is, because the roster is the record and a round is a
+     copy of it. */
+  if(rec.rosterId == null && editing.alsoRoster && rec.name){
+    const already = rosterMen().find(m =>
+      IMP.normaliseName(m.name || "") === IMP.normaliseName(rec.name));
+    const m = already || addToRoster({ name: rec.name, index: rec.index,
+                                       tee: rec.tee, gender: rec.gender });
+    rec.rosterId = m.id;
+  }
+
   editing = null;
   save();
   renderSetup(); show("setup");
