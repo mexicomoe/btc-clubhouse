@@ -15,18 +15,52 @@
   <header class="band">
     <div class="title">Leaderboard</div>
     <div class="sub" id="boardSub">Aberdeen G&amp;CC</div>
+    <button class="gear" data-gear>⚙<span>Settings</span></button>
   </header>
   <nav class="tabs" data-tabs></nav>
+  <!-- THE BOARD IS NOT A FOLD. It is what the screen is for, so it is plain
+       markup above the sections and cannot be shut by the accordion. -->
   <div id="houseRules"></div>
   <div id="boardFlights"></div>
   <div id="rows"></div>
   <div id="boardEmpty"></div>
+  <!-- Everything after the round: a section per contest, every duel, and the
+       skins hole by hole that used to be a tab. Built by drawBoards, because
+       which contests are in the game is the round's own business. -->
   <div id="boards"></div>
   <div id="shareBox"></div>
 </section>
 
+<section id="more" class="screen">
+  <div class="backbar"><button class="back" id="moreBack">‹ Back</button></div>
+  <header class="band">
+    <div class="title">Settings</div>
+    <div class="sub">The things touched once a month</div>
+  </header>
+
+  <button class="fold step go" id="goRoster">
+    <span><span class="fname">The roster</span>
+      <span class="fsub" id="goRosterSub"></span></span></button>
+
+  <button class="fold step go" id="goRules">
+    <span><span class="fname">The rules</span>
+      <span class="fsub" id="goRulesSub"></span></span></button>
+
+  <details class="fold" id="foldMove">
+    <summary><span><span class="fname">Move this event</span>
+      <span class="fsub" id="foldMoveSub"></span></span></summary>
+    <div id="moveBox"></div>
+  </details>
+
+  <details class="fold" id="foldAbout">
+    <summary><span><span class="fname">About</span>
+      <span class="fsub" id="foldAboutSub"></span></span></summary>
+    <div id="aboutBox"></div>
+  </details>
+</section>
+
 <section id="roster" class="screen">
-  <div class="backbar"><button class="back" id="rosterBack">‹ Setup</button></div>
+  <div class="backbar"><button class="back" id="rosterBack">‹ Settings</button></div>
   <header class="band">
     <div class="title">The roster</div>
     <div class="sub" id="rosterSub">Men who play, round after round</div>
@@ -40,11 +74,17 @@
     <div class="title">Send the invitations</div>
     <div class="sub" id="invitesSub">One message a man</div>
   </header>
+  <!-- The two BULK links came here off Setup. They are the same job as the
+       messages below — getting the sheet to the men — and having them a tab
+       apart meant deciding between them without seeing both. -->
+  <div class="section-label">Open the pick sheet</div>
+  <div id="pickLinkBox"></div>
+  <div class="section-label">One message a man</div>
   <div id="invitesScreen"></div>
 </section>
 
 <section id="settings" class="screen">
-  <div class="backbar"><button class="back" id="settingsBack">‹ Setup</button></div>
+  <div class="backbar"><button class="back" id="settingsBack">‹ Settings</button></div>
   <header class="band">
     <div class="title">The rules</div>
     <div class="sub" id="settingsSub">What this round is played under</div>
@@ -61,20 +101,24 @@
   <header class="band">
     <div class="title">Setup</div>
     <div class="sub" id="setupSub">Players for this round</div>
+    <button class="gear" data-gear>⚙<span>Settings</span></button>
   </header>
   <nav class="tabs" data-tabs></nav>
 
   <!--
-    THE ORDER IS THE ORDER HE DOES IT IN, actions first and the player list
-    last. The list was at the top, so every action sat below ten men and
-    everything he came to do needed scrolling to.
+    FOUR STEPS, IN THE ORDER ROB DOES THEM — and on different days. Get the men
+    in, send them the sheet, read the picks back, settle the Hit List. That is
+    the whole of what happens before a round, and the screen now says so.
+
+    It held TWELVE items. The roster, the rules, moving the event and the build
+    line went to the gear — none of them is touched more than once a month.
+    Paste a list of players joined Add player, because both are "get the men
+    in"; Open the pick sheet went onto the invitations screen, because both are
+    "send it to the men". Nothing was renamed and no action was dropped.
 
     Each step is shut and says where it stands, so the screen answers "what have
-    I done and what is left" without opening anything.
-
-    Three of these EXPAND and three GO SOMEWHERE — Add player and the two other
-    pages are screens of their own, not boxes. They are built to look alike and
-    marked differently: a + to open here, a › to leave.
+    I done and what is left" without opening anything. A ＋ opens here, a › goes
+    somewhere.
   -->
   <div id="setupStatus"></div>
 
@@ -82,19 +126,13 @@
     <summary><span><span class="fname">Add player</span>
       <span class="fsub" id="foldAddSub"></span></span></summary>
     <div class="pad"><button class="big solid" id="addBtn">+ Add a player</button></div>
-  </details>
-
-  <details class="fold step" id="foldRoster">
-    <summary><span><span class="fname">Paste a list of players</span>
-      <span class="fsub" id="foldRosterSub"></span></span></summary>
+    <div class="section-label">Paste a list of players</div>
     <div id="rosterBox"></div>
   </details>
 
-  <details class="fold step" id="foldPickLink">
-    <summary><span><span class="fname">Open the pick sheet</span>
-      <span class="fsub" id="foldPickLinkSub"></span></span></summary>
-    <div id="pickLinkBox"></div>
-  </details>
+  <button class="fold step go" id="goInvites">
+    <span><span class="fname">Send the invitations</span>
+      <span class="fsub" id="goInvitesSub"></span></span></button>
 
   <details class="fold step" id="foldPicks">
     <summary><span><span class="fname">Paste birdie picks</span>
@@ -108,7 +146,10 @@
     <div id="hitListBox"></div>
   </details>
 
-  <details class="fold step" id="foldEvent">
+  <!-- NOT one of the four, and NOT in the gear either. The allowance and the
+       skins switch move every man's score, so they stay where they can be read
+       without leaving the screen a round is set up on. -->
+  <details class="fold" id="foldEvent">
     <summary><span><span class="fname">Event settings</span>
       <span class="fsub" id="foldEventSub"></span></span></summary>
     <div id="eventBox"></div>
@@ -117,34 +158,10 @@
     <div id="autoPicksSwitch"></div>
   </details>
 
-  <button class="fold step go" id="goInvites">
-    <span><span class="fname">Send the invitations</span>
-      <span class="fsub" id="goInvitesSub"></span></span></button>
-
-  <button class="fold step go" id="goRoster">
-    <span><span class="fname">The roster</span>
-      <span class="fsub" id="goRosterSub"></span></span></button>
-
-  <button class="fold step go" id="goRules">
-    <span><span class="fname">The rules</span>
-      <span class="fsub" id="goRulesSub"></span></span></button>
-
   <!-- Open, and scrolled PAST rather than through. It is a reference, not an
        action, and it is the longest thing on the screen. -->
   <div class="section-label" id="rosterHead">The player list</div>
   <div id="setupRows"></div>
-
-  <details class="fold" id="foldMove">
-    <summary><span><span class="fname">Move this event</span>
-      <span class="fsub" id="foldMoveSub"></span></span></summary>
-    <div id="moveBox"></div>
-  </details>
-
-  <details class="fold" id="foldAbout">
-    <summary><span><span class="fname">About</span>
-      <span class="fsub" id="foldAboutSub"></span></span></summary>
-    <div id="aboutBox"></div>
-  </details>
 </section>
 
 <section id="edit" class="screen">
@@ -152,20 +169,15 @@
   <div id="editBody"></div>
 </section>
 
-<section id="skins" class="screen">
-  <header class="band">
-    <div class="title">Skins</div>
-    <div class="sub" id="skinsSub">Group against group, hole by hole</div>
-  </header>
-  <nav class="tabs" data-tabs></nav>
-  <div id="skinsFlights"></div>
-  <div id="skinsBody"></div>
-</section>
+<!-- THE SKINS TAB IS GONE. It existed because Skins was once the only contest
+     with hole-by-hole detail; there are four contest boards on Leaders now and
+     Skins is one of four. Everything it held is a section on Leaders. -->
 
 <section id="import" class="screen">
   <header class="band">
     <div class="title">Import scores</div>
     <div class="sub">Paste the rows from Golf Genius</div>
+    <button class="gear" data-gear>⚙<span>Settings</span></button>
   </header>
   <nav class="tabs" data-tabs></nav>
   <div id="importBody"></div>
@@ -461,7 +473,6 @@ function openEvent(id){
   save();
   buildTabs();                      // the Skins tab follows this event's switch
   renderBoard(); renderSetup(); renderImport();
-  if(skinsOn()) renderSkins();
   show("setup");
 }
 
@@ -881,16 +892,23 @@ function cardOf(p){
 function readyPlayers(){ return state.players.filter(isReady); }
 
 /* ---------- screen routing ---------- */
-const SCREENS = ["board","player","setup","edit","skins","import","settings","roster","invites"];
-// Four tabs across a phone: short labels, so none has to shrink below 18px.
-const TAB_LABELS = [["board","Leaders"],["setup","Setup"],["skins","Skins"],["import","Import"]];
+const SCREENS = ["board","player","setup","edit","import","settings","roster","invites","more"];
+/* THREE TABS AND A GEAR. Three labels sit comfortably at 375px; a fourth was
+   already tight, and the gear costs the bar nothing because it lives in the
+   band above it. */
+const TAB_LABELS = [["board","Leaders"],["setup","Setup"],["import","Import"]];
+/** The tabs, and the screens reached from them rather than from the bar. */
+const TABS = TAB_LABELS.map(([id]) => id);
 
 function show(id){
-  // Skins off takes its tab away, so there is nowhere to land — including a
-  // stored tab from before it was switched off.
-  if(id === "skins" && !skinsOn()) id = "board";
+  /* A TAB NAME STORED BY AN OLDER BUILD MUST NOT WHITE-SCREEN THE APP.
+     "skins" was a tab until the boards took its job, and every phone that ever
+     opened it has the word in local storage. Without this, the first line below
+     calls getElementById("skins"), gets null, and throws before anything is
+     drawn — the app would simply not start. */
+  if(!document.getElementById(id)) id = "board";
   SCREENS.forEach(s => document.getElementById(s).classList.toggle("on", s === id));
-  if(id === "board" || id === "setup" || id === "skins" || id === "import"){
+  if(TABS.includes(id)){
     state.tab = id; save();
     document.querySelectorAll("nav.tabs").forEach(nav => {
       nav.querySelectorAll("button").forEach(b =>
@@ -903,14 +921,11 @@ function show(id){
   window.scrollTo(0,0);
 }
 /**
- * The tabs actually on offer. Skins switched off for the round takes its tab
- * with it — there is nothing behind it to read, and a tab that only explains
- * its own absence is a tab in the way. A one-cart round keeps the tab, because
- * there it has something to say.
+ * All three, always. Skins losing its switch no longer takes a tab with it —
+ * it is a section on Leaders now, and a section that is not in the game simply
+ * is not drawn.
  */
-function activeTabs(){
-  return TAB_LABELS.filter(([id]) => id !== "skins" || skinsOn());
-}
+function activeTabs(){ return TAB_LABELS; }
 
 function buildTabs(){
   document.querySelectorAll("nav.tabs").forEach(nav => {
@@ -919,10 +934,30 @@ function buildTabs(){
     nav.querySelectorAll("button").forEach(b =>
       b.addEventListener("click", () => { if(b.dataset.go === "import") renderImport();
                                           if(b.dataset.go === "setup") renderSetup();
-                                          if(b.dataset.go === "skins") renderSkins();
                                           if(b.dataset.go === "board") renderBoard();
                                           show(b.dataset.go); }));
   });
+}
+
+/**
+ * The gear, in the band above the tabs on all three.
+ *
+ * NOT A FOURTH TAB. Three labels fit a phone comfortably and a fourth was
+ * already tight; the gear takes none of that width because it is not in the
+ * bar. It carries the WORD as well as the shape — an unlabelled icon is a
+ * guess, and this audience should not have to make one.
+ *
+ * It remembers where it was tapped from, so Back goes where Back should.
+ */
+let cameFrom = "board";
+function wireGear(){
+  document.querySelectorAll("button.gear").forEach(b =>
+    b.addEventListener("click", () => {
+      cameFrom = TABS.includes(state.tab) ? state.tab : "board";
+      drawFoldSubs();
+      show("more");
+    }));
+  document.getElementById("moreBack").addEventListener("click", () => show(cameFrom));
 }
 
 /* ---------- the leaderboard ---------- */
@@ -948,7 +983,13 @@ function renderBoard(){
   if(ready.length === 0){
     // Nothing set up yet — show the seeded demo round so the screen isn't blank.
     boardCards = E.SAMPLE_ROUND.slice();
-    results = E.computeLeaderboard();
+    /* THE DEMO ROUND IS SCORED UNDER THIS ROUND'S RULES, not the defaults.
+       It used to take no config at all, which was invisible while the boards
+       were one line each: change a value on the rules screen before adding
+       anybody and the board went on showing the default answer, while the
+       Skins section beside it — which reads the round's own rules — showed the
+       new one. Two figures from two rulebooks on one screen. */
+    results = E.computeLeaderboard(boardCards, undefined, contestConfig());
     subEl.textContent = (state.name || "Round") + " · demo round";
     emptyEl.innerHTML =
       `<div class="note warn">This is a demo round. Add your players on the ` +
@@ -1026,6 +1067,54 @@ function renderBoard(){
   fitBoardNames();
 }
 
+/**
+ * THE SHUT LINE FOR ONE CONTEST — who leads it and what he did.
+ *
+ * A shut section has to be worth leaving shut. "Wolfson leads · 3 birdies"
+ * answers the only question most men have about a contest they did not win,
+ * and the ones who did win it open it.
+ */
+function boardSummary(key, board, results){
+  if(board.rows.length === 0) return "not scored this round";
+  const top = board.rows[0];
+  const shared = board.rows.filter(r => r.rank === 1).length;
+  const who = shared > 1 ? shared + " share the lead" : top.name + " leads";
+
+  if(key === "watchTheBirdie"){
+    const c = top.contest;
+    const b = c.birdies || 0, e = c.eagles || 0;
+    const said = [b ? b + " birdie" + (b === 1 ? "" : "s") : "",
+                  e ? e + " eagle" + (e === 1 ? "" : "s") : ""].filter(Boolean).join(" and ");
+    return who + (said ? " · " + said : " · " + fmtStrokes(top.strokes));
+  }
+  if(key === "agonyAlley"){
+    const net = top.contest.netHoles
+      ? top.contest.netHoles.reduce((a, n) => a + n, 0) : null;
+    return who + (net == null ? "" : " · net " + net);
+  }
+  if(key === "hitList"){
+    /* AN UPSET IS A MAN WHO BACKED HIMSELF AGAINST A BETTER PLAYER AND WON —
+       the "lower" band, which is priced hardest at −1.1 precisely because it is
+       the hard way to do it. It is the number worth putting on a shut line:
+       everything else about the Hit List is in the duel table below. */
+    const duels = E.hitListDuels(results);
+    const settled = duels.filter(d => d.settled);
+    const upsets = duels.filter(d => d.outcome === "win" && d.band === "lower").length;
+    return settled.length + " duel" + (settled.length === 1 ? "" : "s") +
+      (upsets ? " · " + upsets + " upset" + (upsets === 1 ? "" : "s") : " · no upsets");
+  }
+  return who + " · " + fmtStrokes(top.strokes);
+}
+
+/** The shut line for the Skins section — the whole contest in six words. */
+function skinsSummary(settled){
+  if(settled.reason === "tooFew") return "no skins — " + settled.fieldSize + " players is too few";
+  if(settled.reason === "noneEntered") return "nobody has a " + (settled.format === "team" ? "team" : "group") + " yet";
+  if(settled.reason === "oneGroup") return "no skins — only one " + (settled.format === "team" ? "team" : "group") + " out";
+  return settled.skinsWon + " skin" + (settled.skinsWon === 1 ? "" : "s") + " · " +
+    Math.abs(settled.skinValue).toFixed(2) + " each";
+}
+
 /* ---------- the minigame boards ----------
    A table of its own for each contest, and every duel in the round.
 
@@ -1034,6 +1123,10 @@ function renderBoard(){
    detail screen nobody opened. With four there is room to say who won each one
    — so a man who came eleventh overall can still have taken Agony Alley, and
    hear about it in the bar rather than never.
+
+   EVERY SECTION IS SHUT AND THE BOARD IS NOT. Five things stacked open is a
+   screen nobody scrolls to the bottom of; the board is what the screen is for,
+   so it stays above them and out of the accordion entirely.
 
    The depth comes from the round's own rules and is a FLOOR: every man level
    with the last one shown is shown as well. */
@@ -1051,15 +1144,24 @@ function drawBoards(results){
   if(scored.length === 0){ box.innerHTML = ""; return; }
 
   const depth = boardDepth();
+  const cfg = contestConfig();
+  const open = readFolds();
   let html = "";
 
+  /** One shut section. `id` is what the open/shut memory is keyed on. */
+  const section = (id, name, sub, body) =>
+    `<details class="fold lead" id="${id}"${open[id] === true ? " open" : ""}>` +
+      `<summary><span><span class="fname">${esc(name)}</span>` +
+      `<span class="fsub">${esc(sub)}</span></span></summary>` +
+      `<div>${body}</div></details>`;
+
   for(const key of boardContests()){
+    if(key === "skins") continue;                 // its own section, below
     const board = E.contestBoard(results, key, { depth });
     if(board.rows.length === 0) continue;
-    html += `<div class="section-label">${esc(CONTEST_NAMES[key] || key)}` +
-      (board.tieNote ? `<span class="mgnote">${esc(board.tieNote)}</span>` : ``) +
-      `</div>`;
-    html += board.rows.map(row => {
+    let body = "";
+    if(board.tieNote) body += `<div class="note">${esc(board.tieNote)}</div>`;
+    body += board.rows.map(row => {
       // What he did, not just what it paid — "3 net birdies" is the sentence a
       // man repeats, and the strokes on their own are not.
       const said = [row.detail, row.wonBy ? "won on " + row.wonBy : ""].filter(Boolean).join(" · ");
@@ -1069,25 +1171,79 @@ function drawBoards(results){
         `<span class="mgd">${esc(said)}</span></span>` +
         `<span class="mgs">${fmtStrokes(row.strokes)}</span></button>`;
     }).join("");
+    html += section("leadBoard_" + key, CONTEST_NAMES[key] || key,
+                    boardSummary(key, board, results), body);
   }
 
   /* ---- every duel, with the margin ----
-     Separate from the top five above it, and the whole table rather than a cut
-     of it: nobody knows who named whom until it is published, so this IS the
-     reveal. Two men who named each other make two lines — they are two
-     separate bets and one can be void while the other stands. */
-  if(contestConfig().hitList != null){
+     Its own section rather than part of the Hit List's five, and the whole
+     table rather than a cut of it: nobody knows who named whom until it is
+     published, so this IS the reveal. Two men who named each other make two
+     lines — they are two separate bets and one can be void while the other
+     stands. */
+  if(cfg.hitList != null){
     const duels = E.hitListDuels(results);
     if(duels.length){
-      html += `<div class="section-label">Every duel</div>`;
-      html += duels.map(d =>
+      const body = duels.map(d =>
         `<div class="duel${d.settled ? "" : " quiet"}">${esc(duelSentence(d))}</div>`).join("");
+      /* The shut line is the headline itself. THE BIGGEST WIN, not the biggest
+         margin: the two are the same duel seen from either end, and "Chip lost
+         to Dex by 9" is the wrong half of it to lead with. */
+      const headline = duels.find(d => d.outcome === "win") || duels[0];
+      html += section("leadDuels", "Every duel", duelSentence(headline), body);
     }
+  }
+
+  /* ---- Skins, the whole of what used to be a tab ---- */
+  if(cfg.skins != null){
+    const settled = E.skinsSettlement(boardCards, undefined, cfg);
+    const board = E.contestBoard(results, "skins", { depth });
+    let body = "";
+    if(board.rows.length){
+      if(board.tieNote) body += `<div class="note">${esc(board.tieNote)}</div>`;
+      body += board.rows.map(row =>
+        `<button class="mg${row.rank === 1 ? " leader" : ""}" data-who="${esc(row.name)}">` +
+        `<span class="mgr">${row.rank}</span>` +
+        `<span class="mgw"><span class="mgn">${esc(row.name)}</span>` +
+        `<span class="mgd">${esc(row.detail)}</span></span>` +
+        `<span class="mgs">${fmtStrokes(row.strokes)}</span></button>`).join("");
+    }
+    body += skinsSectionHtml(settled);
+    const name = settled.format === "team" ? "Team Skins" : "Skins";
+    html += section("leadSkins", name, skinsSummary(settled), body);
   }
 
   box.innerHTML = html;
   box.querySelectorAll("button.mg").forEach(b =>
     b.addEventListener("click", () => showPlayer(b.dataset.who)));
+  wireLeadSections(box);
+}
+
+/**
+ * The accordion, for the sections BUILT HERE.
+ *
+ * `wireFolds` cannot do this job: it runs once at startup over the static
+ * folds, and these are drawn afresh on every render. It also closes every
+ * `details.fold.step` in the document, which is Setup's rule — opening Agony
+ * Alley must not shut "Paste birdie picks" on a screen nobody is looking at.
+ * So these carry `.lead` rather than `.step`, and the two accordions never see
+ * each other.
+ */
+function wireLeadSections(box){
+  box.querySelectorAll("details.fold.lead").forEach(d => {
+    d.addEventListener("toggle", () => {
+      if(d.open){
+        box.querySelectorAll("details.fold.lead").forEach(o => {
+          if(o !== d && o.open) o.open = false;
+        });
+      }
+      // Remembered the same way Setup's are, in the same store, keyed by id.
+      const now = readFolds();
+      box.querySelectorAll("details.fold.lead").forEach(o => { now[o.id] = o.open; });
+      try { localStorage.setItem(FOLD_KEY, JSON.stringify(now)); } catch(e) { /* full or private */ }
+      fitBoardNames();
+    });
+  });
 }
 
 /* ---------- one link, texted to the group ----------
@@ -1496,8 +1652,8 @@ function wireFolds(){
      has to ask for it. Built on open rather than up front so twenty-four
      players are not laid out five times over on a screen nobody has opened. */
   const build = {
-    foldPickLink: showPickLinkBox,
-    foldRoster: showRosterBox,
+    // Add player carries the paste box too — both are "get the men in".
+    foldAdd: showRosterBox,
     foldPicks: showPicksBox,
     foldHitList: showHitListBox,
   };
@@ -1515,7 +1671,10 @@ function wireFolds(){
           if(o !== d && o.open) o.open = false;
         });
       }
-      const now = {};
+      // MERGED, not replaced. The Leaders sections are drawn after this runs
+      // and are not always in the document when it does; writing a fresh object
+      // would forget them every time a Setup step was opened.
+      const now = readFolds();
       document.querySelectorAll("details.fold").forEach(o => { now[o.id] = o.open; });
       try { localStorage.setItem(FOLD_KEY, JSON.stringify(now)); } catch(e) { /* full or private — the fold simply forgets */ }
     });
@@ -1553,20 +1712,16 @@ function drawFoldSubs(){
                   " an index and a tee" : ""),
     notReady > 0);
 
+  /* A PASTE SITTING THERE UNFINISHED beats the count to the line — it is the
+     thing to act on, and it lives inside Add player now. */
   const noIdx = state.players.filter(p => p.index == null).length;
-  say("foldPickLinkSub",
-    men === 0 ? "Send it to the men before the round"
-      : noIdx ? noIdx + " without an index — no Hit List link until they have one"
-      : "Send it to the men · " + ready + " in the field link",
-    noIdx > 0);
-
-  /* PASTE A LIST — whether a paste is sitting there unfinished. */
   const rosterBad = rosterPreview ? rosterPreview.rows.filter(r => r.problems.length).length : 0;
-  say("foldRosterSub",
-    !rosterPreview ? "A tee sheet or a spreadsheet, all at once"
-      : rosterBad ? rosterBad + " of " + rosterPreview.rows.length + " lines could not be read — not yet added"
-      : rosterPreview.rows.length + " read and waiting to be added",
-    rosterBad > 0);
+  if(rosterPreview){
+    say("foldAddSub",
+      rosterBad ? rosterBad + " of " + rosterPreview.rows.length + " pasted lines could not be read — not yet added"
+        : rosterPreview.rows.length + " read and waiting to be added",
+      rosterBad > 0);
+  }
 
   /* BIRDIE PICKS — how many men are actually holding a full set. */
   const withPicks = state.players.filter(p =>
@@ -1610,11 +1765,15 @@ function drawFoldSubs(){
   const inviteable = readyPlayers();
   const sentCount = inviteable.filter(p => sent[p.id] && sent[p.id].six === sixKey(p)).length;
   const stale = inviteable.filter(p => sent[p.id] && sent[p.id].six !== sixKey(p)).length;
+  /* THE PICK SHEET MOVED ONTO THIS SCREEN, so its warning moved onto this
+     line: a man with no index has no opponents to be offered, and the link
+     with the field in it cannot be built until he has one. */
   say("goInvitesSub",
     inviteable.length === 0 ? "Nobody to send to yet"
+      : noIdx ? noIdx + " without an index — no field link until they have one"
       : sentCount + " of " + inviteable.length + " sent" +
         (stale ? " · " + stale + " changed since — send again" : ""),
-    stale > 0);
+    stale > 0 || noIdx > 0);
 
   /* THE RULES — default, or what was changed. */
   say("goRulesSub",
@@ -1625,10 +1784,9 @@ function drawFoldSubs(){
   if(head) head.textContent = men === 0 ? "The player list" :
     "The player list · " + men + (ready < men ? " · " + (men - ready) + " not ready" : "");
 
-  document.getElementById("foldMoveSub").textContent = exportNote(state);
+  say("foldMoveSub", exportNote(state), false);
   const v = window.ClubhouseVersion;
-  document.getElementById("foldAboutSub").textContent =
-    v && v.build ? "Build " + v.build : "Build unknown";
+  say("foldAboutSub", v && v.build ? "Build " + v.build : "Build unknown", false);
 }
 
 /**
@@ -1784,7 +1942,6 @@ function drawAllowance(){
     state.allowancePercent = Number(e.target.value);
     save();
     renderSetup(); renderBoard();
-    if(skinsOn()) renderSkins();
   });
 }
 
@@ -2503,7 +2660,6 @@ function saveSettings(){
   buildTabs();
   // RESCORED FROM THE SCORES ALREADY STORED. No card is ever re-entered.
   renderBoard();
-  if(skinsOn()) renderSkins();
   draft = null;
   renderSettings();
   renderSetup();
@@ -3179,109 +3335,86 @@ function drawHouseRules(){
 }
 
 /* ---------- skins ---------- */
-function renderSkins(){
-  const body = document.getElementById("skinsBody");
-  const sub = document.getElementById("skinsSub");
-  const config = contestConfig().skins;
+/* ---------- the Skins section, on Leaders ----------
+   IT WAS A TAB. It existed because Skins was once the only contest with
+   hole-by-hole detail; there are four contest boards above this now and Skins
+   is one of four, so it is a section like the rest.
 
-  if(!config){
-    document.getElementById("skinsFlights").innerHTML = "";
-    sub.textContent = "Switched off for this round";
-    body.innerHTML = `<div class="note warn">Skins is switched off for this round.
-      Turn it back on at the bottom of the <b>Setup</b> tab.</div>`;
-    return;
-  }
+   IT NO LONGER SETTLES ANYTHING. It used to work the skins out again, in the
+   page, and it did it DIFFERENTLY from the engine — inside the current flight,
+   and without excluding men who never finished. Ten men in two flights of five
+   had the leaderboard paying every man a skin while this screen said there were
+   no skins at all, because five is under the minimum. It reads
+   `E.skinsSettlement` now, which is the same call `applySkins` makes, so the
+   figure here and the figure on a man's card cannot disagree.
 
-  // Skins is played inside a flight: carts only ever face carts they are
-  // flighted with, so this screen shows one flight at a time.
-  const allFlights = E.sortFlights([...new Set(readyPlayers().map(p => (p.flight || "").trim()))]);
-  if(!allFlights.includes(state.flight)) state.flight = allFlights[0] || "";
-  drawFlightPicker("skinsFlights", allFlights, state.flight, (f) => {
-    state.flight = f; save(); renderSkins(); renderBoard();
-  });
+   AND THERE IS NO FLIGHT PICKER, because Skins ignores flights. One here would
+   be a control that changes nothing, which is worse than none. */
 
-  const inFlight = readyPlayers().filter(p =>
-    allFlights.length < 2 || (p.flight || "").trim() === state.flight);
-  // THE FIELD SIZE DECIDES THE FORMAT, not a switch: under 8 there are none,
-  // 8 to 15 is cart against cart, 16 or more is team against team.
-  const format = E.skinsFormat(inFlight.length, config);
+/** What a group is called, without saying "Team Team 2" to a man who typed it. */
+function groupName(id, format){
   const word = format === "team" ? "team" : "group";
   const Word = format === "team" ? "Team" : "Group";
-  /* A man who types "Team 1" into the team field should not be shown
-     "Team Team 1". Prefix only when the name does not already say it. */
-  const named = (id) => new RegExp("^" + word + "\\b", "i").test(String(id).trim())
+  return new RegExp("^" + word + "\\b", "i").test(String(id).trim())
     ? String(id).trim() : Word + " " + id;
+}
 
-  if(format == null){
-    sub.textContent = inFlight.length + " players — too few for skins";
-    body.innerHTML = `<div class="note warn"><b>No skins at ${inFlight.length}
-      player${inFlight.length===1?"":"s"}.</b><br>
+/** The whole of the old Skins tab, as the inside of one section. */
+function skinsSectionHtml(settled){
+  const config = settled.config;
+  const format = settled.format;
+  const word = format === "team" ? "team" : "group";
+  const named = (id) => groupName(id, format);
+
+  /* WHY IT IS NOT RUNNING, when it is not. Every one of these was on the old
+     tab and every one of them still has to be said — a section that simply
+     drew nothing would read as a contest that scored the field nothing. */
+  if(settled.reason === "tooFew"){
+    return `<div class="note warn"><b>No skins at ${settled.fieldSize}
+      player${settled.fieldSize===1?"":"s"}.</b><br>
       Skins needs a field of at least ${config.minPlayers}. Below that there is not
       enough of a field to divide, and the contest is simply not played.</div>`;
-    return;
   }
-
-  const groupOf = (p) => format === "team" ? (p.team || "").trim() : (p.cart == null ? "" : String(p.cart).trim());
-  const entered = inFlight.filter(p => groupOf(p) !== "");
-  if(entered.length === 0){
-    sub.textContent = "No " + word + "s yet";
-    body.innerHTML = `<div class="note">Nobody has a ${word} yet. Give each man
+  if(settled.reason === "noneEntered"){
+    return `<div class="note">Nobody has a ${word} yet. Give each man
       ${format === "team" ? "a team" : "a cart number"} on the <b>Setup</b> tab and the skins
       will run themselves. A man with no ${word} simply doesn't compete for them.</div>`;
-    return;
   }
-
-  const byGroup = new Map();
-  entered.forEach(p => {
-    const id = groupOf(p);
-    if(!byGroup.has(id)) byGroup.set(id, []);
-    byGroup.get(id).push(displayName(p));
-  });
-  const groups = [...byGroup.keys()].sort((a,b) =>
-    (Number(a)||0) - (Number(b)||0) || String(a).localeCompare(String(b)));
-
-  // One group has nobody to play against: uncontested it takes every hole for
-  // going round on its own.
-  if(groups.length < 2){
-    sub.textContent = "Only one " + word + " out";
-    body.innerHTML =
-      `<div class="note warn"><b>No skins today — only one ${word} out.</b><br>
+  if(settled.reason === "oneGroup"){
+    const only = settled.groups[0];
+    return `<div class="note warn"><b>No skins today — only one ${word} out.</b><br>
         Skins is ${word} against ${word}, and a ${word} on its own wins every hole by
         default. Give the men a second ${word} on the <b>Setup</b> tab and the skins
         will run.</div>` +
-      `<div class="contest"><div class="cname"><div class="cn">${esc(named(groups[0]))}</div>` +
-      `<div class="cd">${esc(byGroup.get(groups[0]).join(" & "))}</div></div>` +
-      `<div class="pvt" style="text-align:right"><div class="cd">not playing for skins</div></div></div>`;
-    return;
+      (only ? `<div class="contest"><div class="cname"><div class="cn">${esc(named(only.id))}</div>` +
+        `<div class="cd">${esc(only.members.join(" & "))}</div></div>` +
+        `<div class="pvt" style="text-align:right"><div class="cd">not playing for skins</div></div></div>` : ``);
   }
 
-  const cards = entered.map(cardOf);
-  const table = E.skinsByGroup(cards.map(c => ({ card: c, group: format === "team" ? c.team : c.cart })), undefined);
-  const won = (id) => table.skins.get(String(id)) || 0;
-  let skinsWon = 0; table.skins.forEach(n => { skinsWon += n; });
-  const played = cards.some(c => c.gross.some(g => g != null));
-  sub.textContent = played
-    ? groups.length + " " + word + (groups.length===1?"":"s") + " · " + skinsWon + " skin" +
-      (skinsWon===1?"":"s") + " won"
-    : "No scores imported yet";
-
-  // The POT is fixed and split by the skins actually won, so the value of one
-  // is not known until the round is over. Shown to the hundredth, because this
-  // is the figure a man checks his own total against.
-  const perSkin = E.skinValue(config, skinsWon);
+  const table = settled.table;
+  const skinsWon = settled.skinsWon;
+  const perSkin = settled.skinValue;
 
   let html = `<div class="section-label">Totals by ${word}</div>`;
-  html += groups.slice().sort((a,b) => won(b) - won(a) ||
-      (Number(a)||0)-(Number(b)||0) || String(a).localeCompare(String(b))).map(id => {
-    const n = won(id);
-    const strokes = E.skinStrokes(n, config, skinsWon);
-    return `<div class="contest"><div class="cname">` +
-      `<div class="cn">${esc(named(id))}</div>` +
-      `<div class="cd">${esc(byGroup.get(id).join(" & "))}</div></div>` +
+  html += settled.groups.map(g =>
+    `<div class="contest"><div class="cname">` +
+      `<div class="cn">${esc(named(g.id))}</div>` +
+      `<div class="cd">${esc(g.members.join(" & "))}</div></div>` +
       `<div class="pvt" style="text-align:right;white-space:nowrap">` +
-        `<div class="cn">${n} skin${n===1?"":"s"}</div>` +
-        `<div class="cd">${strokes === 0 ? "0.0" : fmtStrokes(strokes)}</div></div></div>`;
-  }).join("");
+        `<div class="cn">${g.count} skin${g.count===1?"":"s"}</div>` +
+        `<div class="cd">${g.strokes === 0 ? "0.0" : fmtStrokes(g.strokes)}</div></div></div>`
+  ).join("");
+
+  /* WHO IS NOT IN IT, and why. The settlement leaves out a man who did not
+     finish, and a group showing one name where the organiser put two would
+     otherwise look like the app had lost him. */
+  if(settled.left.length){
+    html += `<div class="note">Not in the skins: ` +
+      settled.left.map(l => `<b>${esc(l.name)}</b> — ${esc(l.why)}`).join(" · ") +
+      `.<br>A man who did not go round eighteen plays no part in his ${word}'s best
+       two, or a card that stopped at the twelfth would win holes for a ${word}
+       it then walked out on.</div>`;
+  }
 
   // The floor bites once the division would fall under it — at ten skins here.
   const floored = config.minSkin != null &&
@@ -3303,9 +3436,11 @@ function renderSkins(){
     `<br>Every man in a winning ${word} takes the full amount; it is not shared out
      between them.<br>
      This field plays <b>${format === "team" ? "TEAM" : "CART"} skins</b> —
-     ${inFlight.length} players, and ${format === "team"
+     ${settled.fieldSize} players, and ${format === "team"
        ? "teams are used from " + config.teamFrom + " up"
-       : "carts run from " + config.minPlayers + " to " + (config.teamFrom - 1)}.</div>`;
+       : "carts run from " + config.minPlayers + " to " + (config.teamFrom - 1)}.<br>
+     <b>Skins is played across the whole field</b>, not inside a flight — flights
+     divide the placings and nothing else.</div>`;
 
   html += `<div class="section-label">Hole by hole</div>`;
   html += table.holes.map(h => {
@@ -3328,7 +3463,7 @@ function renderSkins(){
     size. A man out on his own counts his ball twice. <b>A tied hole is not won by
     anybody and nothing carries over.</b></div>`;
 
-  body.innerHTML = html;
+  return html;
 }
 
 /* ---------- import ---------- */
@@ -3725,25 +3860,29 @@ document.getElementById("addBtn").addEventListener("click", () => {
   editPlayer(null);
 });
 // The three pastes are fold contents now, built when their step is opened.
+// The roster and the rules are behind the gear now, so Back returns there.
 document.getElementById("goRoster").addEventListener("click", () => { renderRoster(); show("roster"); });
-document.getElementById("rosterBack").addEventListener("click", () => { renderSetup(); show("setup"); });
-document.getElementById("goInvites").addEventListener("click", () => { renderInvites(); show("invites"); });
+document.getElementById("rosterBack").addEventListener("click", () => { drawFoldSubs(); show("more"); });
+document.getElementById("goInvites").addEventListener("click", () => {
+  // The pick-sheet links live on this screen now and are drawn with it.
+  showPickLinkBox(); renderInvites(); show("invites");
+});
 document.getElementById("invitesBack").addEventListener("click", () => { renderSetup(); show("setup"); });
 document.getElementById("goRules").addEventListener("click", () => {
   draft = null; renderSettings(); show("settings");
 });
 document.getElementById("settingsBack").addEventListener("click", () => {
-  draft = null; renderSetup(); show("setup");
+  draft = null; renderSetup(); renderBoard(); drawFoldSubs(); show("more");
 });
 // Re-fit names when the viewport changes (rotation, split-view, browser resize).
 window.addEventListener("resize", fitBoardNames);
 
 load();
 wireFolds();
+wireGear();
 buildTabs();
 renderBoard();
 renderSetup();
-if(skinsOn()) renderSkins();
 renderImport();
 show(state.tab);
 </script>

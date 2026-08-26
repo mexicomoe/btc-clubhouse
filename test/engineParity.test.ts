@@ -51,7 +51,13 @@ test("the TypeScript view returns exactly what engine.js does", () => {
 test("the HTML loads the shared engine and routes scoring through it", () => {
   assert.match(html, /<script\s+src="engine\.js"><\/script>/, "loads engine.js");
   assert.match(html, /window\.ClubhouseEngine/, "uses the engine's global");
-  assert.match(html, /E\.computeLeaderboard\(\)/, "renders the engine's leaderboard");
+  // ROUTED THROUGH THE ENGINE, with the round's own rules. It used to be the
+  // bare no-argument call — which was the demo round being scored on the
+  // DEFAULTS while the Skins section beside it read the event's rules.
+  assert.match(html, /E\.computeLeaderboard\(boardCards, undefined, contestConfig\(\)\)/,
+    "renders the engine's leaderboard under this round's rules");
+  assert.equal(/E\.computeLeaderboard\(\)/.test(html), false,
+    "and never scores anything on the defaults behind the round's back");
 });
 
 test("the HTML carries no scoring engine of its own", () => {

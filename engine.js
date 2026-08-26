@@ -1541,14 +1541,38 @@
    * A player with no cart number simply doesn't compete for skins — he scores
    * zero from it rather than breaking the round for everyone else.
    */
-  function applySkins(cards, results, course, contests) {
+  /**
+   * SKINS, SETTLED ONCE. Everything any screen needs to know about how the
+   * contest fell: the format, whether it ran at all and why not, who is in
+   * which group, the hole-by-hole table, and what a skin was worth.
+   *
+   * THIS EXISTS BECAUSE THERE WERE TWO OF IT. The leaderboard settled Skins
+   * here, across the whole field; the Skins tab settled it again in the page,
+   * inside the current FLIGHT and without excluding men who never finished.
+   * The two disagreed in ordinary rounds — ten men in two flights of five had
+   * the board paying every man a skin while the tab said there were no skins at
+   * all, because five is under the minimum. A screen that recomputes a rule is
+   * a second opinion, and the man reading it cannot tell which one paid him.
+   *
+   * `results` is optional. Given, it is used for `holesPlayed`; without it the
+   * cards are scored here, so a screen can ask this question on its own.
+   */
+  function skinsSettlement(cards, course, contests, results) {
+    contests = contests || DEFAULT_CONTESTS;
     const config = contests.skins;
-    if (!config) return null;
+    const scored = results || cards.map((c) => scorePlayer(c, course, contests));
 
     // EIGHTEEN HOLES OR YOU ARE NOT IN IT. A man who did not finish plays no
     // part in his group's best two, because a card that stops at the twelfth
     // would otherwise win holes 1-12 for his group and then abandon it.
-    const complete = (i) => results[i].holesPlayed === HOLES;
+    const complete = (i) => scored[i].holesPlayed === HOLES;
+    const finished = cards.filter((c, i) => complete(i)).length;
+
+    if (!config) {
+      return { on: false, reason: "off", format: null, config: null,
+               fieldSize: cards.length, finished,
+               groups: [], left: [], table: null, skinsWon: 0, skinValue: 0 };
+    }
 
     // THE FORMAT IS SET BY THE FIELD THAT TEED OFF, not by who came back.
     // Counted on finishers, one man walking in off an eight-man field took the
@@ -1556,36 +1580,32 @@
     // retrospectively by somebody else's bad back. The club knows whether it is
     // playing carts or teams before anyone hits a ball, and so does this.
     const format = skinsFormat(cards.length, config);
-
     const groupOf = (c) => (format === "team" ? c.team : c.cart);
     const has = (c) => groupOf(c) != null && String(groupOf(c)).trim() !== "";
 
-    const say = (detail) => {
-      cards.forEach((card, i) => {
-        results[i].contests.skins = { strokes: 0, detail: detail(card, i), live: false };
-      });
-      return null;
-    };
-
-    if (format == null) {
-      const n = cards.filter((c, i) => complete(i)).length;
-      return say(() => "no skins under " + (config.minPlayers == null ? 8 : config.minPlayers) +
-                       " players (" + n + " finished)");
-    }
-
+    /* Who is NOT in it, and why — so a screen can say so rather than quietly
+       showing a group one man short of the one the organiser set up. */
+    const left = [];
     const entered = [];
-    cards.forEach((c, i) => { if (has(c) && complete(i)) entered.push({ card: c, group: groupOf(c) }); });
-    if (entered.length === 0) {
-      return say(() => (format === "team" ? "no teams entered" : "no carts entered"));
-    }
+    cards.forEach((c, i) => {
+      if (!complete(i)) { left.push({ name: c.name, why: "no full round" }); return; }
+      if (!has(c)) { left.push({ name: c.name, why: format === "team" ? "no team" : "no group" }); return; }
+      entered.push({ card: c, group: groupOf(c) });
+    });
+
+    const base = { on: true, format, config, fieldSize: cards.length, finished, left,
+                   groups: [], table: null, skinsWon: 0, skinValue: 0 };
+
+    if (format == null) return Object.assign(base, { reason: "tooFew" });
+    if (entered.length === 0) return Object.assign(base, { reason: "noneEntered" });
 
     // One group is nobody to play against: uncontested it wins every hole by
     // default and takes all eighteen for going round on its own.
     const distinct = new Set(entered.map((e) => String(e.group)));
     if (distinct.size < 2) {
-      return say((card, i) => !complete(i) ? "no full round"
-        : !has(card) ? (format === "team" ? "no team" : "no group")
-        : "only one " + (format === "team" ? "team" : "group") + " out");
+      return Object.assign(base, { reason: "oneGroup",
+        groups: [...distinct].map((id) => ({ id, count: 0, strokes: 0,
+          members: entered.filter((e) => String(e.group) === id).map((e) => e.card.name) })) });
     }
 
     const table = skinsByGroup(entered, course);
@@ -1597,6 +1617,54 @@
     table.groupCount = distinct.size;
     table.skinsWon = won;
     table.skinValue = skinValue(config, won);
+
+    const groups = [...distinct].sort((a, b) =>
+      (table.skins.get(b) || 0) - (table.skins.get(a) || 0) ||
+      (Number(a) || 0) - (Number(b) || 0) || String(a).localeCompare(String(b))
+    ).map((id) => ({
+      id,
+      count: table.skins.get(id) || 0,
+      strokes: skinStrokes(table.skins.get(id) || 0, config, won),
+      members: entered.filter((e) => String(e.group) === id).map((e) => e.card.name),
+    }));
+
+    return Object.assign(base, { reason: null, table, groups,
+                                 skinsWon: won, skinValue: table.skinValue });
+  }
+
+  /** Write the settlement onto each man's card. The rule lives above. */
+  function applySkins(cards, results, course, contests) {
+    const config = contests.skins;
+    if (!config) return null;
+
+    const settled = skinsSettlement(cards, course, contests, results);
+    const { format } = settled;
+    const complete = (i) => results[i].holesPlayed === HOLES;
+    const groupOf = (c) => (format === "team" ? c.team : c.cart);
+    const has = (c) => groupOf(c) != null && String(groupOf(c)).trim() !== "";
+
+    const say = (detail) => {
+      cards.forEach((card, i) => {
+        results[i].contests.skins = { strokes: 0, detail: detail(card, i), live: false };
+      });
+      return null;
+    };
+
+    if (settled.reason === "tooFew") {
+      return say(() => "no skins under " + (config.minPlayers == null ? 8 : config.minPlayers) +
+                       " players (" + settled.finished + " finished)");
+    }
+    if (settled.reason === "noneEntered") {
+      return say(() => (format === "team" ? "no teams entered" : "no carts entered"));
+    }
+    if (settled.reason === "oneGroup") {
+      return say((card, i) => !complete(i) ? "no full round"
+        : !has(card) ? (format === "team" ? "no team" : "no group")
+        : "only one " + (format === "team" ? "team" : "group") + " out");
+    }
+
+    const table = settled.table;
+    const won = settled.skinsWon;
 
     cards.forEach((card, i) => {
       const r = results[i];
@@ -1947,7 +2015,7 @@
     parseHandicapIndex, formatHandicapIndex,
     PICKED_UP_OVER_PAR, NET_DOUBLE_OVER_PAR, isPickedUp, grossOnHole, netForHole,
     skinsByGroup, cartSkins, teamSkins, skinStrokes, skinValue, skinsFormat, bestTwo,
-    applySkins, applyHitList, nearestByIndex, matchOfCards, CARD_MATCH,
+    skinsSettlement, applySkins, applyHitList, nearestByIndex, matchOfCards, CARD_MATCH,
     courseHandicap, fullCourseHandicap, FULL_ALLOWANCE,
     resolveCourseHandicap, strokesOnHole, netOnHole, cappedNetByHole,
     birdiePickHoles, birdiePickCandidates, PICK_SLOTS, PICKS_BY_PAR, LEGACY_SLOT_KEYS,

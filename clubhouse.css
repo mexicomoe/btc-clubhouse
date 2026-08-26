@@ -38,9 +38,38 @@
   header.band {
     background: var(--band); color: #fff;
     padding: 18px 20px; position: sticky; top: 0; z-index: 5;
+    /* The gear sits beside the title, and the sub takes the line UNDER both.
+       WRAPPING IS WHAT MAKES THAT WORK: without it the sub is a third column
+       and gets squeezed off the right edge, which is exactly what it did. */
+    display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px;
   }
-  header.band .title { font-size: 30px; font-weight: 800; letter-spacing: .2px; }
-  header.band .sub { font-size: 18px; font-weight: 700; margin-top: 2px; color: #fff; }
+  /* The title takes the room the gear leaves and shrinks rather than pushing. */
+  header.band .title {
+    flex: 1 1 auto; min-width: 0; order: 1;
+    font-size: 30px; font-weight: 800; letter-spacing: .2px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  /* A whole line of its own, below both. */
+  header.band .sub {
+    flex: 1 0 100%; order: 3;
+    font-size: 18px; font-weight: 700; color: #fff;
+  }
+
+  /* THE GEAR. Not a fourth tab: three labels fit a phone comfortably and a
+     fourth was already tight, and this costs the bar nothing because it is
+     above it. It carries the WORD as well as the shape — an unlabelled icon is
+     a guess, and a tooltip is no use on a phone, where nothing hovers. */
+  button.gear {
+    margin-left: auto; flex: 0 0 auto; order: 2;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 2px; min-height: 56px; min-width: 56px; padding: 4px 10px;
+    font: inherit; font-size: 26px; line-height: 1;
+    background: transparent; color: #fff;
+    border: 2px solid rgba(255,255,255,.55); border-radius: 10px; cursor: pointer;
+  }
+  button.gear span { font-size: 18px; font-weight: 800; }
+  button.gear:active { background: #fff; color: var(--band); }
+  button.gear:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
 
   /* Tabs — the three places you can be */
   nav.tabs { display: flex; border-bottom: 3px solid var(--ink); }
@@ -268,6 +297,13 @@
   #foldEvent > summary { background: var(--tint-event); }
   #foldMove  > summary { background: var(--tint-move); }
   #foldAbout > summary { background: var(--tint-about); }
+
+  /* THE LEADERS SECTIONS. The same fold as Setup's, and deliberately so — one
+     accordion to learn, not two. They carry `.lead` rather than `.step` so the
+     two never close each other: opening Agony Alley must not shut "Paste birdie
+     picks" on a screen nobody is looking at. */
+  details.fold.lead > summary { background: var(--wash); }
+  details.fold.lead[open] > summary { background: var(--paper); }
 
   /* A STEP THAT GOES SOMEWHERE rather than opening. Built to sit in the same
      column as the folds and read as one of them — same height, same type, same

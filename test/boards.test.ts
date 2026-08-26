@@ -373,3 +373,151 @@ test("the picture carries the boards too", () => {
   assert.match(html, /boards: boardContests\(\)\.map/);
   assert.match(html, /duels: contestConfig\(\)\.hitList == null/);
 });
+
+/* ---- three tabs and a gear ----
+   Setup held twelve items and one tab carried everything. The cut to four
+   contests also left the Skins tab redundant: it existed because Skins was the
+   only contest with hole-by-hole detail, and there are four contest boards on
+   Leaders now. So this removed a tab rather than adding one. */
+
+test("three tabs, and the fourth did not creep back", () => {
+  const tabs = html.split("\n").find((l) => l.includes("const TAB_LABELS ="))!;
+  assert.equal((tabs.match(/\["/g) || []).length, 3, "three labels: " + tabs);
+  for (const label of ["Leaders", "Setup", "Import"]) assert.ok(tabs.includes(label), label);
+  assert.equal(tabs.includes("Skins"), false, "Skins is a section on Leaders now");
+});
+
+test("the gear is labelled, not just an icon", () => {
+  // A tooltip is no use on a phone, where nothing hovers, so it carries the
+  // word beside the shape.
+  assert.match(html, /<button class="gear" data-gear>⚙<span>Settings<\/span><\/button>/);
+  assert.equal((html.match(/class="gear"/g) || []).length, 3, "one on each of the three tabs");
+});
+
+test("every item off the old four tabs is still reachable", () => {
+  // Nothing was renamed and no action was dropped — only moved.
+  const reachable = [
+    // Setup, as it was
+    "Add player", "Paste a list of players", "Paste birdie picks", "Set the Hit List",
+    "Event settings", "Send the invitations", "The player list",
+    // moved behind the gear
+    "The roster", "The rules", "Move this event", "About",
+    // moved onto the invitations screen
+    "Open the pick sheet",
+  ];
+  for (const item of reachable) {
+    assert.ok(html.includes(">" + item + "<") || html.includes(item),
+      item + " is no longer anywhere in the app");
+  }
+  // And the screens they live on all exist.
+  for (const id of ["board", "setup", "import", "more", "roster", "invites", "settings"]) {
+    assert.match(html, new RegExp('<section id="' + id + '"'), id);
+  }
+  assert.equal(/<section id="skins"/.test(html), false, "the Skins screen is gone");
+});
+
+test("a tab name stored by an older build cannot white-screen the app", () => {
+  // "skins" was a tab, and every phone that opened it has the word in storage.
+  // show() runs against it before anything is drawn.
+  assert.match(html, /if\(!document\.getElementById\(id\)\) id = "board";/);
+});
+
+/* ---- the Leaders accordion ---- */
+
+test("the board is not a fold, so the accordion cannot shut it", () => {
+  const board = html.slice(html.indexOf('<section id="board"'), html.indexOf('<section id="more"'));
+  assert.match(board, /<div id="rows"><\/div>/, "the rows are plain markup");
+  assert.equal(/<details[^>]*>\s*<summary>[^]*?<div id="rows">/.test(board), false,
+    "and not inside a <details>");
+});
+
+test("the two accordions never close each other", () => {
+  // Setup's rule closes every `details.fold.step` in the document. The Leaders
+  // sections carry `.lead` instead, so opening Agony Alley cannot shut "Paste
+  // birdie picks" on a screen nobody is looking at.
+  assert.match(html, /details\.fold\.lead/);
+  assert.match(html, /class="fold lead"/);
+  assert.match(html, /querySelectorAll\("details\.fold\.step"\)/, "Setup's rule is still by .step");
+});
+
+test("opening one Leaders section shuts the others", () => {
+  const fn = html.slice(html.indexOf("function wireLeadSections"));
+  assert.match(fn.slice(0, 900), /if\(o !== d && o\.open\) o\.open = false;/);
+});
+
+test("the sections remember without forgetting Setup's", () => {
+  // One store, keyed by element id. Both writers MERGE — a fresh object from
+  // either would drop the other's, because the Leaders folds are drawn after
+  // startup and are not always in the document when Setup saves.
+  assert.equal((html.match(/const now = readFolds\(\);/g) || []).length, 2,
+    "both the Setup and the Leaders writer merge");
+});
+
+/* ---- the shut lines ---- */
+
+test("each shut line carries the figure that section is about", () => {
+  const results = board([
+    card("Wolfson", { over: { 2: -1, 3: -1, 8: -1 }, handicapIndex: 30, hitList: "Teitelbaum" }),
+    card("Teitelbaum", { over: { 4: -1, 5: -1 }, handicapIndex: 10, hitList: "Wolfson" }),
+  ]);
+  const wtb = contestBoard(results, "watchTheBirdie", { depth: 5 });
+  assert.equal(wtb.rows[0].name, "Wolfson");
+  assert.equal(wtb.rows[0].contest.birdies, 3, "the shut line says '3 birdies'");
+
+  const agony = contestBoard(results, "agonyAlley", { depth: 5 });
+  assert.equal(agony.rows[0].name, "Teitelbaum");
+  const net = agony.rows[0].contest.netHoles!.reduce((a, n) => a + (n || 0), 0);
+  assert.equal(net, 11, "the shut line says 'net 11'");
+});
+
+test("an UPSET is a man who backed himself against a better player and won", () => {
+  // The "lower" band — priced hardest at −1.1 precisely because it is the hard
+  // way to do it. Nothing else about the Hit List belongs on a shut line.
+  const results = board([
+    card("Upset", { handicapIndex: 30, over: { 18: -1 }, hitList: "Star" }),
+    card("Star", { handicapIndex: 5, hitList: "Upset" }),
+  ]);
+  const duels = hitListDuels(results);
+  const upsets = duels.filter((d) => d.outcome === "win" && d.band === "lower");
+  assert.equal(upsets.length, 1);
+  assert.equal(upsets[0].name, "Upset");
+  // Beating a WORSE player is a win, and is not an upset.
+  const other = duels.find((d) => d.name === "Star")!;
+  assert.equal(other.outcome, "loss");
+});
+
+test("a contest that is off has no section to summarise", () => {
+  const off = { ...DEFAULT_CONTESTS, skins: null } as typeof DEFAULT_CONTESTS;
+  const results = computeLeaderboard(
+    ["A", "B", "C", "D", "E", "F", "G", "H"].map((n, i) => card(n, { cart: String(1 + (i >> 1)) })),
+    ABERDEEN_TEE_IV, off);
+  assert.equal(contestBoard(results, "skins", { depth: 5 }).rows.length, 0);
+  assert.equal(results[0].contests.skins, undefined, "absent, not a zero");
+  // And the screen only draws a Skins section when it is in the game.
+  assert.match(html, /if\(cfg\.skins != null\)\{/);
+});
+
+/* ---- the Skins section, folded in from the old tab ---- */
+
+test("the Skins section reads the engine rather than settling it again", () => {
+  assert.match(html, /E\.skinsSettlement\(boardCards, undefined, cfg\)/);
+  assert.equal(/E\.skinsByGroup\(/.test(html), false,
+    "the page no longer works skins out for itself");
+});
+
+test("there is no flight picker on the Skins section", () => {
+  // Skins ignores flights, so a picker there would be a control that changes
+  // nothing — worse than none.
+  assert.equal(/skinsFlights/.test(html), false);
+  assert.match(html, /played across the whole field/);
+});
+
+test("everything the old Skins tab drew is still drawn", () => {
+  const at = html.indexOf("function skinsSectionHtml");
+  const fn = html.slice(at, html.indexOf("\nfunction ", at + 40));
+  for (const piece of ["Totals by ", "Hole by hole", "a skin today", "best two net balls",
+                       "nothing carries over", "No skins at ", "Nobody has a ",
+                       "only one ", "not playing for skins", "tied — nobody wins it"]) {
+    assert.ok(fn.includes(piece), "the section lost: " + piece);
+  }
+});
