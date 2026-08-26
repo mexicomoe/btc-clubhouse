@@ -1,12 +1,45 @@
 #!/bin/sh
 #
-# Stamp version.js so the app can say which build it is.
+# Stamp the build id into version.js AND into every asset URL the pages load.
+#
+# WHY THE URLS. The pages load their code with plain <script src="engine.js">
+# and <link href="clubhouse.css">, and a browser caches those on their own
+# schedule, separately from the HTML. So a phone could hold NEW HTML against
+# OLD JAVASCRIPT — a mixed build. That is worse than a stale one, because it
+# fails silently: a helper the new HTML destructures out of an old display.js
+# is simply `undefined`, and `.sort(undefined)` quietly does nothing rather
+# than throwing. It happened twice in one afternoon on 25 August.
+#
+# Stamping makes each build's assets a DIFFERENT URL, so once the new HTML
+# arrives nothing it references can be served from an old cache. The HTML
+# itself carries no stamp — it is the thing that revalidates, and GitHub Pages
+# serves it with a short max-age.
+#
+# A query string on a file:// URL is ignored by the browser and the file still
+# loads, so a double-clicked page keeps working. Verified in Chrome: both the
+# script and the stylesheet load from file:// with ?v= on them.
 #
 # A commit cannot contain its own hash — the hash is taken over the content, so
 # writing it in would change it. What IS knowable before the commit exists is
-# the content itself, so the build is fingerprinted from the staged blob ids of
-# the files that make up the app. It changes exactly when the app changes, and
-# never when only a test or a note does.
+# the content itself, so the build is fingerprinted from the staged content of
+# the files that make up the app.
+#
+# TWO RULES MAKE THAT STABLE, and both matter:
+#
+#   · THE STAMPS ARE STRIPPED BEFORE HASHING. Otherwise the stamp is part of
+#     what is hashed, so every commit would produce a new hash even when
+#     nothing about the app changed, and the build id would stop meaning
+#     anything.
+#
+#   · EVERY STAMPED FILE IS IN THE FINGERPRINT. If a file can be stamped but
+#     is not fingerprinted, changing it leaves the build id — and therefore its
+#     URL — untouched, and the browser goes on serving the old copy. That is
+#     the original bug wearing a hat. display.js, clubhouse.css, exporter.js,
+#     results.js, fieldlink.js and boardimage.js were all missing from the old
+#     list; display.js is the one that actually bit.
+#
+# version.js is left out of the reckoning: it holds the answer, so it cannot
+# help compute it. Its URL is stamped like everything else.
 #
 # Enable it once per clone (hooks are not carried by git):
 #
@@ -14,21 +47,38 @@
 #
 set -e
 
-# The blob ids git has staged for this commit — what is actually about to be
-# committed, not what happens to be sitting in the working tree. version.js is
-# left out of the reckoning: it holds the answer, so it cannot help compute it.
-BUILD=$(git ls-files -s engine.js importer.js leaderboard.html src/*.ts \
-        | awk '{print $2}' \
-        | git hash-object --stdin \
-        | cut -c1-7)
+# Every file the browser loads, plus the typed wrappers the tests run through.
+APP="engine.js importer.js exporter.js results.js fieldlink.js boardimage.js
+     display.js clubhouse.css leaderboard.html picks.html results.html index.html"
+
+# The staged content of each, with any existing stamp taken out, hashed as one
+# stream. `git show :file` reads the INDEX — what is actually about to be
+# committed, not whatever happens to be sitting in the working tree.
+BUILD=$(
+  { for f in $APP; do git show ":$f" 2>/dev/null || true; done
+    for f in $(git ls-files 'src/*.ts'); do git show ":$f" 2>/dev/null || true; done
+  } | sed -E 's/\?v=[0-9a-f]+//g' | git hash-object --stdin | cut -c1-7
+)
 DATE=$(date +%Y-%m-%d)
 
 cat > version.js <<EOF
 "use strict";
 /* Written by .githooks/pre-commit. Do not edit by hand — any change here is
-   overwritten on the next commit. The build is a fingerprint of engine.js,
-   importer.js, leaderboard.html and src/, so it moves only when the app does. */
+   overwritten on the next commit. The build fingerprints every file the browser
+   loads, with the ?v= stamps stripped first, so it moves exactly when the app
+   moves and not when only a stamp does. */
 globalThis.ClubhouseVersion = { build: "$BUILD", date: "$DATE" };
 EOF
+
+# Stamp every LOCAL .js and .css the pages pull in. Only those two extensions,
+# so a link to another page is left alone, and only bare filenames, so nothing
+# with a scheme on it is touched.
+for page in leaderboard.html picks.html results.html; do
+  [ -f "$page" ] || continue
+  sed -E 's#(src|href)="([A-Za-z0-9_.-]+\.(js|css))(\?v=[0-9a-f]*)?"#\1="\2?v='"$BUILD"'"#g' \
+    "$page" > "$page.stamped"
+  mv "$page.stamped" "$page"
+  git add "$page"
+done
 
 git add version.js

@@ -49,7 +49,9 @@ test("the TypeScript view returns exactly what engine.js does", () => {
 });
 
 test("the HTML loads the shared engine and routes scoring through it", () => {
-  assert.match(html, /<script\s+src="engine\.js"><\/script>/, "loads engine.js");
+  // Stamped with the build id — see stamping.test.ts for why — so the match
+  // allows the query without requiring this test to know the hash.
+  assert.match(html, /<script\s+src="engine\.js(\?v=[0-9a-f]+)?"><\/script>/, "loads engine.js");
   assert.match(html, /window\.ClubhouseEngine/, "uses the engine's global");
   // ROUTED THROUGH THE ENGINE, with the round's own rules. It used to be the
   // bare no-argument call — which was the demo round being scored on the

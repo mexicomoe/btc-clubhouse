@@ -1,5 +1,6 @@
 "use strict";
 /* Written by .githooks/pre-commit. Do not edit by hand — any change here is
-   overwritten on the next commit. The build is a fingerprint of engine.js,
-   importer.js, leaderboard.html and src/, so it moves only when the app does. */
-globalThis.ClubhouseVersion = { build: "8ead8d5", date: "2026-08-25" };
+   overwritten on the next commit. The build fingerprints every file the browser
+   loads, with the ?v= stamps stripped first, so it moves exactly when the app
+   moves and not when only a stamp does. */
+globalThis.ClubhouseVersion = { build: "9b71661", date: "2026-08-25" };
