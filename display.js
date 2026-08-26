@@ -66,6 +66,54 @@
   const MONTHS = ["January","February","March","April","May","June",
                   "July","August","September","October","November","December"];
 
+  /**
+   * A date in the box a man types into: MM/DD/YYYY.
+   *
+   * WHY NOT `<input type="date">`. A native date field is drawn by the BROWSER
+   * in the BROWSER's locale, and nothing on the page reaches it — not `lang`,
+   * not a format attribute, because there is no such attribute. A laptop set to
+   * a British locale showed the event date as 28/08/2026 while every date the
+   * app itself printed read August 28, 2026. Same fault as the rules screen
+   * showing −0,5, and the same fix: stop handing the value to something that
+   * will redraw it, and render the string ourselves.
+   *
+   * THE COST IS THE NATIVE PICKER — the wheel on a phone. Accepted because the
+   * date defaults to today and most rounds never touch it, and because a field
+   * that shows the wrong date every time is worse than one that takes eight
+   * digits on the rare occasion it is wrong.
+   */
+  function usDate(iso){
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ""));
+    return m ? m[2] + "/" + m[3] + "/" + m[1] : "";
+  }
+
+  /**
+   * Read one back. Returns an ISO date, or null for anything it cannot be sure
+   * of — the caller keeps the date it had rather than storing a guess.
+   *
+   * FORGIVING IN THE DIRECTIONS THAT ARE SAFE: single digits, dashes or dots
+   * instead of slashes, and a pasted ISO date, which is what comes off a
+   * spreadsheet. NOT forgiving about a two-digit year, because 08/09/26 has
+   * three readings and only one of them is right.
+   */
+  function isoFromUs(text){
+    const s = String(text == null ? "" : text).trim();
+    if(s === "") return null;
+    // A pasted ISO date is unambiguous, so it is taken as it stands.
+    const iso = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(s);
+    const us = /^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/.exec(s);
+    let y, mo, d;
+    if(iso){ y = +iso[1]; mo = +iso[2]; d = +iso[3]; }
+    else if(us){ mo = +us[1]; d = +us[2]; y = +us[3]; }
+    else return null;
+    if(mo < 1 || mo > 12 || d < 1 || d > 31 || y < 1900 || y > 2999) return null;
+    // A real calendar day, so 02/30 is refused rather than rolled into March.
+    const probe = new Date(Date.UTC(y, mo - 1, d));
+    if(probe.getUTCMonth() !== mo - 1 || probe.getUTCDate() !== d) return null;
+    const p = (n) => String(n).padStart(2, "0");
+    return y + "-" + p(mo) + "-" + p(d);
+  }
+
   function niceDate(iso){
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ""));
     if(!m) return String(iso || "");
@@ -140,5 +188,6 @@
     globalThis.ClubhouseDisplay = {
       esc, fmtFinal, fmtStrokes, fitText, abbreviate, fitName, niceDate,
       MONTHS, CONTEST_NAMES, duelSentence, surnameKey, bySurname,
+      usDate, isoFromUs,
     };
 })();

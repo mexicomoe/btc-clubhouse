@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="theme-color" content="#0b2e13">
 <title>Beat the Crowd · Clubhouse</title>
-<link rel="stylesheet" href="clubhouse.css?v=f8d0430">
+<link rel="stylesheet" href="clubhouse.css?v=2fb5377">
 </head>
 <body>
 
@@ -191,14 +191,14 @@
   <div id="importBody"></div>
 </section>
 
-<script src="engine.js?v=f8d0430"></script>
-<script src="importer.js?v=f8d0430"></script>
-<script src="exporter.js?v=f8d0430"></script>
-<script src="results.js?v=f8d0430"></script>
-<script src="fieldlink.js?v=f8d0430"></script>
-<script src="boardimage.js?v=f8d0430"></script>
-<script src="version.js?v=f8d0430"></script>
-<script src="display.js?v=f8d0430"></script>
+<script src="engine.js?v=2fb5377"></script>
+<script src="importer.js?v=2fb5377"></script>
+<script src="exporter.js?v=2fb5377"></script>
+<script src="results.js?v=2fb5377"></script>
+<script src="fieldlink.js?v=2fb5377"></script>
+<script src="boardimage.js?v=2fb5377"></script>
+<script src="version.js?v=2fb5377"></script>
+<script src="display.js?v=2fb5377"></script>
 <script>
 "use strict";
 /* Rendering and setup only — every number comes from engine.js
@@ -214,7 +214,7 @@ const D  = window.ClubhouseDisplay;
 /* The display helpers live in display.js so results.html can use the same ones.
    Pulled onto locals here so every call site below reads exactly as it did. */
 const { esc, fmtFinal, fmtStrokes, fitText, abbreviate, fitName, niceDate,
-        MONTHS, CONTEST_NAMES, duelSentence, bySurname } = D;
+        MONTHS, CONTEST_NAMES, duelSentence, bySurname, usDate, isoFromUs } = D;
 
 /* The order a card reads down the screen. FOUR OF THESE ARE IN THE GAME —
    Watch the Birdie, Agony Alley, the Hit List and Skins. The rest are switched
@@ -1792,10 +1792,14 @@ function drawFoldSubs(){
      about a field where eight had both. A shut line that overstates is as bad
      as one that hides. */
   const notReady = men - ready;
+  // How many of the regulars are still a tap away — the number that says
+  // whether this step is finished, now that a man in the round leaves the list.
+  const left = rosterMen().filter(m => !playerFor(m)).length;
   say("foldAddSub",
     (men === 0 ? "Nobody yet" : men + " player" + (men === 1 ? "" : "s")) +
       (notReady ? " · " + notReady + (notReady === 1 ? " still needs" : " still need") +
-                  " an index and a tee" : ""),
+                  " an index and a tee" : "") +
+      (left ? " · " + left + " on the roster to tap in" : ""),
     notReady > 0);
 
   /* A PASTE SITTING THERE UNFINISHED beats the count to the line — it is the
@@ -1951,7 +1955,10 @@ function drawEventBox(){
            : "This round keeps its " + men + " player" + (men === 1 ? "" : "s") +
              " and their scores; only the name changes."}</div></div>
      <div class="field"><label for="fEventDate">Date</label>
-       <input type="date" id="fEventDate" value="${esc(e.date || "")}"></div>
+       <input type="text" id="fEventDate" inputmode="numeric" autocomplete="off"
+         placeholder="MM/DD/YYYY" value="${esc(usDate(e.date))}">
+       <div class="cd" id="fEventDateSaid" style="margin-top:8px;font-size:18px;font-weight:700">
+         ${esc(niceDate(e.date))}</div></div>
      <div class="field"><label for="fEventFormat">Format</label>
        <input type="text" id="fEventFormat" list="formatList" autocomplete="off"
          value="${esc(e.format || "")}">
@@ -1973,8 +1980,30 @@ function drawEventBox(){
   $("fEventName").addEventListener("input", (ev) => {
     state.name = ev.target.value; save(); refresh(); drawFoldSubs();
   });
-  $("fEventDate").addEventListener("change", (ev) => {
-    state.date = ev.target.value; save(); refresh();
+  /* MONTH, DAY, YEAR — and read back rather than trusted. An unreadable date
+     leaves the one he had alone: half a date typed in is not a reason to lose
+     the round's date, and the line under the box says what is stored. */
+  const readDate = (ev) => {
+    const said = $("fEventDateSaid");
+    const iso = isoFromUs(ev.target.value);
+    if(iso == null){
+      said.textContent = ev.target.value.trim() === ""
+        ? "Still " + niceDate(state.date)
+        : "Not a date I can read — still " + niceDate(state.date) + ". Use MM/DD/YYYY.";
+      said.classList.add("wrong");
+      return;
+    }
+    said.classList.remove("wrong");
+    state.date = iso; save(); refresh();
+    said.textContent = niceDate(iso);
+  };
+  $("fEventDate").addEventListener("input", readDate);
+  // On the way out, put the box back into the shape it stores things in, so a
+  // half-typed date does not sit there looking accepted.
+  $("fEventDate").addEventListener("blur", () => {
+    $("fEventDate").value = usDate(state.date);
+    $("fEventDateSaid").textContent = niceDate(state.date);
+    $("fEventDateSaid").classList.remove("wrong");
   });
   $("fEventFormat").addEventListener("input", (ev) => {
     state.format = ev.target.value; save(); refresh(); drawFoldSubs();
@@ -2165,45 +2194,72 @@ let rosterPreview = null;
 function drawRosterPick(){
   const box = document.getElementById("rosterPick");
   if(!box) return;
-  const men = rosterMen().slice().sort(bySurname);
+
+  /* MEN NOT YET IN THE ROUND, and only those.
+     
+     IT USED TO SHOW EVERYBODY, marking the ones already in with an IN tag —
+     which meant Setup carried the SAME EIGHT NAMES TWICE on one screen, in two
+     different orders, with nothing saying why. Two lists doing different jobs
+     read as one list duplicated badly.
+     
+     One man, one place. Tapping a name moves it from this list down to the
+     player list; taking him out of the round sends it back up here. The screen
+     never shows a name twice, and there is only one order to get right.
+     
+     THE PRICE IS THE SECOND TAP. "Tap him again to take him out" cannot work
+     when he is not in this list to tap, so removal happens where he now lives:
+     the player list, his row, Remove this player. A mis-tap costs three taps
+     instead of one — against two lists of the same eight names, every time. */
+  const roster = rosterMen();
+  const men = roster.filter(m => !playerFor(m)).sort(bySurname);
+  const inRound = roster.length - men.length;
   const full = state.players.length >= MAX_PLAYERS;
 
-  if(men.length === 0){
+  if(roster.length === 0){
     // A PLAIN LINE, not a blank space. An empty box reads as a thing that has
     // not loaded rather than a list nobody has filled in yet.
     box.innerHTML = `<div class="note">Nobody on the roster yet. Type a man in
-      above and say yes to saving him, or add the men who play every week under
+      below and say yes to saving him, or add the men who play every week under
       <b>⚙ Settings › The roster</b>. After that, building a field is tapping
       names.</div>`;
     return;
   }
 
+  if(men.length === 0){
+    /* ONE LINE, not eight rows nobody can tap. This is also the "that is the
+       lineup" signal — the section emptying out is what says everybody is in,
+       without anyone counting. */
+    box.innerHTML = `<div class="note"><b>Everybody on the roster is in this
+      round</b> — all ${inRound} of them, in the player list below. To take one
+      out, tap his name there and use <b>Remove this player</b>.</div>`;
+    return;
+  }
+
   box.innerHTML =
-    `<div class="note">Tap a man to put him in this round; tap him again to take
-      him out. His index and tee come with him — correcting one <b>for a round</b>
-      never changes him on the roster.</div>` +
+    `<div class="note">Tap a man to put him in this round — his index and tee
+      come with him, and correcting one <b>for a round</b> never changes him on
+      the roster.` +
+      (inRound ? ` The ${inRound} already in ${inRound === 1 ? "is" : "are"} in the
+        player list below; this is who is left.` : ``) + `</div>` +
     (full ? `<div class="note warn">This round is full at ${MAX_PLAYERS} players.
-      Take somebody out before adding another.</div>` : ``) +
+      Take somebody out of the player list before adding another.</div>` : ``) +
     men.map((m, i) => {
-      const here = playerFor(m);
       const bits = [m.index == null ? "no index" : "idx " + E.formatHandicapIndex(m.index),
                     "Tee " + (m.tee || "IV")];
       // A man with no index can be tapped in, but he cannot be scored until he
       // has one — so the row says it rather than the Setup list saying it later.
-      return `<button class="pickman${here ? " in" : ""}" data-man="${i}"` +
-        (!here && full ? " disabled" : "") + `>` +
+      return `<button class="pickman" data-man="${i}"` + (full ? " disabled" : "") + `>` +
         `<span class="pmw"><span class="pmn">${esc(m.name || "(no name)")}</span>` +
         `<span class="pmd">${esc(bits.join(" · "))}</span></span>` +
-        `<span class="pmt">${here ? "IN" : "+"}</span></button>`;
+        `<span class="pmt">+</span></button>`;
     }).join("");
 
   box.querySelectorAll("[data-man]").forEach(b =>
     b.addEventListener("click", () => {
-      const m = men[Number(b.dataset.man)];
-      const here = playerFor(m);
-      const moved = here ? removeFromRound(here) : addFromRoster(m);
-      if(!moved) return;
-      drawRosterPick(); renderSetup(); renderBoard();
+      if(!addFromRoster(men[Number(b.dataset.man)])) return;
+      // renderSetup redraws this list through refreshFieldBoxes, so the man
+      // leaves it and appears in the player list in one pass.
+      renderSetup(); renderBoard();
     }));
 }
 
@@ -2225,6 +2281,12 @@ function drawRosterPick(){
 function refreshFieldBoxes(){
   const hit = document.getElementById("foldHitList");
   if(hit && hit.open) showHitListBox();
+  /* AND THE ROSTER LIST, which now shows only the men NOT in the round — so it
+     is wrong the moment the field moves, including from the edit screen. A man
+     removed there has to reappear here, or he is in neither list and looks
+     lost. */
+  const add = document.getElementById("foldAdd");
+  if(add && add.open) drawRosterPick();
 }
 
 function showRosterBox(){

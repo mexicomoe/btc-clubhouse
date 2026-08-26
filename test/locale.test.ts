@@ -114,3 +114,63 @@ test("the renamed helper is the one that is exported", () => {
   assert.equal(/normaliseName/.test(imp), false);
   assert.equal(/normalise/.test(read("leaderboard.html")), false);
 });
+
+/* ---- the date box ----
+ *
+ * `<input type="date">` is drawn by the BROWSER in the BROWSER's locale, and
+ * nothing on the page reaches it — not `lang`, not a format attribute, because
+ * there is no such attribute. A laptop set to a British locale showed the event
+ * date as 28/08/2026 while every date the app printed read August 28, 2026.
+ *
+ * Same fault as the rules screen showing −0,5, and the same fix: stop handing
+ * the value to something that will redraw it.
+ */
+
+test("no native date, time or month input anywhere", () => {
+  for (const p of PAGES) {
+    const native = [...read(p).matchAll(/<input[^>]*type="(date|time|datetime-local|month|week)"[^>]*>/g)]
+      .map((m) => m[0]);
+    assert.deepEqual(native, [], p + " still lets the browser draw a date: " + native.join(" | "));
+  }
+});
+
+test("the date box is text, in month-day-year, and says what it stored", () => {
+  const html = read("leaderboard.html");
+  const box = html.slice(html.indexOf('for="fEventDate"'), html.indexOf('for="fEventDate"') + 500);
+  assert.match(box, /type="text"/);
+  assert.match(box, /placeholder="MM\/DD\/YYYY"/);
+  assert.match(box, /usDate\(e\.date\)/, "shown US");
+  assert.match(box, /niceDate\(e\.date\)/, "and spelled out underneath, so there is no doubt");
+});
+
+test("a date goes out US and comes back ISO", () => {
+  assert.equal(D.usDate("2026-08-28"), "08/28/2026");
+  assert.equal(D.usDate(""), "");
+  assert.equal(D.usDate(null), "");
+  assert.equal(D.isoFromUs("08/28/2026"), "2026-08-28");
+  // Forgiving where it is safe: single digits, other separators, a pasted ISO.
+  for (const t of ["8/28/2026", "8-28-2026", "08.28.2026", "2026-08-28", " 8/28/2026 "]) {
+    assert.equal(D.isoFromUs(t), "2026-08-28", t);
+  }
+});
+
+test("it refuses what it cannot be sure of, rather than guessing", () => {
+  for (const t of ["", "rubbish", "8/28/26", "13/01/2026", "02/30/2026", "28/08/2026", "8/28"]) {
+    assert.equal(D.isoFromUs(t), null, t + " should not have been read");
+  }
+});
+
+test("a date that will not read leaves the stored one alone", () => {
+  // Half a date typed in is not a reason to lose the round's date.
+  const html = read("leaderboard.html");
+  const fn = html.slice(html.indexOf("const readDate"), html.indexOf("$(\"fEventDate\").addEventListener(\"input\""));
+  assert.match(fn, /if\(iso == null\)\{/);
+  assert.match(fn, /return;/);
+  assert.match(fn, /Not a date I can read/);
+});
+
+test("a round trip through the box changes nothing", () => {
+  for (const iso of ["2026-01-01", "2026-08-28", "2026-12-31", "2027-02-28"]) {
+    assert.equal(D.isoFromUs(D.usDate(iso)), iso, iso);
+  }
+});

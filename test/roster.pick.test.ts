@@ -66,7 +66,7 @@ test("a double-barrelled surname keeps both halves", () => {
 test("both lists sort with the shared comparator", () => {
   assert.equal((html.match(/\.sort\(bySurname\)/g) || []).length, 2,
     "the tap list inside Add player, and the roster screen");
-  assert.match(html, /duelSentence, bySurname \} = D;/, "and it comes from display.js");
+  assert.match(html, /duelSentence, bySurname,/, "and it comes from display.js");
 });
 
 test("there is ONE way a roster man becomes a player", () => {
@@ -156,7 +156,9 @@ test("an empty roster says so in a line, rather than leaving a blank", () => {
 test("a full round says so rather than letting taps do nothing", () => {
   const fn = html.slice(html.indexOf("function drawRosterPick"), html.indexOf("function refreshFieldBoxes"));
   assert.match(fn, /This round is full at \$\{MAX_PLAYERS\} players/);
-  assert.match(fn, /\(!here && full \? " disabled" : ""\)/, "and the rows that cannot be tapped are");
+  // Every row in this list is a man NOT in the round, so a full round makes
+  // all of them untappable — there is no longer an "already in" row to exempt.
+  assert.match(fn, /\(full \? " disabled" : ""\)/, "and the rows that cannot be tapped are");
   assert.match(html, /if\(state\.players\.length >= MAX_PLAYERS\) return false;/);
 });
 
@@ -215,4 +217,59 @@ test("the roster list comes before the blank form", () => {
     "the list must come first");
   assert.ok(fold.indexOf('id="addBtn"') < fold.indexOf('id="rosterBox"'),
     "and typing a man in stays available, above the paste box");
+});
+
+/* ---- one list, not two ----
+ *
+ * Setup was showing the SAME EIGHT NAMES TWICE on one screen: the roster list
+ * at the top with every man marked IN, and the player list at the bottom in a
+ * different order, with nothing on screen saying why there were two. Two lists
+ * doing different jobs read as one list duplicated badly.
+ *
+ * So the roster section holds only the men NOT yet in the round. Tapping a name
+ * moves it down to the player list; taking a man out of the round sends it back
+ * up. One man, one place, and only one order to get right.
+ */
+
+test("the roster list holds only men who are not in the round", () => {
+  const fn = html.slice(html.indexOf("function drawRosterPick"), html.indexOf("function refreshFieldBoxes"));
+  assert.match(fn, /roster\.filter\(m => !playerFor\(m\)\)/, "filtered, not marked");
+  assert.equal(/" in" : ""/.test(fn), false, "no IN tag — a man in the round is not in this list");
+  assert.equal(/const here = playerFor\(m\)/.test(fn), false);
+});
+
+test("when everybody is in, it is one line and not eight dead rows", () => {
+  const fn = html.slice(html.indexOf("function drawRosterPick"), html.indexOf("function refreshFieldBoxes"));
+  assert.match(fn, /if\(men\.length === 0\)\{/);
+  // The sentence wraps in the source, so match the part that does not.
+  assert.match(fn, /Everybody on the roster is in this/);
+  assert.match(fn, /Remove this player/, "and says where to undo it");
+});
+
+test("an empty roster and a fully-used roster say different things", () => {
+  // "Nobody saved yet" and "everybody is already in" are opposite situations
+  // and must not share a line.
+  const fn = html.slice(html.indexOf("function drawRosterPick"), html.indexOf("function refreshFieldBoxes"));
+  assert.ok(fn.indexOf("Nobody on the roster yet") > -1);
+  assert.ok(fn.indexOf("Everybody on the roster is in this") > -1);
+  assert.ok(fn.indexOf("if(roster.length === 0)") < fn.indexOf("if(men.length === 0)"),
+    "the empty-roster case is tested first, or it would never be reached");
+});
+
+test("taking a man out anywhere puts him back in the list", () => {
+  /* The list is derived from the field, so it is wrong the moment the field
+     moves — including from the edit screen, which is now the ONLY way out.
+     A man removed there and not returned here would be in neither list. */
+  const fn = html.slice(html.indexOf("function refreshFieldBoxes"), html.indexOf("function showRosterBox"));
+  assert.match(fn, /drawRosterPick\(\)/);
+  assert.match(fn, /foldAdd/);
+  // And renderSetup is what runs after every way the field can change.
+  assert.match(html, /refreshFieldBoxes\(\);/);
+});
+
+test("tapping a man only ever adds — removal moved to the player list", () => {
+  const fn = html.slice(html.indexOf("function drawRosterPick"), html.indexOf("function refreshFieldBoxes"));
+  assert.match(fn, /if\(!addFromRoster\(/);
+  assert.equal(/removeFromRound/.test(fn), false,
+    "he is not in this list to tap a second time");
 });
