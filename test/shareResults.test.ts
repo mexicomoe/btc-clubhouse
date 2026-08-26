@@ -275,7 +275,11 @@ test("the code carries its own marker and version", () => {
 const RESULTS_HTML = readFileSync(new URL("../results.html", import.meta.url), "utf8");
 
 /** Every file the page actually pulls in. Prose in a comment is not loading. */
-const SCRIPTS = [...RESULTS_HTML.matchAll(/<script[^>]+src="([^"]+)"/g)].map((m) => m[1]);
+/* THE BUILD STAMP COMES OFF HERE. Asset URLs carry ?v=<build>, and leaving it
+   on would not just fail the list below — it would quietly gut the check under
+   it, because `includes("engine.js")` does not match "engine.js?v=9b71661".
+   A guard that stops matching is worse than one that fails. */
+const SCRIPTS = [...RESULTS_HTML.matchAll(/<script[^>]+src="([^"?]+)/g)].map((m) => m[1]);
 
 // Not a flag that could be flipped — the scoring and setup code is simply not
 // on the page, so there is nothing to reach however the address is edited.
