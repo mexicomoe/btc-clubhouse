@@ -35,7 +35,7 @@ A single-page web app, installable to a phone home screen, that **works with no 
 - **Minimum 18px body text**, 24px+ for scores. Nothing renders below 18 anywhere, including inside the shared picture.
 - **Tap targets no smaller than 44px.** In practice nothing in the app is under 56.
 - Very high contrast; assume direct sun on a dim screen
-- No thin greys, no hairline type, no hover-dependent behaviour
+- No thin grays, no hairline type, no hover-dependent behavior
 - **No sideways scrolling on any screen**
 - One thing per screen — the scorer is standing on a cart path
 
@@ -135,7 +135,7 @@ The legal holes are derived from the course's par and its barred list, **never h
 
 **Nothing is paid for a net par**, also tested: paying 0.2 for one takes the repetition of the net score from +0.51 to **+0.73**. Net pars are common — four a round across nine picks — so counting them is close to counting how well a man played, which is the net score's job and not this one's.
 
-*The doubling on holes 4 and 18 is gone. It was printed on the card and changed nobody's behaviour — 8 of 10 still took hole 7 and 9 of 10 still took 16 — so it was paying extra for choices men were making anyway.*
+*The doubling on holes 4 and 18 is gone. It was printed on the card and changed nobody's behavior — 8 of 10 still took hole 7 and 9 of 10 still took 16 — so it was paying extra for choices men were making anyway.*
 
 **Every slot of a par is handed the identical list**, so no hole falls in one slot alone. It used to be true that every hole fell in at most one slot, which is why nominating a hole twice was *also* illegal for one of them and either check caught it. **That is no longer so, and the duplicate pass is now the only thing** standing between a man and being paid twice for one birdie. It runs first, and its message says *"hole 8 is nominated twice"* rather than *"not a legal first par 3"* — which is a baffling thing to be told about a line that plainly says 8 twice.
 
@@ -242,7 +242,7 @@ Null means **not scored, not shown, not exported** — absent from the card enti
 
 ## 3. Edge cases that will actually happen
 
-| Case | Behaviour |
+| Case | Behavior |
 |---|---|
 | Player quits after 12 holes | Everything still scores and is shown, but he takes **no final and no position** — eighteen holes or you are not eligible. A contest that cannot be judged returns 0 and says why. |
 | A man picks up | Golf Genius prints `X`. Scores **net double**, set directly so it holds at every handicap. The hole still counts as played, so an X'd card is a full round and can win. Shown as X, never as the par + 4 filled in behind it. |
@@ -297,7 +297,7 @@ Rob lost to Teitelbaum by 1
 
 **This is the most repeatable thing in the game** — a sentence a man says in the bar — and it is **the reveal**: nobody knows who named whom until it is published. Biggest margin first, because it is read aloud and the heaviest beating is the one worth leading with. **Two men who named each other make two lines**; they are two separate bets, priced separately by each man's band, and one can be void while the other stands. Duels that never came off are still listed, with the reason.
 
-**Setup** — organised by how often a thing is touched, not by how it was built.
+**Setup** — organized by how often a thing is touched, not by how it was built.
 
 *Always out:* **how many players, and whether the cards have come in** — then the player list, **+ Add player**, **Paste a list of players**, **Open the pick sheet**, **Paste birdie picks** and **Set the Hit List**.
 
@@ -314,7 +314,7 @@ Each shut heading carries a line saying what is inside, so the allowance and the
 
 *A player row shows name, handicap index and tee, and nothing else.* Group, flight, picks, GHIN and sex live in the player's own form, one tap away. At twenty-four rows every extra word costs a line.
 
-**Colour helps the eye find things and is never the signal.** A row with something missing is tinted amber with an amber bar — *and says the word "missing" followed by what is missing*. A man who cannot tell the tint from white in Florida sun loses nothing.
+**Color helps the eye find things and is never the signal.** A row with something missing is tinted amber with an amber bar — *and says the word "missing" followed by what is missing*. A man who cannot tell the tint from white in Florida sun loses nothing.
 
 **The rules** — every contest value, with the default beside anything that has moved. **It says why the cut contests are off**, or in November somebody will wonder. A round not on the defaults is marked on the board, in the shared link and in the export, naming what was changed.
 
@@ -338,7 +338,7 @@ Local storage on the device, **several events at once** — the club plays Frida
 
 ### Sharing a finished round
 
-Until this existed, the result of a round was the organiser reading numbers aloud in the bar. **Share offers two things, because neither one does the whole job.**
+Until this existed, the result of a round was the organizer reading numbers aloud in the bar. **Share offers two things, because neither one does the whole job.**
 
 > ⚠️ **THE LINK DOES NOT SURVIVE iOS MESSAGES, AND CANNOT BE MADE TO.**
 >
@@ -475,7 +475,7 @@ women    9 11 17  1  3  7  5 15 13   4 12 16 18  8  6 10 14  2
 
 ## 10. The Golf Genius export — the real format
 
-The organiser downloads the event leaderboard from Golf Genius. It arrives as a **legacy `.xls`** (OLE2, not modern xlsx — SheetJS reads both; openpyxl does not). Read the low-net leaderboard sheet, named something like **"Holes season - low net"**.
+The organizer downloads the event leaderboard from Golf Genius. It arrives as a **legacy `.xls`** (OLE2, not modern xlsx — SheetJS reads both; openpyxl does not). Read the low-net leaderboard sheet, named something like **"Holes season - low net"**.
 
 **Layout, verified against a real 18-player export:**
 
@@ -503,7 +503,7 @@ Verified: Sid Ferndale's 18 holes sum to 72, which matches the Net column. His T
 
 ### Preferred input
 
-**Paste, not file upload.** The organiser selects the player rows in the open spreadsheet and copies — that puts tab-separated text on the clipboard, which is trivial to parse and needs no `.xls` reader in the browser.
+**Paste, not file upload.** The organizer selects the player rows in the open spreadsheet and copies — that puts tab-separated text on the clipboard, which is trivial to parse and needs no `.xls` reader in the browser.
 
 ### Parsing rules
 
@@ -512,7 +512,7 @@ Verified: Sid Ferndale's 18 holes sum to 72, which matches the Net column. His T
 - **A blank cell means the hole was not played. An `X` does not.** Golf Genius prints X where a man picked up; that hole **was** played and scores **net double**. Set the net directly, do not reach it through an imputed gross: a 38 index off Tee I is a course handicap of 47, which is three shots on half the card, and par + 4 less three shots comes in *under* net double and credits a bogey for picking up. A gross of par + 4 is still filled in, but only so the round has a gross total to show.
 - **A picked-up hole counts towards the eighteen.** A man who X'd three holes went round and can win; walking in after twelve is a different thing and is not eligible. Getting this wrong quietly disqualifies him.
 - Show an X as an X, never as the par + 4 filled in behind it.
-- A card with an X on it cannot be summed against Out/In/Total, so gross and net cannot be told apart by arithmetic — **the organiser is asked which the columns are** rather than the paste being called broken.
+- A card with an X on it cannot be summed against Out/In/Total, so gross and net cannot be told apart by arithmetic — **the organizer is asked which the columns are** rather than the paste being called broken.
 - Sheet 1 of the same file holds Golf Genius's own skins result — a free cross-check.
 
 ---

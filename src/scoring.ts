@@ -276,7 +276,7 @@ export interface ParsedIndex {
 
 /**
  * Read a typed handicap index. Never use `parseFloat` for this: parseFloat("24,4")
- * is 24, silently dropping the tenth. A comma is accepted and normalised; anything
+ * is 24, silently dropping the tenth. A comma is accepted and normalized; anything
  * else is refused rather than guessed at.
  */
 export const parseHandicapIndex: (text: string) => ParsedIndex = E.parseHandicapIndex;
@@ -345,7 +345,7 @@ export const computeLeaderboard: (players?: PlayerCard[], course?: CourseSource,
 /** One leaderboard per flight, in reading order. */
 export const computeFlights: (players?: PlayerCard[], course?: CourseSource, contests?: ContestConfig) => FlightBoard[] = E.computeFlights;
 
-/** A player's flight, normalised. "" is the one undivided field. */
+/** A player's flight, normalized. "" is the one undivided field. */
 export const flightOf: (card: PlayerCard) => string = E.flightOf;
 
 /** Every flight in use across a field, in reading order. */

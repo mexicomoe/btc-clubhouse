@@ -7,7 +7,7 @@
  * <script src> and imported for its side effect by src/shareResults.ts, which
  * re-exports it with types so the tests run this exact code.
  *
- * WHAT THIS IS FOR. A round is scored on the organiser's phone and nobody else
+ * WHAT THIS IS FOR. A round is scored on the organizer's phone and nobody else
  * can see it. This turns the finished leaderboard into one link he can text.
  * There is no server: the round travels inside the link.
  *
@@ -16,7 +16,7 @@
  * That is exactly wrong for a share link, three times over: it needs the
  * scoring engine present on a page that must never reach it; it would rescore
  * against the READER's settings, so a link would change its numbers when the
- * organiser changed a threshold; and it costs the eighteen holes a man will
+ * organizer changed a threshold; and it costs the eighteen holes a man will
  * never read on a phone. So the finished figures travel, already settled, and
  * results.html carries no engine at all.
  *

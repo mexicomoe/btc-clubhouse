@@ -6,7 +6,7 @@
  * different product.
  *
  * Built for men in their 70s–80s reading a dim phone in Florida sun.
- * Everything is big, black-on-white or white-on-black, bold, no thin greys.
+ * Everything is big, black-on-white or white-on-black, bold, no thin grays.
  * Nothing is smaller than 18px and nothing tappable is under 48px.
  */
   :root {
@@ -16,7 +16,7 @@
     --penalty: #b0140a;   /* the one contest that can add strokes */
     --band: #0b2e13;      /* header band, deep green */
     --wash: #f0efe9;      /* the only fill that isn't white — still near-black text */
-    /* Colour is here to help the eye FIND things, never to carry meaning on its
+    /* Color is here to help the eye FIND things, never to carry meaning on its
        own: every tinted thing also says in words what it is. These are all pale
        enough to keep black text at full contrast in Florida sun. */
     --amber: #8a5000;     /* something is missing — always beside the word */
@@ -57,7 +57,7 @@
 
   /* THE GEAR. Not a fourth tab: three labels fit a phone comfortably and a
      fourth was already tight, and this costs the bar nothing because it is
-     above it. It carries the WORD as well as the shape — an unlabelled icon is
+     above it. It carries the WORD as well as the shape — an unlabeled icon is
      a guess, and a tooltip is no use on a phone, where nothing hovers. */
   button.gear {
     margin-left: auto; flex: 0 0 auto; order: 2;
@@ -237,7 +237,7 @@
   .cs.good { color: var(--good); }
   .cs.penalty { color: var(--penalty); }
   .cs.none { color: var(--ink); }
-  .cd.dim { font-weight: 800; }   /* "needs 18 holes" — kept bold black, not grey */
+  .cd.dim { font-weight: 800; }   /* "needs 18 holes" — kept bold black, not gray */
 
   /* Shared blocks */
   .pad { padding: 18px 14px; }
@@ -256,7 +256,7 @@
   .big.danger:active { background: var(--penalty); color: var(--paper); }
   .big[disabled] { opacity: .45; cursor: default; }
   .big + .big { margin-top: 12px; }
-  /* A .big that is a real link to another page, not a button. Buttons centre
+  /* A .big that is a real link to another page, not a button. Buttons center
      their label on their own; anchors do not. */
   a.big { text-align: center; text-decoration: none; }
 
@@ -285,7 +285,7 @@
     list-style: none;
   }
   details.fold > summary::-webkit-details-marker { display: none; }
-  /* The open/shut mark is a shape, not a colour, and sits at the 18px floor. */
+  /* The open/shut mark is a shape, not a color, and sits at the 18px floor. */
   details.fold > summary::after {
     content: "＋"; margin-left: auto; font-size: 26px; font-weight: 800;
   }
@@ -314,7 +314,7 @@
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   button.pickman .pmd { display: block; font-size: 18px; font-weight: 700; margin-top: 3px; }
-  /* The mark is a SHAPE and a WORD, never colour alone. */
+  /* The mark is a SHAPE and a WORD, never color alone. */
   button.pickman .pmt { flex: 0 0 auto; font-size: 22px; font-weight: 800; }
   button.pickman.in { background: var(--tint-event); }
   button.pickman.in .pmt { font-size: 18px; letter-spacing: .5px; }
@@ -356,7 +356,7 @@
   a.fold.go:active, button.fold.go:active { background: var(--ink); color: var(--paper); }
   #goRules { background: var(--tint-event); }
 
-  /* A step whose closed line is reporting something wrong. Never colour alone —
+  /* A step whose closed line is reporting something wrong. Never color alone —
      the line itself says what it is. */
   details.fold.step > summary.wrong, button.fold.go.wrong { box-shadow: inset 6px 0 0 var(--penalty); }
   .fsub.wrong { color: var(--penalty); }
@@ -374,7 +374,7 @@
      is what actually says so, for anyone who cannot tell the tint from white. */
   .prow.warn { background: var(--amberwash); box-shadow: inset 8px 0 0 var(--amber); padding-left: 22px; }
   .prow .miss { font-weight: 800; }
-  /* Six pick dropdowns, each labelled with the slot it fills. */
+  /* Six pick dropdowns, each labeled with the slot it fills. */
   .pickrow { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
   .pickrow .picklab { flex: 0 0 42%; font-size: 18px; font-weight: 800; }
   .pickrow select { flex: 1 1 auto; min-width: 0; }

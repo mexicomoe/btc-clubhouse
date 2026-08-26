@@ -57,7 +57,7 @@ const csv = () => eventToCsv(EVENT, board(),
 /**
  * Read a CSV line the way a spreadsheet does. Splitting on commas is exactly
  * the mistake the quoting exists to prevent — "Ridgeway, Ken" would shift every
- * column after it — so the tests must honour quotes or they prove nothing.
+ * column after it — so the tests must honor quotes or they prove nothing.
  */
 function parseCsvLine(line: string): string[] {
   const out: string[] = [];

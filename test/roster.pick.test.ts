@@ -95,11 +95,11 @@ test("his index and tee are COPIED, never linked", () => {
 test("a man already in the round is found, marked, and not offered twice", () => {
   assert.match(html, /function playerFor\(m\)\{/);
   assert.match(html, /function inField\(m\)\{\s*return !!playerFor\(m\);/);
-  // By roster id first, then by normalised name — so a man added by hand or off
-  // a tee sheet is still recognised.
+  // By roster id first, then by normalized name — so a man added by hand or off
+  // a tee sheet is still recognized.
   const fn = html.slice(html.indexOf("function playerFor"), html.indexOf("function addFromRoster"));
   assert.match(fn, /p\.rosterId && p\.rosterId === m\.id/);
-  assert.match(fn, /IMP\.normaliseName/);
+  assert.match(fn, /IMP\.normalizeName/);
   // And the guard is inside the one add path.
   assert.match(html, /if\(inField\(m\)\) return false;/);
 });
@@ -140,7 +140,7 @@ test("a new man typed in is offered the roster, and an existing one is not", () 
   assert.match(html, /p\.isNew \? `<div class="field"><span class="flab">Save him to the roster/);
   // Saving only ever ADDS — a man already saved is matched by name and left be.
   const fn = html.slice(html.indexOf("if(rec.rosterId == null && editing.alsoRoster"));
-  assert.match(fn.slice(0, 600), /IMP\.normaliseName\(m\.name \|\| ""\) === IMP\.normaliseName\(rec\.name\)/);
+  assert.match(fn.slice(0, 600), /IMP\.normalizeName\(m\.name \|\| ""\) === IMP\.normalizeName\(rec\.name\)/);
   assert.match(fn.slice(0, 600), /already \|\| addToRoster\(/);
 });
 
@@ -180,4 +180,39 @@ test("an open Hit List does not go stale as men are tapped in", () => {
   assert.match(html, /if\(hit && hit\.open\) showHitListBox\(\);/);
   assert.match(html, /drawFoldSubs\(\);\n  refreshFieldBoxes\(\);/,
     "called from renderSetup, which runs after every way the field can change");
+});
+
+/* ---- the fold must not scroll past what it just drew ----
+ *
+ * THE FEATURE WAS LIVE FOR A DAY AND NOBODY COULD SEE IT.
+ *
+ * `showRosterBox` ended with `.focus()` on its textarea. That was written when
+ * the paste box was the ONLY thing in the step, where putting the cursor in it
+ * saved a tap. Once the roster list went in above it, focusing an element
+ * scrolled it into view — 952 measured pixels down — carrying the page past
+ * the list, past the button, and parking in a textarea. On a phone it threw the
+ * keyboard up as well.
+ *
+ * Nothing threw and nothing logged. Rob opened Add player, saw a blank form and
+ * a paste box, and reported the feature missing. It was not missing.
+ */
+
+test("opening Add player does not steal focus", () => {
+  const html = readFileSync(new URL("../leaderboard.html", import.meta.url), "utf8");
+  const box = html.slice(html.indexOf("function showRosterBox"),
+                         html.indexOf("function rosterRules"));
+  assert.equal(/rosterPaste"\)\.focus\(\)/.test(box), false,
+    "focusing scrolls, and this box is no longer the only thing in the step");
+});
+
+test("the roster list comes before the blank form", () => {
+  // "+ Type a player in" is the loudest thing in the box and leads AWAY to a
+  // form. Under it, the eight names Rob wants to tap are below the fold he
+  // just opened — so the answer to "add a player" looks like the form.
+  const html = readFileSync(new URL("../leaderboard.html", import.meta.url), "utf8");
+  const fold = html.slice(html.indexOf('id="foldAdd"'), html.indexOf('id="goInvites"'));
+  assert.ok(fold.indexOf('id="rosterPick"') < fold.indexOf('id="addBtn"'),
+    "the list must come first");
+  assert.ok(fold.indexOf('id="addBtn"') < fold.indexOf('id="rosterBox"'),
+    "and typing a man in stays available, above the paste box");
 });

@@ -69,9 +69,12 @@
   function niceDate(iso){
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ""));
     if(!m) return String(iso || "");
-    // Built by hand rather than by toLocaleDateString, which would read
-    // differently on a phone set to another language.
-    return Number(m[3]) + " " + MONTHS[Number(m[2]) - 1] + " " + m[1];
+    /* MONTH, DAY, YEAR — this is a Florida golf club. It read "22 August 2026"
+       for a while, which is not how anybody here writes a date.
+       Built by hand rather than by toLocaleDateString, which would read
+       differently again on a phone set to another language. The point is that
+       every phone shows the SAME thing, and that thing is US. */
+    return MONTHS[Number(m[2]) - 1] + " " + Number(m[3]) + ", " + m[1];
   }
 
     /** The contests, by the names a man reads on the card. */
@@ -131,7 +134,7 @@
     }
     /** Comparator for anything with a `name`. */
     function bySurname(a, b){
-      return surnameKey(a && a.name).localeCompare(surnameKey(b && b.name));
+      return surnameKey(a && a.name).localeCompare(surnameKey(b && b.name), "en-US");
     }
 
     globalThis.ClubhouseDisplay = {

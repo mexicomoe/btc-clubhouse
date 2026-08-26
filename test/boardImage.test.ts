@@ -247,7 +247,7 @@ test("paint puts every operation onto the context, and nothing else", () => {
 
 // The canvas has no cascade, so the palette is repeated in boardimage.js. These
 // hold the two copies together: change clubhouse.css and this fails.
-test("the colours are the stylesheet's own", () => {
+test("the colors are the stylesheet's own", () => {
   const css = readFileSync(new URL("../clubhouse.css", import.meta.url), "utf8");
   for (const [name, value] of [["--band", IMG.BAND], ["--wash", IMG.WASH]]) {
     assert.ok(css.includes(name + ": " + value),

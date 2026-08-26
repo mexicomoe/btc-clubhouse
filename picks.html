@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-US">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -121,8 +121,8 @@
   <p id="copied"></p>
 </div></div>
 
-<script src="engine.js?v=9b71661"></script>
-<script src="fieldlink.js?v=9b71661"></script>
+<script src="engine.js?v=f8d0430"></script>
+<script src="fieldlink.js?v=f8d0430"></script>
 <script>
 /**
  * Where a completed card is filed, on top of the text message.
@@ -329,7 +329,7 @@ function drawField(){
  * The men he may name.
  *
  * From HIS OWN LINK they arrive already decided, bands and all, and the page
- * does no arithmetic — it cannot, because no index travelled.
+ * does no arithmetic — it cannot, because no index traveled.
  *
  * From a field link the page works them out with the ENGINE's own rule. Never a
  * second copy of it: a page that recommends a man the app then refuses is the
@@ -384,7 +384,7 @@ const copied = document.getElementById("copied");
 function line(){
   const name = me ? me.name : (who.value.trim() || "(no name)");
   const first = name + " — " + picksInOrder().join(", ");
-  // THE TARGET GOES ON ITS OWN LINE, LABELLED. A block of these is pasted in
+  // THE TARGET GOES ON ITS OWN LINE, LABELED. A block of these is pasted in
   // one go, and without the label a bare name is indistinguishable from the
   // start of the next man's entry.
   return opponent ? first + "\n" + "Hit List: " + opponent.name : first;
@@ -437,7 +437,7 @@ function refresh(){
   }
   send.disabled = !ready;
   // An anchor with no href is not clickable and not focusable, which is exactly
-  // the disabled behaviour wanted — aria-disabled only tells the screen reader.
+  // the disabled behavior wanted — aria-disabled only tells the screen reader.
   if (ready) sendsms.href = smsHref(line());
   else sendsms.removeAttribute("href");
   sendsms.setAttribute("aria-disabled", ready ? "false" : "true");

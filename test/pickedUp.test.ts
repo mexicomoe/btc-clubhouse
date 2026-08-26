@@ -173,7 +173,7 @@ test("a blank is still an unplayed hole, not a pick-up", () => {
 
 test("a card with an X is not called broken for failing to add up", () => {
   // The eighteen cannot be summed against the Total when one has no number, so
-  // the mode is left for the organiser to say — but nothing is reported wrong.
+  // the mode is left for the organizer to say — but nothing is reported wrong.
   const holes: (number | string)[] = PAR.map((p) => p);
   holes[3] = "X";
   const { cards, errors } = parseScores(`${HEADER}\n${row("Ridgeway, Ken (18)", holes)}`);

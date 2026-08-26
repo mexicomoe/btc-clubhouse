@@ -9,6 +9,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import { parseRoster, splitCsvLine } from "../src/importScores.ts";
 
@@ -126,7 +127,7 @@ test("sixteen men come through in one paste", () => {
   });
 });
 
-test("splitting a line honours quotes", () => {
+test("splitting a line honors quotes", () => {
   assert.deepEqual(splitCsvLine('a,b,c'), ["a", "b", "c"]);
   assert.deepEqual(splitCsvLine('"a,b",c'), ["a,b", "c"]);
   assert.deepEqual(splitCsvLine('"he said ""no""",c'), ['he said "no"', "c"]);
@@ -209,4 +210,43 @@ test("a tee sheet pastes sixteen at a time, and mixes with the old shapes", () =
   assert.equal(ignored, 0);
   assert.deepEqual(rows.map((r) => r.indexText), ["26.9", "12.4", "19.4"]);
   assert.deepEqual(rows.map((r) => r.tee), ["IV", "III", "IV"]);
+});
+
+/* ---- starting a round is not renaming one ---- */
+
+const APP = readFileSync(new URL("../leaderboard.html", import.meta.url), "utf8");
+
+test("a new round is a visible action on Setup", () => {
+  /* IT EXISTED AND WAS HIDDEN. "+ New event" sat in `drawMoveBox` — the
+     export/copy/paste/delete box — which went behind the gear when the tabs
+     were cut to three. So starting a round was three taps from Setup under a
+     heading that reads like a file menu. Rob went looking on Setup, did not
+     find it, and renamed the round instead, which keeps every player. */
+  const box = APP.slice(APP.indexOf("function drawEventBox"), APP.indexOf("function drawMoveBox"));
+  assert.match(box, /id="fNewEvent"/, "on Setup, in Event settings");
+  assert.match(box, /Start a new round/);
+  assert.match(box, /Renaming is not starting a new round/,
+    "and the rename field must say what it is not");
+});
+
+test("only one New event control, so neither can shadow the other", () => {
+  // Two elements with one id is not a duplicate button — it is one button with
+  // a listener and one without, and no way to tell which is which.
+  assert.equal((APP.match(/id="fNewEvent"/g) || []).length, 1);
+});
+
+test("a new round starts empty", () => {
+  const fn = APP.slice(APP.indexOf("function blankEvent"), APP.indexOf("function blankEvent") + 700);
+  assert.match(fn, /players: \[\]/, "no men");
+  assert.match(fn, /scores: \{\}/, "no cards");
+  assert.match(fn, /contests: null/, "and the default rules");
+});
+
+test("the event is called what it was named, and nothing else", () => {
+  // It used to be name + date glued together, so "Friday" read as "Friday ·
+  // August 22, 2026" on the band, in the picker and on the exported file.
+  const at = APP.indexOf("function eventLabel");
+  const fn = APP.slice(at, APP.indexOf("\nfunction ", at + 20));
+  assert.equal(/niceDate/.test(fn), false, "the date is a field of its own");
+  assert.match(fn, /e\.name/);
 });

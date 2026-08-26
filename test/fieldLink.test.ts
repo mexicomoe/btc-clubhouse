@@ -7,7 +7,7 @@
  * picks his own opponent instead of Rob picking it for him.
  *
  * The line that comes back is TWO lines: the holes as before, then the target
- * on its own, labelled. The label is what tells a target apart from the start
+ * on its own, labeled. The label is what tells a target apart from the start
  * of the next man's entry in a pasted block.
  */
 

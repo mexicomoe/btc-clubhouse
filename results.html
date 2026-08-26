@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en-US">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -8,7 +8,7 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="referrer" content="no-referrer">
 <title>Beat the Crowd · Results</title>
-<link rel="stylesheet" href="clubhouse.css?v=9b71661">
+<link rel="stylesheet" href="clubhouse.css?v=f8d0430">
 </head>
 <body>
 
@@ -18,7 +18,7 @@
   THERE IS NO SCORING CODE ON THIS PAGE and no setup. engine.js, importer.js and
   exporter.js are not loaded, and nothing here writes to storage. The round
   arrives already settled — every final, every contest value and every placing
-  was decided on the organiser's phone — so there is nothing here to score with
+  was decided on the organizer's phone — so there is nothing here to score with
   and no way to reach the app's setup, whatever anyone does to the address.
   That is not a flag that could be flipped; the code simply is not present.
 
@@ -41,8 +41,8 @@
   <div id="playerBody"></div>
 </section>
 
-<script src="display.js?v=9b71661"></script>
-<script src="results.js?v=9b71661"></script>
+<script src="display.js?v=f8d0430"></script>
+<script src="results.js?v=f8d0430"></script>
 <script>
 "use strict";
 const D = window.ClubhouseDisplay;
@@ -156,7 +156,7 @@ function showPlayer(name){
   // be a cap on the score itself — so the lines below always add to the total
   // above, and there is nothing to reconcile.
   // Only the contests this round actually played, in the round's own order —
-  // which contests were live travelled with it, so a round scored before a
+  // which contests were live traveled with it, so a round scored before a
   // contest existed does not sprout an empty line for it.
   html += round.contests.map((key) => {
     const v = r.contests[key];

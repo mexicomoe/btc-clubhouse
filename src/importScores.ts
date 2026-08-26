@@ -97,11 +97,11 @@ export interface RosterOptions {
 export const parseRoster: (text: string, options?: RosterOptions) =>
   { rows: RosterRow[]; ignored: number } = I.parseRoster;
 
-/** Split one line on commas, honouring quotes as a spreadsheet writes them. */
+/** Split one line on commas, honoring quotes as a spreadsheet writes them. */
 export const splitCsvLine: (line: string) => string[] = I.splitCsvLine;
 
 /** Case- and spacing-insensitive key for matching a pasted row to a setup player. */
-export const normaliseName: (name: string) => string = I.normaliseName;
+export const normalizeName: (name: string) => string = I.normalizeName;
 
 /** "Ridgeway, Ken" → "Ken Ridgeway"; null when there is no comma to undo. */
 export const unreverseName: (name: string) => string | null = I.unreverseName;

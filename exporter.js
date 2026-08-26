@@ -63,7 +63,7 @@
     const cols = ["Event", "Date", "Rules", "Format",
                   // Two names. The canonical one is what the scoreboard shows;
                   // the one as entered is what Golf Genius will match on, and
-                  // only the organiser's own typing will do for that.
+                  // only the organizer's own typing will do for that.
                   "Name", "Name as entered", "GHIN",
                   "Handicap index", "Tee", "Gender", "Group", "Flight",
                   // The NINE picks, in slot order: two par 5s, three par 3s,

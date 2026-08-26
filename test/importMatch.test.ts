@@ -147,7 +147,7 @@ test("the real paste's names find a roster written as First L.", () => {
   assert.deepEqual(got[1], { index: 1, how: "initial" }, "Merrick, Sal → Sal M.");
   assert.deepEqual(got[3], { index: 3, how: "initial" }, "Danforth, Mike → Mike D.");
   // "Mitchell" is not "Mitch": no rule covers a shortened first name, so this
-  // one comes back unmatched for the organiser to assign rather than guessed.
+  // one comes back unmatched for the organizer to assign rather than guessed.
   assert.equal(got[2].index, -1, "Kingsley, Mitchell does not match Mitch K.");
   assert.equal(got[2].how, null);
 });
@@ -162,7 +162,7 @@ test("a handicap typed into a setup name is not part of the name", () => {
   assert.equal(canonicalName("Kingsley, Mitchell (14)"), "Mitchell Kingsley");
 });
 
-// The organiser typed the roster in the export's own format, handicap and all.
+// The organizer typed the roster in the export's own format, handicap and all.
 // A full first name against a short one is not something any rule may guess at.
 test("full first names never auto-match their short forms", () => {
   const roster = [

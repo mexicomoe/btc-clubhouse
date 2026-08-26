@@ -99,7 +99,7 @@ Ties carry over. Skins still carrying at the 18th vanish. Scaling cap as built: 
 
 **The team is the player.** One card, one set of contests, one final score. No net-per-player, no stroke index per man, no individual anything.
 
-**Handicaps.** Scrambles usually apply a team handicap — commonly a percentage of the combined course handicaps, or a fixed allowance per event. **Whatever the event uses, use the same figure.** Do not invent one; the organiser has already decided it and the players already believe it.
+**Handicaps.** Scrambles usually apply a team handicap — commonly a percentage of the combined course handicaps, or a fixed allowance per event. **Whatever the event uses, use the same figure.** Do not invent one; the organizer has already decided it and the players already believe it.
 
 **The starting score is the team's net.** Same principle as the club version: net anchors, contests reduce, lowest wins.
 
@@ -116,7 +116,7 @@ Golf Genius doesn't track it. So Everybody In requires either:
 - **A paper card** the team marks and hands in, typed up afterwards — fine for 20 teams, tedious for 40, and it is one more thing to lose
 - **A screen in the app** where a team taps whose drive it was, hole by hole — reliable, but it is the score-entry screen we deliberately never built, and it puts a phone in a player's hand during the round
 
-**And the honour-system flaw.** The team marks its own card. A team needing one more of Dave's drives can simply write one down; nobody is watching. Most scrambles already run minimum-drive rules this way and it mostly works — but it is the same class of flaw as Call Your Number, where the rule creates a reason to lie. Among friends, fine. At a charity event with prizes on the table, worth thinking about before it is built.
+**And the honor-system flaw.** The team marks its own card. A team needing one more of Dave's drives can simply write one down; nobody is watching. Most scrambles already run minimum-drive rules this way and it mostly works — but it is the same class of flaw as Call Your Number, where the rule creates a reason to lie. Among friends, fine. At a charity event with prizes on the table, worth thinking about before it is built.
 
 **Options if it proves unworkable:** drop Everybody In and run five contests, or replace it with something derived from the scorecard alone.
 

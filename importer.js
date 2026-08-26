@@ -7,7 +7,7 @@
  * a file:// page) and imported for its side effect by src/importScores.ts,
  * which re-exports it with TypeScript types for the tests.
  *
- * Preferred input is pasted tab-separated text, not a file upload: the organiser
+ * Preferred input is pasted tab-separated text, not a file upload: the organizer
  * selects the player rows in the open leaderboard and copies, which puts TSV on
  * the clipboard and needs no `.xls` reader in the browser.
  *
@@ -75,7 +75,7 @@
     const errors = [];
     if (lines.length === 0) return { cards, errors };
 
-    // Locate the columns. A header row is recognised by its run of hole numbers
+    // Locate the columns. A header row is recognized by its run of hole numbers
     // — Total, if there is one, is a bonus — and the hole/Total/Net positions
     // are read from it, which survives Out/In being dropped from a selection
     // and handles a plain table that has neither. Only a paste with no header
@@ -191,7 +191,7 @@
    * place left, seventeen came through and the eighteenth was blank. The header
    * row itself then parsed as a player called "1".
    *
-   * So the header is recognised by what it actually is — a row of consecutive
+   * So the header is recognized by what it actually is — a row of consecutive
    * hole numbers — and Total, if there is one, is a bonus rather than the test.
    */
   function headerRowIndex(lines) {
@@ -317,7 +317,7 @@
   }
 
   /** Names match on case and spacing only — the roster is eight men, not a database. */
-  function normaliseName(name) {
+  function normalizeName(name) {
     return String(name == null ? "" : name).trim().replace(/\s+/g, " ").toLowerCase();
   }
 
@@ -329,7 +329,7 @@
 
   /**
    * Drop a trailing "(18)". The export carries the handicap after the name, and
-   * the organiser may well have typed it into the setup sheet too — on either
+   * the organizer may well have typed it into the setup sheet too — on either
    * side it is a handicap, not part of what the man is called.
    */
   function stripHandicap(name) {
@@ -353,7 +353,7 @@
    * Null for a single-word name, which has no initial to match on.
    */
   function initialKey(name) {
-    const parts = normaliseName(name).split(" ").filter(Boolean);
+    const parts = normalizeName(name).split(" ").filter(Boolean);
     if (parts.length < 2) return null;
     const last = parts[parts.length - 1].replace(/[^a-z0-9]/g, "");
     if (!last) return null;
@@ -375,14 +375,14 @@
    */
   function matchName(exportName, names) {
     // 1 · the names as written, once any handicap is off either side.
-    const bareKey = normaliseName(stripHandicap(exportName));
-    let i = names.findIndex((n) => normaliseName(stripHandicap(n)) === bareKey);
+    const bareKey = normalizeName(stripHandicap(exportName));
+    let i = names.findIndex((n) => normalizeName(stripHandicap(n)) === bareKey);
     if (i !== -1) return { index: i, how: "exact" };
 
     // 2 · both sides put into "First Last" order.
     const canon = canonicalName(exportName);
-    const canonKey = normaliseName(canon);
-    i = names.findIndex((n) => normaliseName(canonicalName(n)) === canonKey);
+    const canonKey = normalizeName(canon);
+    i = names.findIndex((n) => normalizeName(canonicalName(n)) === canonKey);
     if (i !== -1) return { index: i, how: "reversed" };
 
     // 3 · first name plus last initial, on the ordered form only. This is the
@@ -426,7 +426,7 @@
   /**
    * The roster name a failed match was most likely meant to be.
    *
-   * WHY. "Score belongs to nobody" is true and useless. The organiser typed
+   * WHY. "Score belongs to nobody" is true and useless. The organizer typed
    * "Gidaly, Mitch" into Setup and Golf Genius printed "Gidaly, Mitchell", and
    * he is left to find that himself among two dozen men, six times over. Naming
    * the near miss turns a hunt into a tap.
@@ -434,17 +434,17 @@
    * It only ever SUGGESTS. Nothing is assigned on a guess: a man scored on
    * another man's card is far worse than a row that had to be pointed at by
    * hand, and every rule in `matchName` above is built on refusing rather than
-   * risking it. This keeps that bargain — it hands the organiser a name to
+   * risking it. This keeps that bargain — it hands the organizer a name to
    * confirm, and confirming is still his to do.
    */
   function nearestName(exportName, names) {
-    const want = normaliseName(canonicalName(exportName));
+    const want = normalizeName(canonicalName(exportName));
     const nothing = { index: -1, distance: null };
     if (want === "") return nothing;
 
     let best = -1, bestD = Infinity, runnerUp = Infinity;
     names.forEach((n, i) => {
-      const d = editDistance(want, normaliseName(canonicalName(n)));
+      const d = editDistance(want, normalizeName(canonicalName(n)));
       if (d < bestD) { runnerUp = bestD; bestD = d; best = i; }
       else if (d < runnerUp) runnerUp = d;
     });
@@ -460,7 +460,7 @@
   }
 
   /* ---- pasting a roster ----
-     Sixteen men typed in by hand is a long job, and the organiser has them in a
+     Sixteen men typed in by hand is a long job, and the organizer has them in a
      spreadsheet already. One player a line:
 
          name, handicap index, tee, group, front pick, back pick
@@ -471,7 +471,7 @@
      properly, and an unquoted one is rescued when the row is a field too long
      and the second field is plainly not a handicap. */
 
-  /** Split one line on commas, honouring quotes the way a spreadsheet writes them. */
+  /** Split one line on commas, honoring quotes the way a spreadsheet writes them. */
   function splitCsvLine(line) {
     const out = [];
     let field = "", inQuotes = false;
@@ -648,7 +648,7 @@
    * `opts.slots` is [{ key, label, legal }] in slot order, from the course.
    *
    * Every line comes back whether it worked or not, carrying `problems` and, if
-   * a name was recognised, the index of the player it belongs to. A name that
+   * a name was recognized, the index of the player it belongs to. A name that
    * matches nothing — or matches two men equally — is reported, never guessed.
    */
   /**
@@ -822,7 +822,7 @@
   globalThis.ClubhouseImporter = {
     parseRoster, splitCsvLine, parseBirdiePicks,
     parseScores, splitName, grossCardToPlayer,
-    normaliseName, unreverseName, stripHandicap, canonicalName, initialKey, matchName,
+    normalizeName, unreverseName, stripHandicap, canonicalName, initialKey, matchName,
     nearestName, editDistance,
     PICKED_UP,
   };

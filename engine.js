@@ -99,7 +99,7 @@
    * Resolve the course to score a card against. A field can be spread over
    * several tees and both stroke indexes, so `course` may be:
    *   · omitted    — take the card's own `tee`/`gender`, else men's Tee IV
-   *   · a config   — score everyone against that one course (the old behaviour)
+   *   · a config   — score everyone against that one course (the old behavior)
    *   · a function — called with the card, for any other arrangement
    */
   function courseFor(card, course) {
@@ -134,7 +134,7 @@
      * how well a man played, which is the net score's job and not this one's.
      *
      * THE DOUBLING ON 4 AND 18 IS GONE. It was printed on the card and changed
-     * nobody's behaviour — 8 of 10 still took hole 7 and 9 of 10 still took 16
+     * nobody's behavior — 8 of 10 still took hole 7 and 9 of 10 still took 16
      * — so it was paying extra for choices men were making anyway. Hole 4 is
      * not a candidate at all now; it belongs to Agony Alley.
      */
@@ -352,7 +352,7 @@
   /**
    * Returns { ok, value, error }. A blank field is `ok` with a null value —
    * that is "not filled in yet", not "wrong". A comma is accepted as the
-   * decimal separator and normalised, because a phone keypad in some locales
+   * decimal separator and normalized, because a phone keypad in some locales
    * offers no period; anything else is refused rather than guessed at.
    */
   function parseHandicapIndex(text) {
@@ -563,7 +563,7 @@
     /* THE BARRED LIST IS A GAME RULE WEARING COURSE CLOTHING. It sits on the
        course because it is the course that says which holes are spoken for —
        but which contests own which holes is exactly the sort of thing the
-       organiser now adjusts, so a contest value overrides it when there is one.
+       organizer now adjusts, so a contest value overrides it when there is one.
        Par and the stroke index stay on the course and stay unreachable: those
        describe the ground, and changing one would silently rewrite every net
        score ever stored. */
@@ -677,7 +677,7 @@
    */
   function readPicks(picks, course, who, opts) {
     /* `drop` is for SCORING, where refusing is the wrong answer.
-       A man picks hole 8, the organiser later bars it, and his round must not
+       A man picks hole 8, the organizer later bars it, and his round must not
        stop opening — the whole board threw an error on exactly that, which is
        the loudest possible way to lose a round. Scoring drops the pick and pays
        him nothing for that slot, which is true and survivable.
@@ -1513,7 +1513,7 @@
       if (a === b) return 0;
       if (a === "") return -1;
       if (b === "") return 1;
-      return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" });
+      return String(a).localeCompare(String(b), "en-US", { numeric: true, sensitivity: "base" });
     });
   }
 
@@ -1576,7 +1576,7 @@
 
     // THE FORMAT IS SET BY THE FIELD THAT TEED OFF, not by who came back.
     // Counted on finishers, one man walking in off an eight-man field took the
-    // count to seven and cancelled skins for everybody — a contest decided
+    // count to seven and canceled skins for everybody — a contest decided
     // retrospectively by somebody else's bad back. The club knows whether it is
     // playing carts or teams before anyone hits a ball, and so does this.
     const format = skinsFormat(cards.length, config);
@@ -1584,7 +1584,7 @@
     const has = (c) => groupOf(c) != null && String(groupOf(c)).trim() !== "";
 
     /* Who is NOT in it, and why — so a screen can say so rather than quietly
-       showing a group one man short of the one the organiser set up. */
+       showing a group one man short of the one the organizer set up. */
     const left = [];
     const entered = [];
     cards.forEach((c, i) => {
@@ -1620,7 +1620,7 @@
 
     const groups = [...distinct].sort((a, b) =>
       (table.skins.get(b) || 0) - (table.skins.get(a) || 0) ||
-      (Number(a) || 0) - (Number(b) || 0) || String(a).localeCompare(String(b))
+      (Number(a) || 0) - (Number(b) || 0) || String(a).localeCompare(String(b), "en-US")
     ).map((id) => ({
       id,
       count: table.skins.get(id) || 0,
@@ -1935,7 +1935,7 @@
       }
       // Nothing left to separate them by. Alphabetical so the order is at least
       // the same every time the board is drawn.
-      return String(a.r.name).localeCompare(String(b.r.name));
+      return String(a.r.name).localeCompare(String(b.r.name), "en-US");
     });
 
     let lastRank = 0;
@@ -2004,7 +2004,7 @@
     duels.sort((a, b) => {
       if (a.settled !== b.settled) return a.settled ? -1 : 1;
       if (a.settled && (b.margin || 0) !== (a.margin || 0)) return (b.margin || 0) - (a.margin || 0);
-      return String(a.name).localeCompare(String(b.name));
+      return String(a.name).localeCompare(String(b.name), "en-US");
     });
     return duels;
   }

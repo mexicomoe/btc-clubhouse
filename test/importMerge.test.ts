@@ -136,7 +136,7 @@ test("a shortened first name is offered, not just rejected", () => {
   assert.equal(ROSTER[near.index], "Gidaly, Mitchell");
 });
 
-test("a misspelt surname is offered", () => {
+test("a misspelled surname is offered", () => {
   assert.equal(ROSTER[nearestName("Gidali, Mitchell", ROSTER).index], "Gidaly, Mitchell");
 });
 
@@ -146,7 +146,7 @@ test("a stranger is not dressed up as a near miss", () => {
 
 test("two names equally close is a coin toss, so nothing is offered", () => {
   // "Smith, Jon" sits one edit from both. Guessing here would be worse than
-  // saying nothing, because the organiser would trust it.
+  // saying nothing, because the organizer would trust it.
   const tie = ["Smith, John", "Smith, Joan"];
   assert.equal(nearestName("Smith, Jon", tie).index, -1);
 });

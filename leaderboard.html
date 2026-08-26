@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en-US">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="theme-color" content="#0b2e13">
 <title>Beat the Crowd · Clubhouse</title>
-<link rel="stylesheet" href="clubhouse.css?v=9b71661">
+<link rel="stylesheet" href="clubhouse.css?v=f8d0430">
 </head>
 <body>
 
@@ -125,14 +125,15 @@
   <details class="fold step" id="foldAdd">
     <summary><span><span class="fname">Add player</span>
       <span class="fsub" id="foldAddSub"></span></span></summary>
-    <div class="pad"><button class="big solid" id="addBtn">+ Add a player</button></div>
-    <!-- THE ROSTER, HERE, rather than a round trip to the gear and back. Rob
-         runs two or three events a week and every one starts by building a
-         lineup from the same regular men; the gear is for things touched once a
-         month. The roster SCREEN stays where it is, for adding a new man and
-         correcting an index. This is a way in, not a relocation. -->
+    <!-- THE ROSTER FIRST. It was under the "+ Add a player" button, which is
+         the loudest thing in the box and goes to a blank form — so the answer
+         to "add a player" looked like the form, and the eight names Rob wanted
+         to tap were below the fold he had just opened. Tapping names is the
+         job; typing a new man is the exception, and it is still here. -->
     <div class="section-label" id="rosterPickHead">From the roster</div>
     <div id="rosterPick"></div>
+    <div class="section-label">Somebody new</div>
+    <div class="pad"><button class="big solid" id="addBtn">+ Type a player in</button></div>
     <div class="section-label">Paste a list of players</div>
     <div id="rosterBox"></div>
   </details>
@@ -190,14 +191,14 @@
   <div id="importBody"></div>
 </section>
 
-<script src="engine.js?v=9b71661"></script>
-<script src="importer.js?v=9b71661"></script>
-<script src="exporter.js?v=9b71661"></script>
-<script src="results.js?v=9b71661"></script>
-<script src="fieldlink.js?v=9b71661"></script>
-<script src="boardimage.js?v=9b71661"></script>
-<script src="version.js?v=9b71661"></script>
-<script src="display.js?v=9b71661"></script>
+<script src="engine.js?v=f8d0430"></script>
+<script src="importer.js?v=f8d0430"></script>
+<script src="exporter.js?v=f8d0430"></script>
+<script src="results.js?v=f8d0430"></script>
+<script src="fieldlink.js?v=f8d0430"></script>
+<script src="boardimage.js?v=f8d0430"></script>
+<script src="version.js?v=f8d0430"></script>
+<script src="display.js?v=f8d0430"></script>
 <script>
 "use strict";
 /* Rendering and setup only — every number comes from engine.js
@@ -299,7 +300,7 @@ function inField(m){
 function playerFor(m){
   return state.players.find(p =>
     (p.rosterId && p.rosterId === m.id) ||
-    IMP.normaliseName(p.name || "") === IMP.normaliseName(m.name || "")) || null;
+    IMP.normalizeName(p.name || "") === IMP.normalizeName(m.name || "")) || null;
 }
 
 /**
@@ -354,7 +355,7 @@ function addToRoster(fields){
   Object.assign(m, fields || {});
   m.id = id;
   roster.push(m);
-  roster.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+  roster.sort((a, b) => String(a.name).localeCompare(String(b.name), "en-US"));
   save();
   return m;
 }
@@ -394,7 +395,7 @@ function blankEvent(name, date){
  * and there is nothing to guess at; the man is shown as missing that slot,
  * which is true, rather than being refused his round.
  */
-function normalisePlayer(p){
+function normalizePlayer(p){
   const out = Object.assign({}, p);
   const legal = E.birdiePickHoles(courseOf(out));
   // Where a slot's holes may have come from, oldest form last. The par 3s and
@@ -434,14 +435,14 @@ function normalisePlayer(p){
 }
 
 /** Fill in anything a stored event is missing, so an old blob still opens. */
-function normaliseEvent(e, fallbackName){
+function normalizeEvent(e, fallbackName){
   return {
     id: e.id || ("e" + (store.nextEventId++)),
     name: typeof e.name === "string" && e.name.trim() ? e.name : (fallbackName || "Round"),
     date: /^\d{4}-\d{2}-\d{2}$/.test(e.date) ? e.date : todayISO(),
     format: typeof e.format === "string" && e.format.trim() ? e.format : DEFAULT_FORMAT,
     nextId: e.nextId || (Array.isArray(e.players) ? e.players.length + 1 : 1),
-    players: (Array.isArray(e.players) ? e.players : []).map(normalisePlayer),
+    players: (Array.isArray(e.players) ? e.players : []).map(normalizePlayer),
     scores: e.scores || {},
     handicaps: e.handicaps || {},
     // A round stored while Skins had its own flag: carry the OFF across into
@@ -478,7 +479,7 @@ function load(){
       if(s && Array.isArray(s.events) && s.events.length){
         store.nextEventId = s.nextEventId || s.events.length + 1;
         store.roster = Array.isArray(s.roster) ? s.roster : [];
-        store.events = s.events.map((e, i) => normaliseEvent(e, "Round " + (i + 1)));
+        store.events = s.events.map((e, i) => normalizeEvent(e, "Round " + (i + 1)));
         store.currentId = s.currentId;        // the last one opened comes back
         state = currentEvent();
         store.currentId = state.id;
@@ -495,7 +496,7 @@ function load(){
     if(old){
       const s = JSON.parse(old);
       if(s && Array.isArray(s.players)){
-        const first = normaliseEvent(Object.assign({}, s, { name: "First round" }));
+        const first = normalizeEvent(Object.assign({}, s, { name: "First round" }));
         store.events = [first];
         store.currentId = first.id;
         state = first;
@@ -532,10 +533,29 @@ function openEvent(id){
   show("setup");
 }
 
+/**
+ * A NEW ROUND — empty field, today's date, the default rules.
+ *
+ * THIS EXISTED AND WAS NEVER WIRED TO ANYTHING. Multiple events shipped on
+ * 6 August with a picker that could only ever list one, and no way to make a
+ * second; the function below has sat here unused since. So the only way to
+ * "start a new round" was to rename the old one — which keeps every player,
+ * every score and every pick, because a rename is one field on the round you
+ * are already in. Rob did exactly that and turned up with last week's men.
+ *
+ * It goes through `openEvent`, so everything on screen is redrawn against the
+ * new round rather than left showing the old one.
+ */
 function addEvent(){
   const e = blankEvent("Round " + (store.events.length + 1));
   store.events.push(e);
   openEvent(e.id);
+  // Land on Setup with the event box open — the first thing he wants is to
+  // name it and start tapping men in.
+  const fold = document.getElementById("foldEvent");
+  if(fold) fold.open = true;
+  renderSetup();
+  show("setup");
 }
 
 function removeEvent(id){
@@ -727,7 +747,7 @@ function takePastedEvent(){
     store.events = store.events.filter(e => e.id !== clash.id);
   }
 
-  const brought = normaliseEvent(Object.assign({}, read.event, { id: null }));
+  const brought = normalizeEvent(Object.assign({}, read.event, { id: null }));
   store.events.push(brought);
   save();
   openEvent(brought.id);
@@ -736,12 +756,20 @@ function takePastedEvent(){
 /** Events in date order, newest first — the one being played is near the top. */
 function eventsInOrder(){
   return store.events.slice().sort((a, b) =>
-    (b.date || "").localeCompare(a.date || "") || (a.name || "").localeCompare(b.name || ""));
+    (b.date || "").localeCompare(a.date || "", "en-US") || (a.name || "").localeCompare(b.name || "", "en-US"));
 }
 
 /** "Friday · 5 August 2026", for a picker or a heading. */
+/**
+ * WHAT HE CALLED IT, and nothing else.
+ *
+ * It used to be name + date glued together, so "Friday" became "Friday ·
+ * August 22, 2026" everywhere — the band, the picker, the exported file. Rob
+ * names a round what he wants it called; the date is a field of its own two
+ * lines below and does not need saying twice.
+ */
 function eventLabel(e){
-  return (e.name || "Untitled") + " · " + niceDate(e.date);
+  return (e.name || "").trim() || "Untitled";
 }
 
 /** Whether a copy of this event has ever left the phone, in words. */
@@ -775,7 +803,7 @@ function fitBoardNames(){
 /* ---------- player records ---------- */
 function blankPlayer(){
   // Almost every round is men off the same tee, so a new man arrives set that
-  // way and the organiser changes it only when it is not true.
+  // way and the organizer changes it only when it is not true.
   return { id: "p" + (state.nextId++), name: "", ghin: "", index: null,
            tee: state.lastTee || "IV", gender: "M",
            cart: null, team: "", flight: "", hitList: "",
@@ -784,7 +812,7 @@ function blankPlayer(){
            ...Object.fromEntries(E.PICK_SLOTS.map(sl => [sl.key, null])) };
 }
 /**
- * The thresholds this round is scored on. The only thing the organiser can
+ * The thresholds this round is scored on. The only thing the organizer can
  * change from the app is whether Skins runs — switched off, it scores nothing
  * and no cart number is read.
  */
@@ -797,7 +825,7 @@ function blankPlayer(){
  * CSV all mark on.
  *
  * The Skins switch on Setup stays where it was and still wins: it is a
- * per-round decision the organiser makes on the day, not a rule change.
+ * per-round decision the organizer makes on the day, not a rule change.
  */
 function contestConfig(){
   return E.mergeContests(E.DEFAULT_CONTESTS, state.contests || null);
@@ -832,7 +860,7 @@ function courseOf(p){ return E.courseForTee(p.tee || "IV", p.gender || "M"); }
 /* ---------- flights ----------
    Free text, because the club names them however it likes — "A", "Front 9",
    "Seniors". The names already in use are offered for the picking so the
-   organiser types each one once and the rest are a tap. Blank means the man is
+   organizer types each one once and the rest are a tap. Blank means the man is
    in the one undivided field. A flight is not a cart: the two are different
    groupings and nothing here assumes they line up. */
 
@@ -898,7 +926,7 @@ function scoresFor(p){
 }
 /**
  * The name to put on the scoreboard. The setup sheet may carry whatever the
- * organiser typed — "Ridgeway, Robert (18)", straight off the export — but a
+ * organizer typed — "Ridgeway, Robert (18)", straight off the export — but a
  * handicap is not part of a man's name and the board is read at arm's length,
  * so it shows "Robert Ridgeway". Setup keeps what was typed.
  */
@@ -1000,7 +1028,7 @@ function buildTabs(){
  *
  * NOT A FOURTH TAB. Three labels fit a phone comfortably and a fourth was
  * already tight; the gear takes none of that width because it is not in the
- * bar. It carries the WORD as well as the shape — an unlabelled icon is a
+ * bar. It carries the WORD as well as the shape — an unlabeled icon is a
  * guess, and this audience should not have to make one.
  *
  * It remembers where it was tapped from, so Back goes where Back should.
@@ -1654,7 +1682,7 @@ function renderSetup(){
       const ch = chOf(p);
       const hcp = handicapOf(p);
       // The index gives one figure and the card another. When they disagree the
-      // played one is what scores, so THAT is the number shown, labelled as
+      // played one is what scores, so THAT is the number shown, labeled as
       // played — the two-number column belongs on the player's own screen.
       const differs = hcp.source === "paste" && ch != null && hcp.value !== ch;
       const shown = differs ? hcp.value : ch;
@@ -1692,7 +1720,7 @@ function renderSetup(){
 
 /* ---------- the folded sections ----------
    Closed on arrival, because none of them is touched more than once a round.
-   Whichever is left open comes back open: an organiser who is mid-way through
+   Whichever is left open comes back open: an organizer who is mid-way through
    setting a round up should not have to find his place again. The choice is a
    property of the DEVICE, not of the event, so it does not travel in an event
    code and does not differ between Friday's round and Saturday's. */
@@ -1791,7 +1819,7 @@ function drawFoldSubs(){
       : withPicks + " of " + men + " picks in",
     // ONLY A FAILED PASTE IS WRONG. Seven of ten picks in on a Wednesday is
     // progress, and painting it red says a thing is broken when the thing is
-    // simply not finished — which teaches a man to ignore the colour by
+    // simply not finished — which teaches a man to ignore the color by
     // Saturday, when it will mean something.
     picksBad > 0);
 
@@ -1898,12 +1926,30 @@ function drawEventBox(){
   const options = eventsInOrder().map(x =>
     `<option value="${esc(x.id)}"${x.id===e.id?" selected":""}>${esc(eventLabel(x))}</option>`).join("");
 
+  const men = state.players.length;
+
   document.getElementById("eventBox").innerHTML =
-    `<div class="field"><label for="fEvent">Event</label>
-       <select id="fEvent">${options}</select>
-</div>
-     <div class="field"><label for="fEventName">Name</label>
-       <input type="text" id="fEventName" autocomplete="off" value="${esc(e.name || "")}"></div>
+    /* STARTING A ROUND AND RENAMING ONE ARE DIFFERENT THINGS, and the screen
+       has to say so. There was no way to start one at all — the picker listed
+       the rounds that existed and nothing made another — so renaming was the
+       only move that looked like it, and it carries every player with it. */
+    `<div class="pad">
+       <button class="big solid" id="fNewEvent">+ Start a new round</button>
+       <div class="cd" style="margin-top:10px;font-size:18px;font-weight:700">
+         An empty field, today's date, the default rules. This round stays
+         exactly as it is and you can come back to it in the picker below.</div>
+     </div>
+     <div class="field"><label for="fEvent">Open a round</label>
+       <select id="fEvent">${options}</select></div>
+     <div class="field"><label for="fEventName">Name of this round</label>
+       <input type="text" id="fEventName" autocomplete="off" value="${esc(e.name || "")}">
+       <div class="cd" style="margin-top:10px;font-size:18px;font-weight:700">
+         Call it whatever you call it — this is the name on the board, the
+         picture and the exported file.<br>
+         <b>Renaming is not starting a new round.</b> ${men === 0
+           ? "This round has nobody in it yet."
+           : "This round keeps its " + men + " player" + (men === 1 ? "" : "s") +
+             " and their scores; only the name changes."}</div></div>
      <div class="field"><label for="fEventDate">Date</label>
        <input type="date" id="fEventDate" value="${esc(e.date || "")}"></div>
      <div class="field"><label for="fEventFormat">Format</label>
@@ -1922,9 +1968,10 @@ function drawEventBox(){
   };
   refresh();
 
+  $("fNewEvent").addEventListener("click", addEvent);
   $("fEvent").addEventListener("change", (ev) => openEvent(ev.target.value));
   $("fEventName").addEventListener("input", (ev) => {
-    state.name = ev.target.value; save(); refresh();
+    state.name = ev.target.value; save(); refresh(); drawFoldSubs();
   });
   $("fEventDate").addEventListener("change", (ev) => {
     state.date = ev.target.value; save(); refresh();
@@ -1942,10 +1989,14 @@ function drawEventBox(){
 function drawMoveBox(){
   document.getElementById("moveBox").innerHTML =
     `<div class="pad">
-       <!-- Starting a fresh round is not a SETTING, and it was three taps down
-            under a heading called Event inside Event settings. It belongs with
-            the other things done to a whole event. -->
-       <button class="big solid" id="fNewEvent">+ New event</button>
+       <!-- "+ New event" USED TO BE HERE, and being here is what hid it. This
+            box is about getting a round on and off the phone — export, copy,
+            paste, delete — and it went behind the gear when the tabs were cut
+            to three, which put starting a round three taps from Setup under a
+            heading that reads like a file menu. Rob went looking for it on
+            Setup, did not find it, and renamed the round instead — which keeps
+            every player. It is on Setup now, in Event settings, where a round
+            is actually started. -->
        <button class="big" id="fExportEvent">Export a spreadsheet (CSV)</button>
        <button class="big" id="fCopyEvent">Copy this event</button>
        <button class="big" id="fPasteEvent">Paste an event</button>
@@ -1953,7 +2004,6 @@ function drawMoveBox(){
        <div class="cd" style="margin:16px 0 12px;font-size:18px;font-weight:700">${esc(deleteNote(state))}</div>
        <button class="big danger" id="fDeleteEvent">Delete this event</button>
      </div>`;
-  document.getElementById("fNewEvent").addEventListener("click", addEvent);
   document.getElementById("fExportEvent").addEventListener("click", exportEvent);
   document.getElementById("fCopyEvent").addEventListener("click", copyEvent);
   document.getElementById("fPasteEvent").addEventListener("click", showPasteBox);
@@ -2004,7 +2054,7 @@ function drawAllowance(){
 }
 
 /**
- * The one threshold the organiser can change from the app. Some rounds the
+ * The one threshold the organizer can change from the app. Some rounds the
  * groups won't divide sensibly and he'll want to skip skins altogether — a
  * round with only one cart skips itself, but this covers the rest.
  */
@@ -2096,7 +2146,7 @@ function drawMissingPicks(){
 }
 
 /* ---------- setup: a whole list of players at once ----------
-   Sixteen men typed in by hand is a long job, and the organiser has them in a
+   Sixteen men typed in by hand is a long job, and the organizer has them in a
    spreadsheet already. Nothing is added until the list has been read back to
    him, the same way a paste of scores is. */
 
@@ -2193,7 +2243,13 @@ function showRosterBox(){
      <div style="padding:0 0 12px"><button class="big solid" id="rosterRead">Show what this contains</button></div>
      <div id="rosterOut"></div>`;
   document.getElementById("rosterRead").addEventListener("click", readRoster);
-  document.getElementById("rosterPaste").focus();
+  /* NO FOCUS ON OPEN. This box used to be the only thing in the step, so
+     putting the cursor in it saved a tap. It is the third thing now — and
+     focusing an element SCROLLS IT INTO VIEW, so opening "Add player" jumped
+     the page 952 measured pixels down, straight past the roster list and the
+     button above it, and parked in a textarea. The feature was live and
+     correct for a day and nobody could see it. On a phone it also threw the
+     keyboard up over the screen. */
 }
 
 /** What the course allows, so the parser can refuse a tee or a pick outright. */
@@ -2218,7 +2274,7 @@ function readRoster(){
     else if(read.value == null) row.problems = row.problems.concat(["no handicap index"]);
 
     const already = state.players.some(p =>
-      IMP.normaliseName(p.name) === IMP.normaliseName(row.name));
+      IMP.normalizeName(p.name) === IMP.normalizeName(row.name));
     if(already) row.problems = row.problems.concat(["already on the list"]);
   });
 
@@ -2303,7 +2359,7 @@ function commitRoster(){
 }
 
 /* ---------- setup: a block of Watch the Birdie picks ----------
-   The men message their picks in, one line each, and the organiser has sixteen
+   The men message their picks in, one line each, and the organizer has sixteen
    of those in a thread by Thursday night. Pasted together here rather than
    opened sixteen times.
 
@@ -2486,8 +2542,14 @@ function numField(label, path, value, dflt, opts){
   // the opposite of what the line is for. It appears only where something has
   // actually moved, so seeing one means something.
   return `<div class="field"><label for="s_${path}">${esc(label)}</label>` +
-    `<input id="s_${path}" data-path="${path}" type="number" inputmode="decimal" ` +
-      `step="${o.step || 0.1}" value="${value}">` +
+    /* TEXT, NOT number. A `type="number"` input is rendered in the BROWSER's
+       locale, so a laptop set to a comma-decimal language showed the rules
+       screen as −0,5 — a figure this game never writes. Text renders the string
+       we put in it, exactly. `inputmode="decimal"` keeps the numeric keypad on
+       a phone, and the reader below already accepts a comma from anyone who
+       types one out of habit. */
+    `<input id="s_${path}" data-path="${path}" type="text" inputmode="decimal" ` +
+      `autocomplete="off" data-step="${o.step || 0.1}" value="${value}">` +
     (same ? `` :
       `<div class="cd" style="margin-top:8px;font-size:18px;font-weight:700">` +
         `was <b>${fmtRule(dflt)}</b></div>`) +
@@ -2604,9 +2666,9 @@ function renderSettings(){
         h += `<div class="field"><label>${esc(rungLabel(key, draft[key], i))}</label>` +
           `<div style="display:flex;gap:10px">` +
             (lastRung ? `` :
-              `<input data-ladder="${key}" data-i="${i}" data-f="threshold" type="number" step="1"
+              `<input data-ladder="${key}" data-i="${i}" data-f="threshold" type="text" inputmode="numeric"
                  value="${rung.threshold}" aria-label="${esc(rungLabel(key, draft[key], i))} — the figure" style="flex:1">`) +
-            `<input data-ladder="${key}" data-i="${i}" data-f="strokes" type="number" step="0.1"
+            `<input data-ladder="${key}" data-i="${i}" data-f="strokes" type="text" inputmode="decimal"
                value="${rung.strokes}" aria-label="${esc(rungLabel(key, draft[key], i))} — pays" style="flex:1">` +
           `</div>` +
           `<div class="cd" style="margin-top:8px;font-size:18px;font-weight:700">` +
@@ -2956,7 +3018,7 @@ function renderRoster(){
     // over again.
     let added = 0;
     for(const p of state.players){
-      if(rosterMen().some(m => IMP.normaliseName(m.name) === IMP.normaliseName(p.name || ""))) continue;
+      if(rosterMen().some(m => IMP.normalizeName(m.name) === IMP.normalizeName(p.name || ""))) continue;
       if(!(p.name || "").trim()) continue;
       const m = addToRoster({ name: p.name, index: p.index, tee: p.tee, gender: p.gender });
       p.rosterId = m.id;
@@ -3004,7 +3066,7 @@ function editRosterMan(i){
     m.tee = document.getElementById("rmTee").value;
     m.mobile = document.getElementById("rmMobile").value.trim();
     m.email = document.getElementById("rmEmail").value.trim();
-    rosterMen().sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    rosterMen().sort((a, b) => String(a.name).localeCompare(String(b.name), "en-US"));
     save();
     box.innerHTML = "";
     renderRoster();
@@ -3143,7 +3205,7 @@ function renderInvites(){
 const firstNameOf = (p) => displayName(p).split(/\s+/)[0] || displayName(p);
 function rosterEmail(p){
   const m = rosterMen().find(r => r.id === p.rosterId) ||
-            rosterMen().find(r => IMP.normaliseName(r.name) === IMP.normaliseName(p.name || ""));
+            rosterMen().find(r => IMP.normalizeName(r.name) === IMP.normalizeName(p.name || ""));
   return m && m.email ? m.email : "";
 }
 
@@ -3187,7 +3249,7 @@ function tel(raw){
 /** His mobile, from the roster. The twin of rosterEmail, which existed alone. */
 function rosterMobile(p){
   const m = rosterMen().find(r => r.id === p.rosterId) ||
-            rosterMen().find(r => IMP.normaliseName(r.name) === IMP.normaliseName(p.name || ""));
+            rosterMen().find(r => IMP.normalizeName(r.name) === IMP.normalizeName(p.name || ""));
   return m && m.mobile ? m.mobile : "";
 }
 
@@ -3338,7 +3400,7 @@ function drawEdit(){
        <span id="fChNote" style="font-size:18px"></span></div>
 
      <div class="field"><label for="fCart">Cart</label>
-      <input type="number" id="fCart" inputmode="numeric" step="1" value="${p.cart==null?"":p.cart}">
+      <input type="text" id="fCart" inputmode="numeric" autocomplete="off" value="${p.cart==null?"":p.cart}">
       <div class="cd" style="margin-top:10px;font-size:18px;font-weight:700">
         His cart. Skins are played between carts in a field of 8 to 15.</div></div>
 
@@ -3487,7 +3549,7 @@ function saveEditing(){
      copy of it. */
   if(rec.rosterId == null && editing.alsoRoster && rec.name){
     const already = rosterMen().find(m =>
-      IMP.normaliseName(m.name || "") === IMP.normaliseName(rec.name));
+      IMP.normalizeName(m.name || "") === IMP.normalizeName(rec.name));
     const m = already || addToRoster({ name: rec.name, index: rec.index,
                                        tee: rec.tee, gender: rec.gender });
     rec.rosterId = m.id;
@@ -3596,7 +3658,7 @@ function skinsSectionHtml(settled){
   ).join("");
 
   /* WHO IS NOT IN IT, and why. The settlement leaves out a man who did not
-     finish, and a group showing one name where the organiser put two would
+     finish, and a group showing one name where the organizer put two would
      otherwise look like the app had lost him. */
   if(settled.left.length){
     html += `<div class="note">Not in the skins: ` +
@@ -3689,7 +3751,7 @@ function renderImport(){
         x.setAttribute("aria-pressed", String(x.dataset.m === importMode)));
       // Redraw, do NOT re-parse. Net/Gross changes how the eighteen numbers are
       // read, not which rows are in the paste — and re-parsing threw away every
-      // player picked by hand, so a man who assigned six rows and then realised
+      // player picked by hand, so a man who assigned six rows and then realized
       // the columns were net lost all six and had no idea why.
       if(importPreview) drawPreview();
     }));
@@ -3719,7 +3781,7 @@ function assess(row, idx, all){
     } else {
       // "Score belongs to nobody" is true and useless. A typed "Gidaly, Mitch"
       // against an exported "Gidaly, Mitchell" is a spelling, not a stranger,
-      // and the organiser should not have to find that himself six times over.
+      // and the organizer should not have to find that himself six times over.
       // The near miss is NAMED but never taken — confirming is still his.
       const near = IMP.nearestName(card.name, state.players.map(p => p.name || ""));
       const who = near.index >= 0 ? state.players[near.index] : null;
@@ -3924,7 +3986,7 @@ function drawPreview(){
           : ``) +
         // An answered card keeps a way back. Both answers are ordinary, the
         // difference between them is whether the man is scored at all, and an
-        // organiser who taps the wrong one must not have to re-paste the round.
+        // organizer who taps the wrong one must not have to re-paste the round.
         (row.xRule
           ? `<div class="note">${a.satOut
                ? `He sat out ${a.xCount} holes, so he played ${18 - a.xCount} —

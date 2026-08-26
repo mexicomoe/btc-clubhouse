@@ -6,7 +6,7 @@
  *
  * The thing these tests are really protecting is that the numbers are SETTLED
  * before they leave. Finals, contest values and placings all travel as decided
- * on the organiser's phone, so a link keeps its numbers for good however the
+ * on the organizer's phone, so a link keeps its numbers for good however the
  * club's settings move afterwards. Nothing at the far end recomputes anything;
  * results.html has no engine on it at all.
  *

@@ -171,7 +171,7 @@ test("the defaults themselves pass", () => {
 
 test("A PICK ON A HOLE BARRED LATER IS DROPPED, NOT THROWN", () => {
   // This is the one change that could take the whole board down rather than
-  // give a wrong number. A man picks 8, the organiser bars it that evening, and
+  // give a wrong number. A man picks 8, the organizer bars it that evening, and
   // his round must still open.
   const c = card();
   const barred = merge({ watchTheBirdie: { barred: [4, 5, 6, 8] } });

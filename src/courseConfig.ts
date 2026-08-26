@@ -50,7 +50,7 @@ export interface Step {
  * What one Watch the Birdie pick pays for a net birdie. `perPick` applies to
  * every nominated hole; `byHole` optionally overrides single holes, so a hard
  * every nominated hole. There is no per-hole override any more: the doubling on
- * 4 and 18 was printed on the card and changed nobody's behaviour.
+ * 4 and 18 was printed on the card and changed nobody's behavior.
  */
 export interface BirdiePayout {
   /** What a net birdie on a nominated hole pays. */

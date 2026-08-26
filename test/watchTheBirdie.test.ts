@@ -21,7 +21,7 @@
  * across nine picks is close to counting how well a man played.
  *
  * THE DOUBLING ON 4 AND 18 IS GONE. It was printed on the card and changed
- * nobody's behaviour — 8 of 10 still took hole 7, 9 of 10 still took 16 — so it
+ * nobody's behavior — 8 of 10 still took hole 7, 9 of 10 still took 16 — so it
  * was paying extra for choices men were making anyway. Hole 4 is not a
  * candidate at all now.
  *

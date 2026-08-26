@@ -21,7 +21,7 @@ const html = readFileSync(new URL("../leaderboard.html", import.meta.url), "utf8
 /**
  * The seed round's finals, ON THE ZERO BASE — strokes under and over par, not
  * net scores in the sixties and seventies. This is the board the app opens on,
- * so it is also what an organiser sees before he has entered anything of his
+ * so it is also what an organizer sees before he has entered anything of his
  * own, and it should look like a real Saturday.
  *
  * RE-CUT WITH THE GAME. Four contests instead of eight, and nine picks instead

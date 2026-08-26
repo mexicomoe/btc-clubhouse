@@ -387,7 +387,7 @@ test("three tabs, and the fourth did not creep back", () => {
   assert.equal(tabs.includes("Skins"), false, "Skins is a section on Leaders now");
 });
 
-test("the gear is labelled, not just an icon", () => {
+test("the gear is labeled, not just an icon", () => {
   // A tooltip is no use on a phone, where nothing hovers, so it carries the
   // word beside the shape.
   assert.match(html, /<button class="gear" data-gear>⚙<span>Settings<\/span><\/button>/);
@@ -486,7 +486,7 @@ test("an UPSET is a man who backed himself against a better player and won", () 
   assert.equal(other.outcome, "loss");
 });
 
-test("a contest that is off has no section to summarise", () => {
+test("a contest that is off has no section to summarize", () => {
   const off = { ...DEFAULT_CONTESTS, skins: null } as typeof DEFAULT_CONTESTS;
   const results = computeLeaderboard(
     ["A", "B", "C", "D", "E", "F", "G", "H"].map((n, i) => card(n, { cart: String(1 + (i >> 1)) })),

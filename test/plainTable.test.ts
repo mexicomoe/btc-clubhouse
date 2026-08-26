@@ -183,7 +183,7 @@ test("an X in a plain table is still a pick-up", () => {
 });
 
 // A selection that clipped the right-hand end is common, and the header is
-// still recognisably a header — it must not fall back to the fixed layout.
+// still recognizably a header — it must not fall back to the fixed layout.
 test("a header clipped short is still a header", () => {
   const short = ["1\t2\t3\t4\t5\t6",
     ["Abe Whitfield", 5, 5, 4, 6, 6, 5].join("\t")].join("\n");
