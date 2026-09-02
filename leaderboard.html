@@ -7,44 +7,166 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="theme-color" content="#0b2e13">
 <title>Beat the Crowd · Clubhouse</title>
-<link rel="stylesheet" href="clubhouse.css?v=2fb5377">
+<link rel="stylesheet" href="clubhouse.css?v=8b84ac5">
 </head>
 <body>
 
-<section id="board" class="screen on">
-  <header class="band">
-    <div class="title">Leaderboard</div>
-    <div class="sub" id="boardSub">Aberdeen G&amp;CC</div>
+<!--
+  THREE TABS, NAMED FOR THE STAGES OF A ROUND, AND A GEAR.
+
+  The four old tabs were named for the app's own machinery — Leaders, Setup,
+  Import — and a man had to know which one held the thing he wanted. These are
+  named for what he is doing: getting ready for a round, running it, finishing
+  it. Each carries its own color, and that color runs into the section headings,
+  so a glance says where you are without reading a word.
+
+  THE PROSE IS NOT HERE. Every paragraph that explained a rule moved behind the
+  gear, under How to run Clubhouse and Questions and answers. These three screens
+  carry what has happened and what is left, and nothing else.
+-->
+
+<!-- ================= TAB 1 · START A ROUND ================= -->
+<section id="start" class="screen tab">
+  <div class="topbar">
+    <nav class="tabs" data-tabs></nav>
     <button class="gear" data-gear>⚙<span>Settings</span></button>
-  </header>
-  <nav class="tabs" data-tabs></nav>
-  <!-- THE BOARD IS NOT A FOLD. It is what the screen is for, so it is plain
-       markup above the sections and cannot be shut by the accordion. -->
-  <div id="houseRules"></div>
-  <div id="boardFlights"></div>
-  <div id="rows"></div>
-  <div id="boardEmpty"></div>
-  <!-- Everything after the round: a section per contest, every duel, and the
-       skins hole by hole that used to be a tab. Built by drawBoards, because
-       which contests are in the game is the round's own business. -->
-  <div id="boards"></div>
-  <div id="shareBox"></div>
+  </div>
+  <div class="roundline" data-roundline></div>
+
+  <details class="fold step" id="foldRoster">
+    <summary><span><span class="fname">The roster</span>
+      <span class="fsub" id="foldRosterSub"></span></span></summary>
+    <div id="rosterScreen"></div>
+    <div id="rosterPasteBox"></div>
+  </details>
+
+  <details class="fold step" id="foldRound">
+    <summary><span><span class="fname">The round</span>
+      <span class="fsub" id="foldRoundSub"></span></span></summary>
+    <div id="eventBox"></div>
+    <div id="allowanceBox"></div>
+  </details>
+
+  <!-- OUT IN THE OPEN, not inside a fold. Starting a round was three taps down
+       a file menu, so renaming the old one looked like the way to do it — and a
+       rename carries every player, every score and every pick with it. -->
+  <div class="pad act">
+    <button class="big solid" id="fNewEvent">+ Start a new round</button>
+    <div class="undertext">Renaming a round is not starting one.</div>
+  </div>
 </section>
 
+<!-- ================= TAB 2 · THE ROUND ================= -->
+<section id="round" class="screen tab on">
+  <div class="topbar">
+    <nav class="tabs" data-tabs></nav>
+    <button class="gear" data-gear>⚙<span>Settings</span></button>
+  </div>
+  <div class="roundline" data-roundline></div>
+
+  <details class="fold step" id="foldAdd">
+    <summary><span><span class="fname">The players</span>
+      <span class="fsub" id="foldAddSub"></span></span></summary>
+    <!-- THE ROSTER FIRST. "+ Type a player in" is the loudest thing in the box
+         and leads away to a blank form, so the answer to "add a player" looked
+         like the form and the eight names to tap were below the fold. -->
+    <div class="section-label" id="rosterPickHead">From the roster</div>
+    <div id="rosterPick"></div>
+    <div class="section-label">Somebody new</div>
+    <div class="pad"><button class="big solid" id="addBtn">+ Type a player in</button></div>
+    <div class="section-label">Paste a list of players</div>
+    <div id="rosterBox"></div>
+    <div class="section-label" id="rosterHead">The player cards</div>
+    <div id="setupRows"></div>
+  </details>
+
+  <details class="fold step" id="foldPicks">
+    <summary><span><span class="fname">Watch the birdie</span>
+      <span class="fsub" id="foldPicksSub"></span></span></summary>
+    <div id="picksBox"></div>
+    <div id="autoPicksSwitch"></div>
+  </details>
+
+  <details class="fold step" id="foldHitList">
+    <summary><span><span class="fname">Hit list</span>
+      <span class="fsub" id="foldHitListSub"></span></span></summary>
+    <div id="hitListPaste"></div>
+    <div id="hitListBox"></div>
+    <div id="autoHitListSwitch"></div>
+  </details>
+
+  <!-- OUT IN THE OPEN, and ONE BUTTON. There were two links — a plain sheet
+       with no Hit List, and the one carrying the field — and choosing between
+       them was a decision nobody should have to make. Both contests travel in
+       the one link and come back in one message. -->
+  <div class="pad act">
+    <div id="pickLinkBox"></div>
+  </div>
+  <button class="fold go" id="goInvites">
+    <span><span class="fname">One message a man</span>
+      <span class="fsub" id="goInvitesSub"></span></span></button>
+</section>
+
+<!-- ================= TAB 3 · FINISH A ROUND ================= -->
+<section id="finish" class="screen tab">
+  <div class="topbar">
+    <nav class="tabs" data-tabs></nav>
+    <button class="gear" data-gear>⚙<span>Settings</span></button>
+  </div>
+  <div class="roundline" data-roundline></div>
+
+  <details class="fold step" id="foldImport">
+    <summary><span><span class="fname">Paste the scores</span>
+      <span class="fsub" id="foldImportSub"></span></span></summary>
+    <div id="importBody"></div>
+  </details>
+
+  <!-- THE BOARD IS NOT A FOLD. It is what the screen is for, so it is plain
+       markup above the sections and cannot be shut by the accordion. Five men
+       are shown and the rest collapse, with the control at BOTH ends — at
+       eighty players a control only at the bottom strands you. -->
+  <div id="houseRules"></div>
+  <div id="boardFlights"></div>
+  <div id="boardMoreTop"></div>
+  <div id="rows"></div>
+  <div id="boardMoreBot"></div>
+  <div id="boardEmpty"></div>
+  <!-- A section per contest, every duel, and the skins hole by hole. -->
+  <div id="boards"></div>
+  <!-- What sharing had to say for itself — copied, sent, saved, or too long to
+       send. It sits in the flow, above the bar, because it can run to several
+       lines and the bar must not grow under a thumb. -->
+  <div id="shareOut"></div>
+  <!-- Fixed at the bottom of the screen, so sharing never needs a scroll to
+       the end of an eighty-man board. -->
+  <div class="sharebar" id="shareBox"></div>
+</section>
+
+<!-- ================= THE GEAR ================= -->
 <section id="more" class="screen">
   <div class="backbar"><button class="back" id="moreBack">‹ Back</button></div>
   <header class="band">
     <div class="title">Settings</div>
-    <div class="sub">The things touched once a month</div>
+    <div class="sub">The rules, the reasoning, and the once-a-month things</div>
   </header>
 
-  <button class="fold step go" id="goRoster">
-    <span><span class="fname">The roster</span>
-      <span class="fsub" id="goRosterSub"></span></span></button>
-
-  <button class="fold step go" id="goRules">
-    <span><span class="fname">The rules</span>
+  <button class="fold go" id="goRules">
+    <span><span class="fname">The rules and their values</span>
       <span class="fsub" id="goRulesSub"></span></span></button>
+
+  <button class="fold go" id="goHowTo">
+    <span><span class="fname">How to run Clubhouse</span>
+      <span class="fsub">Step by step, from the roster to the board</span></span></button>
+
+  <button class="fold go" id="goQA">
+    <span><span class="fname">Questions and answers</span>
+      <span class="fsub">Why the numbers are what they are</span></span></button>
+
+  <details class="fold" id="foldAbout">
+    <summary><span><span class="fname">About</span>
+      <span class="fsub" id="foldAboutSub"></span></span></summary>
+    <div id="aboutBox"></div>
+  </details>
 
   <details class="fold" id="foldMove">
     <summary><span><span class="fname">Move this event</span>
@@ -52,35 +174,9 @@
     <div id="moveBox"></div>
   </details>
 
-  <details class="fold" id="foldAbout">
-    <summary><span><span class="fname">About</span>
-      <span class="fsub" id="foldAboutSub"></span></span></summary>
-    <div id="aboutBox"></div>
-  </details>
-</section>
-
-<section id="roster" class="screen">
-  <div class="backbar"><button class="back" id="rosterBack">‹ Settings</button></div>
-  <header class="band">
-    <div class="title">The roster</div>
-    <div class="sub" id="rosterSub">Men who play, round after round</div>
-  </header>
-  <div id="rosterScreen"></div>
-</section>
-
-<section id="invites" class="screen">
-  <div class="backbar"><button class="back" id="invitesBack">‹ Setup</button></div>
-  <header class="band">
-    <div class="title">Send the invitations</div>
-    <div class="sub" id="invitesSub">One message a man</div>
-  </header>
-  <!-- The two BULK links came here off Setup. They are the same job as the
-       messages below — getting the sheet to the men — and having them a tab
-       apart meant deciding between them without seeing both. -->
-  <div class="section-label">Open the pick sheet</div>
-  <div id="pickLinkBox"></div>
-  <div class="section-label">One message a man</div>
-  <div id="invitesScreen"></div>
+  <button class="fold go" id="goArchive">
+    <span><span class="fname">Archive</span>
+      <span class="fsub" id="goArchiveSub"></span></span></button>
 </section>
 
 <section id="settings" class="screen">
@@ -92,113 +188,60 @@
   <div id="settingsBody"></div>
 </section>
 
+<section id="howto" class="screen">
+  <div class="backbar"><button class="back" id="howtoBack">‹ Settings</button></div>
+  <header class="band">
+    <div class="title">How to run Clubhouse</div>
+    <div class="sub">From the roster to the board</div>
+  </header>
+  <div id="howtoBody"></div>
+</section>
+
+<section id="qa" class="screen">
+  <div class="backbar"><button class="back" id="qaBack">‹ Settings</button></div>
+  <header class="band">
+    <div class="title">Questions and answers</div>
+    <div class="sub">Why the numbers are what they are</div>
+  </header>
+  <div id="qaBody"></div>
+</section>
+
+<section id="archive" class="screen">
+  <div class="backbar"><button class="back" id="archiveBack">‹ Settings</button></div>
+  <header class="band">
+    <div class="title">Archive</div>
+    <div class="sub" id="archiveSub">Every round this phone is holding</div>
+  </header>
+  <div id="archiveBody"></div>
+</section>
+
+<section id="invites" class="screen">
+  <div class="backbar"><button class="back" id="invitesBack">‹ The round</button></div>
+  <header class="band">
+    <div class="title">One message a man</div>
+    <div class="sub" id="invitesSub">A text or an e-mail, each with his own link</div>
+  </header>
+  <div id="invitesScreen"></div>
+</section>
+
 <section id="player" class="screen">
-  <div class="backbar"><button class="back" id="backBtn">‹ Leaderboard</button></div>
+  <div class="backbar"><button class="back" id="backBtn">‹ The board</button></div>
   <div id="playerBody"></div>
 </section>
 
-<section id="setup" class="screen">
-  <header class="band">
-    <div class="title">Setup</div>
-    <div class="sub" id="setupSub">Players for this round</div>
-    <button class="gear" data-gear>⚙<span>Settings</span></button>
-  </header>
-  <nav class="tabs" data-tabs></nav>
-
-  <!--
-    FOUR STEPS, IN THE ORDER ROB DOES THEM — and on different days. Get the men
-    in, send them the sheet, read the picks back, settle the Hit List. That is
-    the whole of what happens before a round, and the screen now says so.
-
-    It held TWELVE items. The roster, the rules, moving the event and the build
-    line went to the gear — none of them is touched more than once a month.
-    Paste a list of players joined Add player, because both are "get the men
-    in"; Open the pick sheet went onto the invitations screen, because both are
-    "send it to the men". Nothing was renamed and no action was dropped.
-
-    Each step is shut and says where it stands, so the screen answers "what have
-    I done and what is left" without opening anything. A ＋ opens here, a › goes
-    somewhere.
-  -->
-  <div id="setupStatus"></div>
-
-  <details class="fold step" id="foldAdd">
-    <summary><span><span class="fname">Add player</span>
-      <span class="fsub" id="foldAddSub"></span></span></summary>
-    <!-- THE ROSTER FIRST. It was under the "+ Add a player" button, which is
-         the loudest thing in the box and goes to a blank form — so the answer
-         to "add a player" looked like the form, and the eight names Rob wanted
-         to tap were below the fold he had just opened. Tapping names is the
-         job; typing a new man is the exception, and it is still here. -->
-    <div class="section-label" id="rosterPickHead">From the roster</div>
-    <div id="rosterPick"></div>
-    <div class="section-label">Somebody new</div>
-    <div class="pad"><button class="big solid" id="addBtn">+ Type a player in</button></div>
-    <div class="section-label">Paste a list of players</div>
-    <div id="rosterBox"></div>
-  </details>
-
-  <button class="fold step go" id="goInvites">
-    <span><span class="fname">Send the invitations</span>
-      <span class="fsub" id="goInvitesSub"></span></span></button>
-
-  <details class="fold step" id="foldPicks">
-    <summary><span><span class="fname">Paste birdie picks</span>
-      <span class="fsub" id="foldPicksSub"></span></span></summary>
-    <div id="picksBox"></div>
-  </details>
-
-  <details class="fold step" id="foldHitList">
-    <summary><span><span class="fname">Set the Hit List</span>
-      <span class="fsub" id="foldHitListSub"></span></span></summary>
-    <div id="hitListBox"></div>
-  </details>
-
-  <!-- NOT one of the four, and NOT in the gear either. The allowance and the
-       skins switch move every man's score, so they stay where they can be read
-       without leaving the screen a round is set up on. -->
-  <details class="fold" id="foldEvent">
-    <summary><span><span class="fname">Event settings</span>
-      <span class="fsub" id="foldEventSub"></span></span></summary>
-    <div id="eventBox"></div>
-    <div id="allowanceBox"></div>
-    <div id="skinsSwitch"></div>
-    <div id="autoPicksSwitch"></div>
-  </details>
-
-  <!-- Open, and scrolled PAST rather than through. It is a reference, not an
-       action, and it is the longest thing on the screen. -->
-  <div class="section-label" id="rosterHead">The player list</div>
-  <div id="setupRows"></div>
-</section>
-
 <section id="edit" class="screen">
-  <div class="backbar"><button class="back" id="editBack">‹ Setup</button></div>
+  <div class="backbar"><button class="back" id="editBack">‹ The round</button></div>
   <div id="editBody"></div>
 </section>
 
-<!-- THE SKINS TAB IS GONE. It existed because Skins was once the only contest
-     with hole-by-hole detail; there are four contest boards on Leaders now and
-     Skins is one of four. Everything it held is a section on Leaders. -->
-
-<section id="import" class="screen">
-  <header class="band">
-    <div class="title">Import scores</div>
-    <div class="sub">Paste the rows from Golf Genius</div>
-    <button class="gear" data-gear>⚙<span>Settings</span></button>
-  </header>
-  <nav class="tabs" data-tabs></nav>
-  <div id="importBody"></div>
-</section>
-
-<script src="engine.js?v=2fb5377"></script>
-<script src="importer.js?v=2fb5377"></script>
-<script src="exporter.js?v=2fb5377"></script>
-<script src="results.js?v=2fb5377"></script>
-<script src="fieldlink.js?v=2fb5377"></script>
-<script src="boardimage.js?v=2fb5377"></script>
-<script src="version.js?v=2fb5377"></script>
-<script src="display.js?v=2fb5377"></script>
+<script src="engine.js?v=8b84ac5"></script>
+<script src="importer.js?v=8b84ac5"></script>
+<script src="exporter.js?v=8b84ac5"></script>
+<script src="results.js?v=8b84ac5"></script>
+<script src="fieldlink.js?v=8b84ac5"></script>
+<script src="boardimage.js?v=8b84ac5"></script>
+<script src="version.js?v=8b84ac5"></script>
+<script src="display.js?v=8b84ac5"></script>
 <script>
 "use strict";
 /* Rendering and setup only — every number comes from engine.js
@@ -378,7 +421,9 @@ function blankEvent(name, date){
     date: date || todayISO(),
     format: DEFAULT_FORMAT,
     nextId: 1, players: [], scores: {}, handicaps: {},
-    autoPicks: false, allowancePercent: 100, flight: "", lastTee: "IV", tab: "setup",
+    autoPicks: false, autoHitList: false,
+    allowancePercent: 100, flight: "", lastTee: "IV", tab: "round",
+    invitesSent: {},
     // Null means the defaults. A diff, never a copy — see mergeContests.
     contests: null,
     exportedAt: null, exportedSignature: null,
@@ -454,12 +499,27 @@ function normalizeEvent(e, fallbackName){
       return c;
     })(),
     // Off unless it was deliberately switched on — a drawn pick is not a
-    // chosen one, so it never happens by default.
+    // chosen one, so it never happens by default. The Hit List draw is stricter
+    // again: a drawn OPPONENT puts a second man in a bet he never made, so it
+    // is off unless somebody has said otherwise, on this round, in as many
+    // words.
     autoPicks: e.autoPicks === true,
+    autoHitList: e.autoHitList === true,
     allowancePercent: typeof e.allowancePercent === "number" ? e.allowancePercent : 100,
     flight: typeof e.flight === "string" ? e.flight : "",
     lastTee: typeof e.lastTee === "string" ? e.lastTee : "IV",
-    tab: e.tab === "setup" || e.tab === "import" || e.tab === "skins" ? e.tab : "board",
+    /* THE STORED TAB IS MIGRATED, NOT REFUSED.
+       Rob's phone has "setup" saved from the last build and "skins" from the one
+       before that. Refusing an unknown name and falling back to a hardcoded
+       screen is what white-screened the app last time — the fallback itself had
+       been renamed. `screenFor` owns the mapping and is the only thing that
+       decides; this just carries the word through so it can. */
+    tab: typeof e.tab === "string" && e.tab ? e.tab : "round",
+    /* SENT MARKS SURVIVE A RELOAD. They were written to the event and saved with
+       it, and then dropped here, on the way back in — so invitations sent on
+       Thursday looked unsent on Friday, which is exactly the two-day case they
+       exist for. */
+    invitesSent: e.invitesSent && typeof e.invitesSent === "object" ? e.invitesSent : {},
     // Carried through, or the delete warning would forget an export had happened.
     exportedAt: typeof e.exportedAt === "string" ? e.exportedAt : null,
     exportedSignature: typeof e.exportedSignature === "string" ? e.exportedSignature : null,
@@ -528,9 +588,9 @@ function openEvent(id){
   store.currentId = id;
   state = found;
   save();
-  buildTabs();                      // the Skins tab follows this event's switch
+  boardOpen = false;                // a different round starts shut, at five
   renderBoard(); renderSetup(); renderImport();
-  show("setup");
+  show("round");
 }
 
 /**
@@ -550,12 +610,12 @@ function addEvent(){
   const e = blankEvent("Round " + (store.events.length + 1));
   store.events.push(e);
   openEvent(e.id);
-  // Land on Setup with the event box open — the first thing he wants is to
-  // name it and start tapping men in.
-  const fold = document.getElementById("foldEvent");
+  // Land back on Start a round with The round open — the first thing he wants
+  // is to name it and put the date on it.
+  const fold = document.getElementById("foldRound");
   if(fold) fold.open = true;
   renderSetup();
-  show("setup");
+  show("start");
 }
 
 function removeEvent(id){
@@ -759,7 +819,6 @@ function eventsInOrder(){
     (b.date || "").localeCompare(a.date || "", "en-US") || (a.name || "").localeCompare(b.name || "", "en-US"));
 }
 
-/** "Friday · 5 August 2026", for a picker or a heading. */
 /**
  * WHAT HE CALLED IT, and nothing else.
  *
@@ -976,27 +1035,57 @@ function cardOf(p){
 function readyPlayers(){ return state.players.filter(isReady); }
 
 /* ---------- screen routing ---------- */
-const SCREENS = ["board","player","setup","edit","import","settings","roster","invites","more"];
-/* THREE TABS AND A GEAR. Three labels sit comfortably at 375px; a fourth was
-   already tight, and the gear costs the bar nothing because it lives in the
-   band above it. */
-const TAB_LABELS = [["board","Leaders"],["setup","Setup"],["import","Import"]];
+const SCREENS = ["start","round","finish","player","edit","more","settings",
+                 "howto","qa","archive","invites"];
+/* THREE TABS AND A GEAR, NAMED FOR THE STAGES OF A ROUND.
+   Leaders, Setup and Import were named for the app's own machinery, and a man
+   had to know which one held the thing he wanted. These are named for what he
+   is doing, and each carries a color that runs into the screen under it. */
+const TAB_LABELS = [["start","Start a round"],["round","The round"],["finish","Finish a round"]];
 /** The tabs, and the screens reached from them rather than from the bar. */
 const TABS = TAB_LABELS.map(([id]) => id);
 
+/**
+ * EVERY TAB NAME THIS APP HAS EVER STORED, and where it goes now.
+ *
+ * The last restructure white-screened Rob's phone, and the guard written then
+ * only half covers this one: it rewrote an unknown name to "board", which was
+ * a screen that existed. Rename the screens and the fallback itself is gone —
+ * `getElementById("board")` is null too, nothing gets the `on` class, and the
+ * app draws a white page exactly as before.
+ *
+ * So the old names are MIGRATED rather than merely refused. Setup was where a
+ * round was run, so it is The round; Leaders and Import are both after the
+ * cards come in, so both are Finish. A man's phone opens on the screen he left
+ * it on, which is the whole point of storing it.
+ */
+const TAB_ALIASES = { setup:"round", board:"finish", import:"finish", skins:"finish",
+                      leaders:"finish", more:"more" };
+
+/** A stored screen name, as a screen that exists today. Never returns nothing. */
+function screenFor(id){
+  let want = String(id || "");
+  if(TAB_ALIASES[want]) want = TAB_ALIASES[want];
+  if(document.getElementById(want)) return want;
+  // The first tab, and only if IT is really there — a hardcoded fallback is
+  // what failed last time.
+  if(document.getElementById(TABS[0])) return TABS[0];
+  const first = SCREENS.find(s => document.getElementById(s));
+  return first || null;
+}
+
 function show(id){
-  /* A TAB NAME STORED BY AN OLDER BUILD MUST NOT WHITE-SCREEN THE APP.
-     "skins" was a tab until the boards took its job, and every phone that ever
-     opened it has the word in local storage. Without this, the first line below
-     calls getElementById("skins"), gets null, and throws before anything is
-     drawn — the app would simply not start. */
-  if(!document.getElementById(id)) id = "board";
-  SCREENS.forEach(s => document.getElementById(s).classList.toggle("on", s === id));
-  if(TABS.includes(id)){
-    state.tab = id; save();
+  const want = screenFor(id);
+  if(!want) return;                 // nothing to show; better blank than thrown
+  SCREENS.forEach(s => {
+    const el = document.getElementById(s);
+    if(el) el.classList.toggle("on", s === want);
+  });
+  if(TABS.includes(want)){
+    state.tab = want; save();
     document.querySelectorAll("nav.tabs").forEach(nav => {
       nav.querySelectorAll("button").forEach(b =>
-        b.setAttribute("aria-current", String(b.dataset.go === id)));
+        b.setAttribute("aria-current", String(b.dataset.go === want)));
     });
   }
   // Fit only now the screen is visible — a display:none box measures zero wide,
@@ -1004,11 +1093,8 @@ function show(id){
   fitBoardNames();
   window.scrollTo(0,0);
 }
-/**
- * All three, always. Skins losing its switch no longer takes a tab with it —
- * it is a section on Leaders now, and a section that is not in the game simply
- * is not drawn.
- */
+
+/** All three, always. */
 function activeTabs(){ return TAB_LABELS; }
 
 function buildTabs(){
@@ -1016,29 +1102,34 @@ function buildTabs(){
     nav.innerHTML = activeTabs().map(([id,label]) =>
       `<button data-go="${id}">${label}</button>`).join("");
     nav.querySelectorAll("button").forEach(b =>
-      b.addEventListener("click", () => { if(b.dataset.go === "import") renderImport();
-                                          if(b.dataset.go === "setup") renderSetup();
-                                          if(b.dataset.go === "board") renderBoard();
+      b.addEventListener("click", () => { if(b.dataset.go === "finish"){ renderImport(); renderBoard(); }
+                                          if(b.dataset.go === "round") renderRound();
+                                          if(b.dataset.go === "start") renderStart();
                                           show(b.dataset.go); }));
   });
 }
 
 /**
- * The gear, in the band above the tabs on all three.
+ * The gear, in the bar itself rather than in a band above it.
  *
- * NOT A FOURTH TAB. Three labels fit a phone comfortably and a fourth was
- * already tight; the gear takes none of that width because it is not in the
- * bar. It carries the WORD as well as the shape — an unlabeled icon is a
- * guess, and this audience should not have to make one.
+ * THE BAND WENT. It carried a title that said the same word as the lit tab
+ * below it, and it took eighty pixels of a phone to do it — eighty pixels that
+ * the bar now uses to stay on screen while a long board scrolls. The gear came
+ * down with it, because a gear that scrolls away is a gear you cannot reach.
+ *
+ * It carries the WORD as well as the shape — an unlabeled icon is a guess, and
+ * this audience should not have to make one.
  *
  * It remembers where it was tapped from, so Back goes where Back should.
  */
-let cameFrom = "board";
+let cameFrom = "finish";
 function wireGear(){
   document.querySelectorAll("button.gear").forEach(b =>
     b.addEventListener("click", () => {
-      cameFrom = TABS.includes(state.tab) ? state.tab : "board";
+      cameFrom = TABS.includes(state.tab) ? state.tab : TABS[0];
       drawFoldSubs();
+      drawAbout();
+      drawMoveBox();
       show("more");
     }));
   document.getElementById("moreBack").addEventListener("click", () => show(cameFrom));
@@ -1060,7 +1151,6 @@ function tieNote(r){
 function renderBoard(){
   const rowsEl = document.getElementById("rows");
   const emptyEl = document.getElementById("boardEmpty");
-  const subEl = document.getElementById("boardSub");
   const ready = readyPlayers();
 
   let results;
@@ -1074,19 +1164,15 @@ function renderBoard(){
        Skins section beside it — which reads the round's own rules — showed the
        new one. Two figures from two rulebooks on one screen. */
     results = E.computeLeaderboard(boardCards, undefined, contestConfig());
-    subEl.textContent = (state.name || "Round") + " · demo round";
     emptyEl.innerHTML =
-      `<div class="note warn">This is a demo round. Add your players on the ` +
-      `<b>Setup</b> tab, then paste the scores on <b>Import</b>.</div>`;
+      `<div class="note warn">This is a demo round — nobody is in yours yet.</div>`;
   } else {
     boardCards = ready.map(cardOf);
     // No course argument: every card is scored against its own tee and gender.
     results = E.computeLeaderboard(boardCards, undefined, contestConfig());
     const withScores = boardCards.filter(c => c.gross.some(g => g != null)).length;
-    subEl.textContent = (state.name || "Round") + " · " + ready.length + " player" + (ready.length===1?"":"s") +
-      (withScores === 0 ? " · no scores yet" : "");
     emptyEl.innerHTML = withScores === 0
-      ? `<div class="note">No scores imported yet. Paste them on the <b>Import</b> tab.</div>`
+      ? `<div class="note">No cards in yet.</div>`
       : "";
   }
 
@@ -1106,14 +1192,24 @@ function renderBoard(){
   });
   if(flights.length > 1){
     results = results.filter(r => (r.flight || "") === state.flight);
-    subEl.textContent = subEl.textContent.replace(/·[^·]*player[^·]*/,
-      "· " + flightLabel(state.flight) + " · " + results.length + " player" + (results.length===1?"":"s"));
   }
 
   boardResults = results;
   rowsEl.innerHTML = "";
+
+  /* FIVE MEN, AND THE REST COLLAPSED.
+     A round is eight men and the board fits; a society day is eighty and it
+     does not, and everything under the board — the four contests, the duels,
+     the skins — was below eighty rows nobody scrolled past. Five is what the
+     contest boards already show, so the two halves of the screen agree.
+
+     THE CONTROL IS AT BOTH ENDS. With it only at the bottom, opening eighty
+     men strands you eighty rows from the way back. */
+  const shown = boardOpen ? results.length : Math.min(BOARD_SHOWN, results.length);
+  const hidden = results.length - shown;
+
   let markedIneligible = false;
-  results.forEach(r=>{
+  results.slice(0, shown).forEach(r=>{
     // Everyone who finished, then a line, then everyone who didn't.
     if(!r.eligible && !markedIneligible){
       markedIneligible = true;
@@ -1131,11 +1227,13 @@ function renderBoard(){
     // The holes played are already on the line above, and the heading says why,
     // so this only has to carry the one word that matters — and fit at 18px.
     // A drawn set of picks is marked, always, because the board must never let a
-    // drawn pick pass for a chosen one. It rides on the same line as the tie
-    // note — both are things about a man's round rather than his score.
+    // drawn pick pass for a chosen one. A drawn OPPONENT is marked the same way,
+    // and for the same reason. Both ride on the tie line — they are things about
+    // a man's round rather than about his score.
     const src = state.players.find(p => displayName(p) === r.name);
     const notes = [r.eligible ? tieNote(r) : "not eligible",
-                   src && src.picksAuto ? "picks drawn" : ""].filter(Boolean).join(" · ");
+                   src && src.picksAuto ? "picks drawn" : "",
+                   src && src.hitListAuto ? "opponent drawn" : ""].filter(Boolean).join(" · ");
     b.innerHTML =
       `<span class="rank">${r.eligible ? r.rank : "–"}</span>` +
       `<span class="who"><span class="name">${esc(r.name)}</span>` +
@@ -1145,10 +1243,48 @@ function renderBoard(){
     b.addEventListener("click", ()=>showPlayer(r.name));
     rowsEl.appendChild(b);
   });
+
+  drawBoardMore(hidden);
+
   drawHouseRules();
   drawBoards(fieldResults);
   drawShare(results);
   fitBoardNames();
+}
+
+/* How many men the board shows before it collapses, and whether it is open.
+   A property of the LOOK, not of the round: it does not travel in an event code
+   and it is not worth a line in storage. It resets to shut on a reload, which is
+   the state the screen is designed to be read in. */
+const BOARD_SHOWN = 5;
+let boardOpen = false;
+
+/**
+ * "15 more" — and "Show fewer" once it is open. One control, drawn at BOTH ends
+ * of the list, because at eighty players a control only at the bottom leaves a
+ * man eighty rows from the way back.
+ *
+ * It says the FIGURE rather than "show all": a man deciding whether to open it
+ * wants to know what it costs him, and "15 more" answers that where "show all"
+ * does not.
+ */
+function drawBoardMore(hidden){
+  const top = document.getElementById("boardMoreTop");
+  const bot = document.getElementById("boardMoreBot");
+  if(!top || !bot) return;
+  if(hidden <= 0 && !boardOpen){ top.innerHTML = ""; bot.innerHTML = ""; return; }
+  const label = boardOpen ? "Show fewer" : hidden + " more";
+  // BOTH ENDS, IN BOTH STATES. It is tempting to leave the top one off while
+  // the list is only five rows long — but then the control a man learns to use
+  // when the board is open is not where he left it when it is shut, and a
+  // control that moves is a control that has to be found again.
+  const html = `<button class="boardmore">${esc(label)}</button>`;
+  top.innerHTML = html;
+  bot.innerHTML = html;
+  [top, bot].forEach(host => {
+    const b = host.querySelector("button.boardmore");
+    if(b) b.addEventListener("click", () => { boardOpen = !boardOpen; renderBoard(); });
+  });
 }
 
 /**
@@ -1372,38 +1508,42 @@ function shareRound(){
 
 function drawShare(results){
   const box = document.getElementById("shareBox");
+  if(!box) return;
+  const finish = document.getElementById("finish");
   const scored = results.filter(r => r.final != null);
   if(scored.length === 0 || readyPlayers().length === 0){
     box.innerHTML = "";                          // nothing to share until it is scored
+    box.classList.remove("on");
+    if(finish) finish.classList.remove("hasbar");
     return;
   }
 
   const link = RS.resultsLink(resultsBaseUrl(), shareRound(),
     results.map(r => ({ ...r, tieNote: tieNote(r) })), contestsInPlay());
 
-  // TWO WAYS OUT, because neither one does the whole job.
-  //
-  // The picture goes first because it is the one that always arrives. A link of
-  // 250 characters or more is flaky through iOS Messages — measured on the
-  // club's own phone: 154, 159, 190 and 219 arrived first time, 250 and 299
-  // needed a second attempt, 350 failed twice — and a ten-man round cannot get
-  // under 250 while still carrying the contest breakdown. A picture has no
-  // length limit anywhere, so it is what a man texts.
-  //
-  // The link stays for e-mail, where it has always worked, because it carries
-  // the per-player breakdown that a picture cannot.
+  /* FIXED AT THE BOTTOM OF THE SCREEN.
+     It used to sit under the four contest boards, which is the end of the
+     longest screen in the app — so finishing a round meant scrolling past
+     everything to reach the two buttons that end it. It is the last thing done
+     every single time, so it is always in reach.
+
+     TWO WAYS OUT, because neither does the whole job. The picture always
+     arrives — no length limit in any messenger — and is what a man texts. The
+     link carries the per-player breakdown a picture cannot, and works by
+     e-mail, where it always has. */
   box.innerHTML =
-    `<div class="pad">
-       <button class="big solid" id="shareImgBtn">Send the board as a picture</button>
-       <button class="big" id="shareBtn">Copy the link, for e-mail</button>
-       <div id="shareOut"></div></div>`;
+    `<button class="sharebtn" id="shareImgBtn">Picture</button>` +
+    `<button class="sharebtn" id="shareBtn">Email link</button>`;
+  box.classList.add("on");
+  if(finish) finish.classList.add("hasbar");
+
   document.getElementById("shareImgBtn").addEventListener("click", () => shareBoardImage(results));
   document.getElementById("shareBtn").addEventListener("click", () => {
     if(!link.fits){
       document.getElementById("shareOut").innerHTML =
         `<div class="note warn">This round makes a link of ${link.length} characters and
          ${link.limit} is the most a message will carry. Send the picture instead, or the
-         CSV from <b>Setup → Move this event</b>.</div>`;
+         CSV from <b>Settings → Move this event</b>.</div>`;
       return;
     }
     copyShareLink(link);
@@ -1647,33 +1787,47 @@ function missingFrom(p){
 /** Whether a man's card has come in — any hole at all counts as started. */
 function hasScores(p){ return scoresFor(p).some(v => v != null); }
 
+/* THE TWO-BOX STATUS BLOCK IS GONE.
+   It sat above everything and said "8 players · 6 of 8 cards in" — both of
+   which are now on shut lines that say the same thing in the place the work is
+   done: the count under The players, the cards under Paste the scores, and the
+   round itself on the line under the bar. Three copies of one figure is three
+   chances to disagree. */
+
 /**
- * The first thing looked at, every time, and the reason it is above everything
- * that folds: how many men are in, and whether the cards have arrived.
+ * THE ROUND'S IDENTITY, on all three tabs.
+ *
+ * The green band used to carry it, and the band is gone — it said the same word
+ * as the lit tab below it and cost eighty pixels of a phone to do so. This is
+ * one line, under the bar, saying which round is open. Not sticky: the bar has
+ * to stay and this does not.
  */
-function drawStatus(){
-  const n = state.players.length;
-  const inn = state.players.filter(hasScores).length;
-  const waiting = n === 0 || inn < n;
-  const cards = n === 0 ? "None yet" : inn === 0 ? "None yet" : inn + " of " + n;
-  document.getElementById("setupStatus").innerHTML =
-    `<div class="status">
-       <div class="stat${n === 0 ? " wait" : ""}">
-         <div class="statn">${n}${n >= MAX_PLAYERS ? " · full" : ""}</div>
-         <div class="statl">player${n===1?"":"s"}</div></div>
-       <div class="stat${waiting ? " wait" : ""}">
-         <div class="statn">${esc(cards)}</div>
-         <div class="statl">${inn > 0 && inn === n ? "cards all in" : "cards in"}</div></div>
-     </div>`;
+function drawRoundLines(){
+  const men = state.players.length;
+  const said = [state.name || "Round", niceDate(state.date),
+                men === 0 ? "nobody in yet" : men + " player" + (men === 1 ? "" : "s")]
+                .join(" · ");
+  document.querySelectorAll("[data-roundline]").forEach(el => { el.textContent = said; });
 }
 
-function renderSetup(){
+/** TAB 1 — the roster, the round's own settings, and starting a new one. */
+function renderStart(){
+  renderRoster();
+  drawRosterPasteBox();
+  drawEventBox();
+  drawAllowance();
+  drawRoundLines();
+  drawFoldSubs();
+}
+
+/** TAB 2 — the men, their picks, and getting the sheet to them. */
+function renderRound(){
   const wrap = document.getElementById("setupRows");
   const n = state.players.length;
 
   if(n === 0){
-    wrap.innerHTML = `<div class="empty">Nobody set up yet. Add the players in this round —
-      eight is typical, up to ${MAX_PLAYERS}.</div>`;
+    wrap.innerHTML = `<div class="empty">Nobody in this round yet. Tap the men in
+      from the roster above — eight is typical, up to ${MAX_PLAYERS}.</div>`;
   } else {
     // Name, index and tee, and nothing else. At twenty-four rows every extra
     // word costs a line, and group, flight, picks, GHIN and sex are all one tap
@@ -1706,17 +1860,27 @@ function renderSetup(){
       b.addEventListener("click", () => editPlayer(b.dataset.id)));
   }
   document.getElementById("addBtn").disabled = n >= MAX_PLAYERS;
-  drawStatus();
-  drawEventBox();
-  drawAllowance();
-  drawSkinsSwitch();
   drawAutoPicksSwitch();
-  drawMoveBox();
-  drawAbout();
+  drawAutoHitListSwitch();
+  drawHitListPaste();
+  showPickLinkBox();
+  drawRoundLines();
   drawFoldSubs();
   refreshFieldBoxes();
   fitBoardNames();
 }
+
+/**
+ * BOTH TAB SCREENS, under the name every call site already uses.
+ *
+ * A field change touches both — a man tapped in on The round changes the
+ * roster list on Start a round, and the allowance set on Start a round changes
+ * every course handicap on The round. Splitting the render and leaving forty
+ * call sites to decide which half they needed is how the two screens would
+ * start disagreeing.
+ */
+function renderSetup(){ renderStart(); renderRound(); }
+
 
 /* ---------- the folded sections ----------
    Closed on arrival, because none of them is touched more than once a round.
@@ -1737,29 +1901,35 @@ function wireFolds(){
      has to ask for it. Built on open rather than up front so twenty-four
      players are not laid out five times over on a screen nobody has opened. */
   const build = {
-    // Add player carries the roster tap-list and the paste box too — all three
-    // are "get the men in".
+    foldRoster: () => { renderRoster(); drawRosterPasteBox(); },
+    foldRound: () => { drawEventBox(); drawAllowance(); },
+    // The players carries the roster tap-list, the paste box and the cards —
+    // all of them "get the men in".
     foldAdd: () => { drawRosterPick(); showRosterBox(); },
-    foldPicks: showPicksBox,
-    foldHitList: showHitListBox,
+    foldPicks: () => { showPicksBox(); drawAutoPicksSwitch(); },
+    foldHitList: () => { drawHitListPaste(); showHitListBox(); drawAutoHitListSwitch(); },
+    foldImport: renderImport,
   };
   document.querySelectorAll("details.fold").forEach(d => {
     d.open = open[d.id] === true;
     if(d.open && build[d.id]) build[d.id]();
     d.addEventListener("toggle", () => {
       if(d.open && build[d.id]) build[d.id]();
-      // ONE STEP AT A TIME. Six open sections is the wall this screen was, and
-      // a man opening the fifth cannot see he left the first open above him.
-      // Only the numbered STEPS take part — Move this event and About sit under
-      // the player list and are nobody's next action.
+      /* ONE STEP AT A TIME, AND WITHIN ONE SCREEN ONLY.
+         The rule used to close every `details.fold.step` in the DOCUMENT, which
+         was right when every step was on Setup. The steps are spread over two
+         tabs now, and a document-wide rule would let opening The players on one
+         screen silently shut The round on another — a man would come back to a
+         tab he had left open and find it closed with nothing to explain it. */
       if(d.open && d.classList.contains("step")){
-        document.querySelectorAll("details.fold.step").forEach(o => {
+        const screen = d.closest("section.screen") || document;
+        screen.querySelectorAll("details.fold.step").forEach(o => {
           if(o !== d && o.open) o.open = false;
         });
       }
-      // MERGED, not replaced. The Leaders sections are drawn after this runs
+      // MERGED, not replaced. The Finish sections are drawn after this runs
       // and are not always in the document when it does; writing a fresh object
-      // would forget them every time a Setup step was opened.
+      // would forget them every time a step was opened.
       const now = readFolds();
       document.querySelectorAll("details.fold").forEach(o => { now[o.id] = o.open; });
       try { localStorage.setItem(FOLD_KEY, JSON.stringify(now)); } catch(e) { /* full or private — the fold simply forgets */ }
@@ -1768,10 +1938,12 @@ function wireFolds(){
 }
 
 /**
- * One line under each heading saying what is inside, so a shut section can still
- * be checked at a glance. This is where the allowance and the skins switch get
- * seen without being opened — both change every man's score, and neither should
- * be able to hide.
+ * ONE LINE UNDER EVERY SHUT HEADING, saying where that section stands.
+ *
+ * This is what makes a screen of shut sections answer "what have I done and
+ * what is left" without opening anything. Every one of them shows a FIGURE,
+ * and shows it at zero as readily as at eight — a line that goes blank when
+ * there is nothing yet is a line that cannot be trusted when there is.
  */
 function drawFoldSubs(){
   const men = state.players.length;
@@ -1785,25 +1957,40 @@ function drawFoldSubs(){
     if(head) head.classList.toggle("wrong", !!wrong);
   };
 
-  /* ADD PLAYER — the count, and how many cannot be scored yet.
+  /* THE ROSTER — the men who outlive a round. */
+  const roster = rosterMen();
+  say("foldRosterSub",
+    roster.length === 0 ? "Nobody saved yet"
+      : roster.length + " m" + (roster.length === 1 ? "an" : "en") +
+        " · " + roster.filter(m => inField(m)).length + " in this round",
+    false);
+
+  /* THE ROUND — the day, and the two figures that move every man's score.
+     Skins rides on the end only when it is OFF: on is the ordinary case and
+     needs nothing said, off changes what the board pays and must not hide. */
+  say("foldRoundSub",
+    [dayAndDate(state.date), state.format || DEFAULT_FORMAT,
+     state.allowancePercent + "%"]
+      .concat(skinsOn() ? [] : ["no skins"]).join(" · "),
+    false);
+
+  /* THE PLAYERS — how many are in, and how many regulars are still a tap away.
      COUNTED ON isReady, not on missingFrom. missingFrom also reports a man with
      no cart, which is a thing to fix before skins and not a thing that stops
      him being scored — counting it here said "10 still need an index or a tee"
      about a field where eight had both. A shut line that overstates is as bad
      as one that hides. */
   const notReady = men - ready;
-  // How many of the regulars are still a tap away — the number that says
-  // whether this step is finished, now that a man in the round leaves the list.
-  const left = rosterMen().filter(m => !playerFor(m)).length;
+  const left = roster.filter(m => !playerFor(m)).length;
   say("foldAddSub",
-    (men === 0 ? "Nobody yet" : men + " player" + (men === 1 ? "" : "s")) +
+    (men === 0 ? "Nobody in yet" : men + " in") +
       (notReady ? " · " + notReady + (notReady === 1 ? " still needs" : " still need") +
                   " an index and a tee" : "") +
-      (left ? " · " + left + " on the roster to tap in" : ""),
+      " · " + left + " on the roster to tap in",
     notReady > 0);
 
   /* A PASTE SITTING THERE UNFINISHED beats the count to the line — it is the
-     thing to act on, and it lives inside Add player now. */
+     thing to act on, and it lives inside The players. */
   const noIdx = state.players.filter(p => p.index == null).length;
   const rosterBad = rosterPreview ? rosterPreview.rows.filter(r => r.problems.length).length : 0;
   if(rosterPreview){
@@ -1813,70 +2000,83 @@ function drawFoldSubs(){
       rosterBad > 0);
   }
 
-  /* BIRDIE PICKS — how many men are actually holding a full set. */
+  /* WATCH THE BIRDIE — how many men are holding a full set, and what becomes
+     of the ones who are not. */
   const withPicks = state.players.filter(p =>
     E.PICK_SLOTS.every(sl => p[sl.key] != null)).length;
+  const shortPicks = men - withPicks;
   const picksBad = picksPreview ? picksPreview.rows.filter(r => r.problems.length).length : 0;
   say("foldPicksSub",
     picksBad ? picksBad + " of " + picksPreview.rows.length + " lines could not be read — not yet set"
       : men === 0 ? "Nobody to give picks to yet"
-      : withPicks + " of " + men + " picks in",
+      : withPicks + " of " + men + " picks in" +
+        (shortPicks === 0 ? ""
+          : state.autoPicks ? " · " + shortPicks + " to draw"
+          : " · " + shortPicks + " will score nothing"),
     // ONLY A FAILED PASTE IS WRONG. Seven of ten picks in on a Wednesday is
     // progress, and painting it red says a thing is broken when the thing is
     // simply not finished — which teaches a man to ignore the color by
     // Saturday, when it will mean something.
     picksBad > 0);
 
-  /* HIT LIST — how many have named an opponent. */
+  /* THE HIT LIST — how many have named an opponent, and what the rest get. */
   const named = state.players.filter(p => (p.hitList || "").trim() !== "").length;
+  const unnamed = men - named;
   // Never wrong: a man is allowed to name nobody, and the pick simply pays 0.
   say("foldHitListSub",
-    men === 0 ? "Nobody to name yet" : named + " of " + men + " named",
+    men === 0 ? "Nobody to name yet"
+      : named + " of " + men + " named" +
+        (unnamed === 0 ? ""
+          : state.autoHitList ? " · " + unnamed + " to draw"
+          : " · " + unnamed + " will score nothing"),
     false);
 
-  /* EVENT SETTINGS — the two figures that move every man's score, plus whether
-     picks will be drawn for the men who sent none. */
-  const carts = new Set(readyPlayers()
-    .filter(p => p.cart != null && String(p.cart).trim() !== "").map(p => String(p.cart)));
-  say("foldEventSub",
-    [state.format || DEFAULT_FORMAT,
-     state.allowancePercent + "%",
-     skinsOn() ? (carts.size < 2 ? "skins on, one group" : "skins on") : "skins off",
-     state.autoPicks ? "picks drawn" : "picks not drawn",
-    ].join(" · "), false);
-
-  const roster = rosterMen();
-  say("goRosterSub",
-    roster.length === 0 ? "Nobody saved yet — add the men who play every week"
-      : roster.length + " saved · " + roster.filter(m => inField(m)).length + " in this round",
+  /* THE SCORES — the count that says whether the round is finished. */
+  const cardsIn = state.players.filter(hasScores).length;
+  say("foldImportSub",
+    men === 0 ? "Nobody to take a card from yet" : cardsIn + " of " + men + " cards in",
     false);
 
   const sent = state.invitesSent || {};
   const inviteable = readyPlayers();
   const sentCount = inviteable.filter(p => sent[p.id] && sent[p.id].six === sixKey(p)).length;
   const stale = inviteable.filter(p => sent[p.id] && sent[p.id].six !== sixKey(p)).length;
-  /* THE PICK SHEET MOVED ONTO THIS SCREEN, so its warning moved onto this
-     line: a man with no index has no opponents to be offered, and the link
-     with the field in it cannot be built until he has one. */
   say("goInvitesSub",
     inviteable.length === 0 ? "Nobody to send to yet"
-      : noIdx ? noIdx + " without an index — no field link until they have one"
       : sentCount + " of " + inviteable.length + " sent" +
         (stale ? " · " + stale + " changed since — send again" : ""),
-    stale > 0 || noIdx > 0);
+    stale > 0);
 
   /* THE RULES — default, or what was changed. */
   say("goRulesSub",
     rulesChanged() ? "Changed: " + changedRulesNote() : "The default values",
     false);
 
+  say("goArchiveSub",
+    store.events.length + " round" + (store.events.length === 1 ? "" : "s") + " on this phone",
+    false);
+
   const head = document.getElementById("rosterHead");
-  if(head) head.textContent = men === 0 ? "The player list" :
-    "The player list · " + men + (ready < men ? " · " + (men - ready) + " not ready" : "");
+  if(head) head.textContent = men === 0 ? "The player cards" :
+    "The player cards · " + men + (ready < men ? " · " + (men - ready) + " not ready" : "");
 
   say("foldMoveSub", exportNote(state), false);
   const v = window.ClubhouseVersion;
   say("foldAboutSub", v && v.build ? "Build " + v.build : "Build unknown", false);
+}
+
+/**
+ * "Friday · August 29" — the day of the week first, because that is how this
+ * club names a round. Built by hand from the ISO date for the same reason
+ * every other date on these screens is: a phone set to another language must
+ * show the same words as the one beside it.
+ */
+const DAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+function dayAndDate(iso){
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ""));
+  if(!m) return String(iso || "");
+  const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+  return DAYS[d.getUTCDay()] + " · " + MONTHS[+m[2] - 1] + " " + Number(m[3]);
 }
 
 /**
@@ -1927,38 +2127,15 @@ function drawAbout(){
  */
 function drawEventBox(){
   const e = state;
-  const options = eventsInOrder().map(x =>
-    `<option value="${esc(x.id)}"${x.id===e.id?" selected":""}>${esc(eventLabel(x))}</option>`).join("");
-
   const men = state.players.length;
 
   document.getElementById("eventBox").innerHTML =
-    /* STARTING A ROUND AND RENAMING ONE ARE DIFFERENT THINGS, and the screen
-       has to say so. There was no way to start one at all — the picker listed
-       the rounds that existed and nothing made another — so renaming was the
-       only move that looked like it, and it carries every player with it. */
-    `<div class="pad">
-       <button class="big solid" id="fNewEvent">+ Start a new round</button>
-       <div class="cd" style="margin-top:10px;font-size:18px;font-weight:700">
-         An empty field, today's date, the default rules. This round stays
-         exactly as it is and you can come back to it in the picker below.</div>
-     </div>
-     <div class="field"><label for="fEvent">Open a round</label>
-       <select id="fEvent">${options}</select></div>
-     <div class="field"><label for="fEventName">Name of this round</label>
-       <input type="text" id="fEventName" autocomplete="off" value="${esc(e.name || "")}">
-       <div class="cd" style="margin-top:10px;font-size:18px;font-weight:700">
-         Call it whatever you call it — this is the name on the board, the
-         picture and the exported file.<br>
-         <b>Renaming is not starting a new round.</b> ${men === 0
-           ? "This round has nobody in it yet."
-           : "This round keeps its " + men + " player" + (men === 1 ? "" : "s") +
-             " and their scores; only the name changes."}</div></div>
+    `<div class="field"><label for="fEventName">Name of this round</label>
+       <input type="text" id="fEventName" autocomplete="off" value="${esc(e.name || "")}"></div>
      <div class="field"><label for="fEventDate">Date</label>
        <input type="text" id="fEventDate" inputmode="numeric" autocomplete="off"
          placeholder="MM/DD/YYYY" value="${esc(usDate(e.date))}">
-       <div class="cd" id="fEventDateSaid" style="margin-top:8px;font-size:18px;font-weight:700">
-         ${esc(niceDate(e.date))}</div></div>
+       <div class="cd" id="fEventDateSaid">${esc(niceDate(e.date))}</div></div>
      <div class="field"><label for="fEventFormat">Format</label>
        <input type="text" id="fEventFormat" list="formatList" autocomplete="off"
          value="${esc(e.format || "")}">
@@ -1966,19 +2143,12 @@ function drawEventBox(){
          `<option value="${esc(f)}"></option>`).join("")}</datalist></div>`;
 
   const $ = (id) => document.getElementById(id);
-  // The band already names the open event, so a rename shows up there at once
-  // even with this section shut. Neither redraws the screen under the thumb.
-  const refresh = () => {
-    document.getElementById("setupSub").textContent = eventLabel(state);
-    const opt = $("fEvent").querySelector(`option[value="${CSS.escape(state.id)}"]`);
-    if(opt) opt.textContent = eventLabel(state);
-  };
-  refresh();
+  // The line under the bar names the open round, so a rename shows up there at
+  // once even with this section shut. Neither redraws the screen under a thumb.
+  const refresh = () => { drawRoundLines(); drawFoldSubs(); };
 
-  $("fNewEvent").addEventListener("click", addEvent);
-  $("fEvent").addEventListener("change", (ev) => openEvent(ev.target.value));
   $("fEventName").addEventListener("input", (ev) => {
-    state.name = ev.target.value; save(); refresh(); drawFoldSubs();
+    state.name = ev.target.value; save(); refresh();
   });
   /* MONTH, DAY, YEAR — and read back rather than trusted. An unreadable date
      leaves the one he had alone: half a date typed in is not a reason to lose
@@ -2006,7 +2176,7 @@ function drawEventBox(){
     $("fEventDateSaid").classList.remove("wrong");
   });
   $("fEventFormat").addEventListener("input", (ev) => {
-    state.format = ev.target.value; save(); refresh(); drawFoldSubs();
+    state.format = ev.target.value; save(); refresh();
   });
 }
 
@@ -2016,27 +2186,52 @@ function drawEventBox(){
  * than under a thumb that is scrolling for a player.
  */
 function drawMoveBox(){
-  document.getElementById("moveBox").innerHTML =
+  const box = document.getElementById("moveBox");
+  if(!box) return;
+  box.innerHTML =
     `<div class="pad">
-       <!-- "+ New event" USED TO BE HERE, and being here is what hid it. This
-            box is about getting a round on and off the phone — export, copy,
-            paste, delete — and it went behind the gear when the tabs were cut
-            to three, which put starting a round three taps from Setup under a
-            heading that reads like a file menu. Rob went looking for it on
-            Setup, did not find it, and renamed the round instead — which keeps
-            every player. It is on Setup now, in Event settings, where a round
-            is actually started. -->
        <button class="big" id="fExportEvent">Export a spreadsheet (CSV)</button>
        <button class="big" id="fCopyEvent">Copy this event</button>
        <button class="big" id="fPasteEvent">Paste an event</button>
        <div id="eventTransfer"></div>
-       <div class="cd" style="margin:16px 0 12px;font-size:18px;font-weight:700">${esc(deleteNote(state))}</div>
+       <div class="cd" style="margin:16px 0 12px">${esc(deleteNote(state))}</div>
        <button class="big danger" id="fDeleteEvent">Delete this event</button>
      </div>`;
   document.getElementById("fExportEvent").addEventListener("click", exportEvent);
   document.getElementById("fCopyEvent").addEventListener("click", copyEvent);
   document.getElementById("fPasteEvent").addEventListener("click", showPasteBox);
   document.getElementById("fDeleteEvent").addEventListener("click", () => removeEvent(state.id));
+}
+
+/**
+ * EVERY ROUND THIS PHONE IS HOLDING, and the way back into one.
+ *
+ * The picker used to be a dropdown inside Event settings, which is a fine way
+ * to change something and a poor way to look through a season. The club plays
+ * Friday and Saturday, so by November there are sixty of these.
+ */
+function renderArchive(){
+  const box = document.getElementById("archiveBody");
+  if(!box) return;
+  const rounds = eventsInOrder();
+  document.getElementById("archiveSub").textContent =
+    rounds.length + " round" + (rounds.length === 1 ? "" : "s") + " on this phone";
+
+  box.innerHTML = rounds.map(e => {
+    const men = (e.players || []).length;
+    const cards = (e.players || []).filter(p =>
+      Object.prototype.hasOwnProperty.call(e.scores || {}, p.id)).length;
+    const bits = [dayAndDate(e.date),
+                  men === 0 ? "nobody in" : men + " player" + (men === 1 ? "" : "s"),
+                  men === 0 ? "" : cards + " of " + men + " cards in"].filter(Boolean);
+    return `<button class="fold go" data-open="${esc(e.id)}">` +
+      `<span><span class="fname">${esc(eventLabel(e))}` +
+      (e.id === state.id ? ` <span class="tag">open</span>` : ``) + `</span>` +
+      `<span class="fsub">${esc(bits.join(" · "))}</span></span></button>`;
+  }).join("");
+
+  box.querySelectorAll("[data-open]").forEach(b =>
+    b.addEventListener("click", () => openEvent(b.dataset.open)));
 }
 
 /**
@@ -2053,12 +2248,13 @@ function drawAllowance(){
     .map(v => `<option value="${v}"${v===pct?" selected":""}>${v}%</option>`).join("");
 
   // What it actually costs the men in this round, worst and least affected.
+  // A figure, not an explanation — the reasoning is in Settings.
   const ready = readyPlayers();
   let effect;
   if(pct === 100){
-    effect = "Everyone plays off their full course handicap.";
+    effect = "Full course handicap for everybody.";
   } else if(ready.length === 0){
-    effect = "Applied to every player's course handicap once they are added.";
+    effect = "Applied once there are players.";
   } else {
     const cuts = ready.map(p => ({ name: displayName(p), lost: (fullChOf(p) || 0) - (chOf(p) || 0) }))
                       .sort((a,b) => b.lost - a.lost);
@@ -2072,7 +2268,7 @@ function drawAllowance(){
   document.getElementById("allowanceBox").innerHTML =
     `<div class="field"><label for="fAllow">Handicap allowance</label>
        <select id="fAllow">${options}</select>
-       <div class="cd" style="margin-top:10px;font-size:18px;font-weight:700">${effect}</div>
+       <div class="cd">${effect}</div>
      </div>`;
 
   document.getElementById("fAllow").addEventListener("change", (e) => {
@@ -2083,74 +2279,111 @@ function drawAllowance(){
 }
 
 /**
- * The one threshold the organizer can change from the app. Some rounds the
- * groups won't divide sensibly and he'll want to skip skins altogether — a
- * round with only one cart skips itself, but this covers the rest.
- */
-/**
- * Where the Skins switch used to be.
- *
- * It lives in Settings now, with every other contest's. What stays here is the
- * one thing Setup knows and Settings does not: how many groups are actually
- * out, which decides whether skins can run at all today whatever the rules say.
- */
-function drawSkinsSwitch(){
-  const carts = new Set(readyPlayers()
-    .filter(p => p.cart != null && String(p.cart).trim() !== "")
-    .map(p => String(p.cart)));
-  const n = readyPlayers().length;
-  const cfg = contestConfig().skins;
-  const note = !cfg ? "Switched off for this round, under The rules."
-    : n < cfg.minPlayers ? n + " players — too few for skins, which start at " + cfg.minPlayers + "."
-    : carts.size < 2 ? "Only one group out, so no skins today whatever the rules say."
-    : carts.size + " groups out, playing " +
-      (n >= cfg.teamFrom ? "team" : "cart") + " skins.";
-
-  document.getElementById("skinsSwitch").innerHTML =
-    `<div class="field"><span class="flab">Skins</span>
-       <div class="cd" style="margin-top:4px;font-size:18px;font-weight:700">${esc(note)}<br>
-         Switched on and off under <b>The rules</b>, with every other contest.</div>
-     </div>`;
-}
-
-/**
  * Picks drawn for the man who never sent his in.
  *
- * OFF BY DEFAULT, and it stays that way unless somebody turns it on. Watch the
- * Birdie is a contest of nerve — a man says in advance which holes he fancies —
- * and a drawn set is not a choice. What it stops is an empty contest reading as
- * a bad round on the board, which is a different thing and worth fixing.
+ * OFF BY DEFAULT. Watch the Birdie is a contest of nerve — a man says in
+ * advance which holes he fancies — and a drawn set is not a choice. What it
+ * stops is an empty contest reading as a bad round on the board.
  *
  * The draw happens ONCE, when the scores go in, and is written to the player.
  * Drawing it afresh on every render would give a man different picks each time
  * the board was looked at, which is not a game.
  */
 function drawAutoPicksSwitch(){
+  const box = document.getElementById("autoPicksSwitch");
+  if(!box) return;
   const missing = readyPlayers().filter(p => E.PICK_SLOTS.every(sl => p[sl.key] == null)).length;
   const drawn = state.players.filter(p => p.picksAuto).length;
   const note = state.autoPicks
-    ? (missing > 0
-        ? missing + " player" + (missing===1?"":"s") + " with no picks — they will be drawn when the scores go in."
-        : "Everybody has picks. Nothing will be drawn.")
-    : "A man with no picks scores nothing on Watch the Birdie.";
+    ? (missing > 0 ? missing + " with no picks — drawn when the scores go in."
+                   : "Everybody has picks. Nothing will be drawn.")
+    : missing + " with no picks — they score nothing.";
 
-  document.getElementById("autoPicksSwitch").innerHTML =
+  box.innerHTML =
     `<div class="field"><span class="flab">Draw missing picks</span>
        <div class="seg" id="autoPicksSeg">
          <button type="button" data-on="1" aria-pressed="${state.autoPicks}">On</button>
          <button type="button" data-on="0" aria-pressed="${!state.autoPicks}">Off</button>
        </div>
-       <div class="cd" style="margin-top:10px;font-size:18px;font-weight:700">${esc(note)}` +
-       (drawn ? `<br>${drawn} man${drawn===1?"":"'s"} picks ${drawn===1?"was":"were"} drawn, and the board says so beside ${drawn===1?"his":"their"} name${drawn===1?"":"s"}.` : ``) +
+       <div class="cd">${esc(note)}` +
+       (drawn ? `<br>${drawn} man${drawn===1?"":"'s"} picks ${drawn===1?"was":"were"} drawn, and the board says so.` : ``) +
        `</div></div>`;
 
-  document.getElementById("autoPicksSeg").querySelectorAll("button").forEach(b =>
+  box.querySelectorAll("#autoPicksSeg button").forEach(b =>
     b.addEventListener("click", () => {
       state.autoPicks = b.dataset.on === "1";
       save();
-      renderSetup(); renderBoard();
-      show("setup");
+      drawAutoPicksSwitch(); drawFoldSubs(); renderBoard();
     }));
+}
+
+/**
+ * AN OPPONENT DRAWN FOR THE MAN WHO NEVER REPLIED — and why it starts off.
+ *
+ * Choosing holes affects nobody but the man who chose them. Naming an opponent
+ * puts ANOTHER MAN IN IT: a drawn opponent collects the reward for a gamble the
+ * player never took, and the man he was drawn against never agreed to the bet.
+ * So this is off, and a man who never replies simply scores nothing on the Hit
+ * List — which is what he chose by not replying.
+ *
+ * It is here rather than absent because a scramble, a scorecard from a society
+ * day, or a round being reconstructed afterwards can all want it. The reasoning
+ * sits in Settings, under Questions and answers.
+ */
+function drawAutoHitListSwitch(){
+  const box = document.getElementById("autoHitListSwitch");
+  if(!box) return;
+  const unnamed = readyPlayers().filter(p => (p.hitList || "").trim() === "").length;
+  const drawn = state.players.filter(p => p.hitListAuto).length;
+  const note = state.autoHitList
+    ? (unnamed > 0 ? unnamed + " unnamed — an opponent is drawn when the scores go in."
+                   : "Everybody has named a man. Nothing will be drawn.")
+    : unnamed + " unnamed — they score nothing.";
+
+  box.innerHTML =
+    `<div class="field"><span class="flab">Draw missing picks</span>
+       <div class="seg" id="autoHitSeg">
+         <button type="button" data-on="1" aria-pressed="${state.autoHitList === true}">On</button>
+         <button type="button" data-on="0" aria-pressed="${state.autoHitList !== true}">Off</button>
+       </div>
+       <div class="cd">${esc(note)}` +
+       (drawn ? `<br>${drawn} opponent${drawn===1?" was":"s were"} drawn, and the board says so.` : ``) +
+       `</div></div>`;
+
+  box.querySelectorAll("#autoHitSeg button").forEach(b =>
+    b.addEventListener("click", () => {
+      state.autoHitList = b.dataset.on === "1";
+      save();
+      drawAutoHitListSwitch(); drawFoldSubs(); renderBoard();
+    }));
+}
+
+/**
+ * Draw an opponent for anybody who named nobody. Returns how many were drawn.
+ *
+ * OFF UNLESS SWITCHED ON, and it draws from the same eight the picking screen
+ * offers him — `E.nearestByIndex`, the one implementation — so a drawn duel is
+ * one he could have made himself. A man who named somebody is never touched.
+ *
+ * The draw is written to the player and happens ONCE, when the scores go in,
+ * for the same reason the birdie draw is: an opponent who changed every time
+ * the board was looked at would not be a bet.
+ */
+function drawMissingOpponents(){
+  if(state.autoHitList !== true) return 0;
+  let drawn = 0;
+  for(const p of state.players){
+    if(!isReady(p)) continue;
+    if((p.hitList || "").trim() !== "") continue;      // he named somebody
+    const eight = nearestEight(p);
+    if(eight.length === 0) continue;                   // nobody to draw from
+    // Deterministic in the only way that matters: it is written down at once,
+    // so it never moves again.
+    p.hitList = displayName(eight[Math.floor(Math.random() * eight.length)]);
+    p.hitListAuto = true;
+    drawn++;
+  }
+  return drawn;
 }
 
 /**
@@ -2218,10 +2451,8 @@ function drawRosterPick(){
   if(roster.length === 0){
     // A PLAIN LINE, not a blank space. An empty box reads as a thing that has
     // not loaded rather than a list nobody has filled in yet.
-    box.innerHTML = `<div class="note">Nobody on the roster yet. Type a man in
-      below and say yes to saving him, or add the men who play every week under
-      <b>⚙ Settings › The roster</b>. After that, building a field is tapping
-      names.</div>`;
+    box.innerHTML = `<div class="note">Nobody on the roster yet. Add the men who
+      play every week under <b>Start a round › The roster</b>.</div>`;
     return;
   }
 
@@ -2235,12 +2466,11 @@ function drawRosterPick(){
     return;
   }
 
+  // What the roster IS, and why a correction here does not reach back into it,
+  // is in Settings under How to run Clubhouse. This is a count and a tap.
   box.innerHTML =
-    `<div class="note">Tap a man to put him in this round — his index and tee
-      come with him, and correcting one <b>for a round</b> never changes him on
-      the roster.` +
-      (inRound ? ` The ${inRound} already in ${inRound === 1 ? "is" : "are"} in the
-        player list below; this is who is left.` : ``) + `</div>` +
+    `<div class="note">Tap a man to put him in this round.` +
+      (inRound ? ` ${inRound} already in.` : ``) + `</div>` +
     (full ? `<div class="note warn">This round is full at ${MAX_PLAYERS} players.
       Take somebody out of the player list before adding another.</div>` : ``) +
     men.map((m, i) => {
@@ -2295,14 +2525,8 @@ function showRosterBox(){
        <textarea id="rosterPaste" spellcheck="false" autocorrect="off"
          autocapitalize="off" autocomplete="off"
          placeholder="Finkelstein, Dave (26.9 / 21 / 21) IV"></textarea>
-       <div class="cd" style="margin-top:10px;font-size:18px;font-weight:700">
-         A Golf Genius tee sheet pastes straight in: name, then the three figures
-         in brackets, then the tee. Only the first figure is kept — the other two
-         are worked out again when the round is scored.<br><br>
-         A spreadsheet also reads: name, handicap index, tee, group, front par 4,
-         back par 4 — tab or comma separated. Anything after the name may be left
-         out.</div></div>
-     <div style="padding:0 0 12px"><button class="big solid" id="rosterRead">Show what this contains</button></div>
+       <div class="cd">A Golf Genius tee sheet pastes straight in.</div></div>
+     <div style="padding:0 0 12px"><button class="big solid" id="rosterRead">Check paste first</button></div>
      <div id="rosterOut"></div>`;
   document.getElementById("rosterRead").addEventListener("click", readRoster);
   /* NO FOCUS ON OPEN. This box used to be the only thing in the step, so
@@ -2430,22 +2654,39 @@ function commitRoster(){
    anything that fits two men equally comes back for a person to settle. */
 
 let picksPreview = null;
+/* WHICH BOX THE PREVIEW BELONGS TO. The men send one message carrying both
+   contests — the holes and the man they named — and `importer.js` reads both
+   off the same line. So the same paste box appears under Watch the birdie and
+   under Hit list, and a man can go to whichever one he was thinking about.
+   One reader, one preview, two ways in; the accordion keeps only one of them
+   on screen at a time, so the preview can only ever be in one place. */
+let picksWhere = "picks";
+const PICK_BOXES = {
+  picks: { box: "picksBox",     ta: "picksPaste", btn: "picksRead", out: "picksOut" },
+  hit:   { box: "hitListPaste", ta: "hlPaste",    btn: "hlRead",    out: "hlOut" },
+};
 
-function showPicksBox(){
+function showPicksBox(where){
+  const w = PICK_BOXES[where] ? where : "picks";
+  const el = PICK_BOXES[w];
+  const host = document.getElementById(el.box);
+  if(!host) return;
   const legal = E.birdiePickHoles(E.courseForTee(state.lastTee || "IV", "M"));
   const order = E.PICK_SLOTS.map(sl => sl.label + " " + legal[sl.key].join("/")).join(" · ");
-  document.getElementById("picksBox").innerHTML =
-    `<div class="field"><label for="picksPaste">One player a line</label>
-       <textarea id="picksPaste" spellcheck="false" autocorrect="off"
+  host.innerHTML =
+    `<div class="field"><label for="${el.ta}">Paste the picks — one player a line</label>
+       <textarea id="${el.ta}" spellcheck="false" autocorrect="off"
          autocapitalize="off" autocomplete="off"
-         placeholder="Ridgeway, Ken — 7, 16, 3, 8, 13, 1, 2, 10, 14"></textarea>
-       <div class="cd" style="margin-top:10px;font-size:18px;font-weight:700">
-         ${E.PICK_SLOTS.length} numbers in this order: ${esc(order)}</div></div>
-     <div style="padding:0 0 12px"><button class="big solid" id="picksRead">Show what this contains</button></div>
-     <div id="picksOut"></div>`;
-  document.getElementById("picksRead").addEventListener("click", readPicksPaste);
-  document.getElementById("picksPaste").focus();
+         placeholder="Ridgeway, Ken — 7, 16, 3, 8, 13, 1, 2, 10, 14&#10;Hit List: Mike Knazick"></textarea>
+       <div class="cd">${E.PICK_SLOTS.length} numbers in this order: ${esc(order)}.
+         A <b>Hit List:</b> line under a man names his opponent.</div></div>
+     <div style="padding:0 0 12px"><button class="big solid" id="${el.btn}">Check paste first</button></div>
+     <div id="${el.out}"></div>`;
+  document.getElementById(el.btn).addEventListener("click", () => readPicksPaste(w));
 }
+
+/** The same box, under the Hit list heading. */
+function drawHitListPaste(){ showPicksBox("hit"); }
 
 /**
  * THE HIT LIST — the eight players nearest a man's own index.
@@ -2488,11 +2729,9 @@ function showHitListBox(){
       with an index and a tee.</div>`;
     return;
   }
+  // No explanation here. What the Hit List is, and why beating a better player
+  // pays more, is in Settings under How to run Clubhouse. This is the list.
   box.innerHTML =
-    `<div class="cd" style="padding:0 0 12px;font-size:18px;font-weight:700">
-       Each man backs himself to post the better net score against ONE opponent.
-       He is offered the eight players nearest his own index — beating a better
-       player pays more, so the easy pick is not the best one.</div>` +
     men.map(p => {
       const eight = nearestEight(p);
       const opts = `<option value="">— nobody —</option>` +
@@ -2514,7 +2753,9 @@ function showHitListBox(){
       const man = state.players.find(p => p.id === sel.dataset.hl);
       if(!man) return;
       man.hitList = sel.value || "";
-      save(); renderBoard();
+      // Named by hand is no longer drawn, whatever it was before.
+      delete man.hitListAuto;
+      save(); drawFoldSubs(); drawAutoHitListSwitch(); renderBoard();
     }));
   document.getElementById("hitListDone").addEventListener("click", () => {
     document.getElementById("hitListBox").innerHTML = "";
@@ -2805,7 +3046,7 @@ function renderSettings(){
      card — but it is a rule of the round and belongs where the rules are. */
   h += `<div class="section-label">The minigame boards</div>` +
     numField("Men shown on each board", "boards.depth", draft.boards.depth, D.boards.depth, {step:1}) +
-    `<div class="note">Each contest gets a table of its own on the Leaders screen,
+    `<div class="note">Each contest gets a table of its own on Finish a round,
       so a man who finished eleventh overall can still have won something.<br>
       <b>Five means something different at eight players than at eighty</b>, which is
       why it is a setting rather than a number in the code.<br>
@@ -2892,7 +3133,7 @@ function wireSettings(){
     saveSettings();
   });
   document.getElementById("setCancel").addEventListener("click", () => {
-    draft = null; renderSetup(); show("setup");
+    draft = null; renderSetup(); show("round");
   });
   document.getElementById("settingsSub").textContent = rulesChanged()
     ? "Changed from the defaults" : "The default rules";
@@ -2932,6 +3173,7 @@ function saveSettings(){
  */
 function showPickLinkBox(){
   const box = document.getElementById("pickLinkBox");
+  if(!box) return;
   const base = location.href.split("?")[0].split("#")[0]
     .replace(/leaderboard\.html$/, "picks.html");
   const men = readyPlayers();
@@ -2939,33 +3181,24 @@ function showPickLinkBox(){
   // NAMED and the link refused rather than quietly leaving him off it.
   const noIndex = state.players.filter(p => p.index == null);
 
+  /* ONE BUTTON, NOT TWO.
+     There were two links here: a plain sheet with holes only and no Hit List,
+     and one carrying the field. Choosing between them meant knowing that only
+     the second brings back both contests — so the men got the wrong one, named
+     nobody, and scored nothing on the Hit List. Both contests travel in this
+     link and come back in one message. The plain sheet is still there, in
+     Settings under How to run Clubhouse, for a field that is not settled yet. */
   box.innerHTML =
-    `<div class="pad">` +
-      `<a class="big" href="picks.html">Open the plain pick sheet</a>` +
-      `<div class="cd" style="margin:10px 0 18px;font-size:18px;font-weight:700">
-         Holes only. Every man types his own name and there is no Hit List —
-         which is right when the field is not settled yet.</div>` +
-      (noIndex.length
-        ? `<div class="note warn"><b>No link with the field yet.</b><br>
-             ${noIndex.map(p => esc(displayName(p))).join(", ")}
-             ${noIndex.length === 1 ? "has" : "have"} no handicap index, and a man's
-             eight opponents cannot be worked out without one. Give
-             ${noIndex.length === 1 ? "him" : "them"} an index on the player list
-             below and this link appears.</div>`
-        : men.length < 2
-        ? `<div class="note warn"><b>No link with the field yet.</b><br>
-             There have to be at least two players with an index and a tee before
-             anybody has an opponent to name.</div>`
-        : `<button class="big solid" id="makeFieldLink">Copy the link WITH the field</button>
-           <div class="cd" style="margin-top:10px;font-size:18px;font-weight:700">
-             Carries all ${men.length} players and their handicap indexes, readable
-             by anyone who opens it — the same names and figures that are on the
-             Golf Genius portal. Each man taps his own name and gets his own eight
-             opponents.<br><br>
-             It is a SNAPSHOT of the field as it stands now. Send a fresh one if
-             men join or drop out.</div>
-           <div id="fieldLinkOut"></div>`) +
-    `</div>`;
+    (noIndex.length
+      ? `<div class="note warn"><b>No link yet.</b>
+           ${noIndex.map(p => esc(displayName(p))).join(", ")}
+           ${noIndex.length === 1 ? "has" : "have"} no handicap index.</div>`
+      : men.length < 2
+      ? `<div class="note warn"><b>No link yet.</b> Two players with an index and
+           a tee is the least the Hit List can work from.</div>`
+      : `<button class="big solid" id="makeFieldLink">Send the picks</button>
+         <div class="undertext">Holes and Hit List, all ${men.length} men, one link.</div>
+         <div id="fieldLinkOut"></div>`);
 
   const make = document.getElementById("makeFieldLink");
   if(make) make.addEventListener("click", () => {
@@ -2975,24 +3208,14 @@ function showPickLinkBox(){
       niceDate(todayISO()));
     /* THE BANDS ARE MEASURED, not guessed — on the club's own phone, through
        iOS Messages: 154, 159, 190 and 219 arrived first time; 250 and 299 each
-       failed once and arrived on a second attempt; 350 failed twice.
-       A field link passes 219 at about six men and 300 at about nine, so for
-       any real Saturday field this is an E-MAIL, not a text. */
+       failed once; 350 failed twice. The measurements are written up in
+       Settings, under Questions and answers. What belongs HERE is the length
+       and the verdict — one line, because it is read while sending. */
     const said = `<div class="note${url.length > 219 ? " warn" : ""}">` +
-      `<b>${url.length} characters.</b><br>` +
-      (url.length > 299
-        ? `<b>Do not text this — it will arrive broken.</b> Measured on your own
-           phone, a link this long is cut short by iOS Messages and the men open a
-           page with no field in it, which looks like the app is broken rather
-           than the message. <b>E-mail it</b>, the way you already e-mail the
-           results.`
-        : url.length > 219
-        ? `<b>Too long to text reliably.</b> Measured on your own phone, links
-           between 250 and 299 characters arrived only on the second attempt. A
-           link that works on the second try is not good enough for the men —
-           <b>e-mail it</b>.`
-        : `Short enough to text — under the 219 that arrived first time every
-           time on your own phone.`) + `</div>`;
+      `<b>${url.length} characters.</b> ` +
+      (url.length > 219
+        ? `<b>E-mail it — too long to text.</b>`
+        : `Short enough to text.`) + `</div>`;
     const out = document.getElementById("fieldLinkOut");
     if(navigator.clipboard && navigator.clipboard.writeText){
       navigator.clipboard.writeText(url).then(
@@ -3015,10 +3238,10 @@ function showLink(url){
 
 function renderRoster(){
   const box = document.getElementById("rosterScreen");
+  if(!box) return;
   const roster = rosterMen();
-  document.getElementById("rosterSub").textContent =
-    roster.length === 0 ? "Nobody saved yet" :
-    roster.length + " men · " + roster.filter(m => inField(m)).length + " in this round";
+  // The shut line above says how many there are — drawFoldSubs owns it, so the
+  // count is written in one place and cannot disagree with itself.
 
   // The same order as the list inside Add player — one comparator, so the same
   // forty men are not in two orders on two screens.
@@ -3039,11 +3262,9 @@ function renderRoster(){
       `<div class="pad" style="padding-top:0"><button class="big" data-edit="${i}">Edit ${esc(m.name || "him")}</button></div>`;
   }).join("");
 
+  // No explanation here. What the roster is for is in Settings, under How to
+  // run Clubhouse.
   box.innerHTML =
-    `<div class="note">These men outlive a round. Building a field is picking
-      names off this list rather than typing them again — his index and tee come
-      with him, and correcting one <b>for a round</b> never changes him here.
-      Editing him here never touches a round already scored.</div>` +
     (roster.length ? `<div class="pad">` +
        `<button class="big solid" id="rosterAddAll">Add everyone not in this round</button></div>` : ``) +
     rows +
@@ -3056,7 +3277,7 @@ function renderRoster(){
   box.querySelectorAll("[data-add]").forEach(b =>
     b.addEventListener("click", () => {
       if(!addFromRoster(shown[Number(b.dataset.add)])) return;
-      renderRoster(); renderSetup(); renderBoard();
+      renderSetup(); renderBoard();
     }));
   box.querySelectorAll("[data-edit]").forEach(b =>
     b.addEventListener("click", () =>
@@ -3067,13 +3288,15 @@ function renderRoster(){
   const all = document.getElementById("rosterAddAll");
   if(all) all.addEventListener("click", () => {
     for(const m of shown) if(!addFromRoster(m) && state.players.length >= MAX_PLAYERS) break;
-    renderRoster(); renderSetup(); renderBoard();
+    renderSetup(); renderBoard();
   });
   document.getElementById("rosterNew").addEventListener("click", () => {
     addToRoster({ name: "" });
     renderRoster();
     editRosterMan(rosterMen().findIndex(m => m.name === ""));
   });
+  drawFoldSubs();
+
   document.getElementById("rosterFromField").addEventListener("click", () => {
     // Anybody in the round who is not yet saved. One tap, because the usual way
     // in is a tee sheet paste and retyping them here would be the whole problem
@@ -3087,6 +3310,95 @@ function renderRoster(){
       added++;
     }
     save(); renderRoster();
+  });
+}
+
+/**
+ * A WHOLE ROSTER PASTED IN AT ONCE.
+ *
+ * Forty men typed in one at a time is the job nobody does, so the roster stayed
+ * empty and every round started from nothing. The same parser the round's paste
+ * uses reads it — `IMP.parseRoster`, one implementation — so a tee sheet that
+ * works for a field works for the roster.
+ *
+ * IT FILLS THE ROSTER AND NOT THE ROUND. That is the whole difference between
+ * this box and the one under The players, and it is why they are on different
+ * screens: this is who plays here, that is who is playing today.
+ */
+let rosterAddPreview = null;
+
+function drawRosterPasteBox(){
+  const box = document.getElementById("rosterPasteBox");
+  if(!box) return;
+  box.innerHTML =
+    `<div class="section-label">Paste a list</div>
+     <div class="field"><label for="rmPaste">One man a line</label>
+       <textarea id="rmPaste" spellcheck="false" autocorrect="off"
+         autocapitalize="off" autocomplete="off"
+         placeholder="Finkelstein, Dave (26.9 / 21 / 21) IV"></textarea>
+       <div class="cd">Name, handicap index, tee. A Golf Genius tee sheet pastes
+         straight in.</div></div>
+     <div style="padding:0 0 12px"><button class="big solid" id="rmRead">Check paste first</button></div>
+     <div id="rmPasteOut"></div>`;
+  document.getElementById("rmRead").addEventListener("click", readRosterPaste);
+}
+
+function readRosterPaste(){
+  const text = document.getElementById("rmPaste").value;
+  const parsed = IMP.parseRoster(text, rosterRules());
+  parsed.rows.forEach(row => {
+    const read = E.parseHandicapIndex(row.indexText);
+    row.index = read.value;
+    if(!read.ok) row.problems = row.problems.concat([read.error]);
+    const already = rosterMen().some(m =>
+      IMP.normalizeName(m.name) === IMP.normalizeName(row.name));
+    if(already) row.problems = row.problems.concat(["already on the roster"]);
+  });
+  rosterAddPreview = parsed;
+  drawRosterPastePreview();
+}
+
+function drawRosterPastePreview(){
+  const out = document.getElementById("rmPasteOut");
+  if(!out) return;
+  const rows = rosterAddPreview ? rosterAddPreview.rows : [];
+  if(rows.length === 0){
+    out.innerHTML = `<div class="note warn">No men read from that yet.</div>`;
+    return;
+  }
+  const good = rows.filter(r => r.problems.length === 0);
+  const bad = rows.filter(r => r.problems.length > 0);
+  const line = (r) => {
+    const isBad = r.problems.length > 0;
+    const bits = [r.index == null ? "no index" : "idx " + E.formatHandicapIndex(r.index),
+                  "Tee " + r.tee];
+    return `<div class="prev"><div class="pv">` +
+      `<div class="pvn">${esc(r.name)}</div>` +
+      `<div class="pvd">${esc(isBad ? r.problems.join(" · ") : bits.join(" · "))}</div></div>` +
+      `<div class="pvt"><span class="tag${isBad?" no":""}">${isBad ? "skip" : "add"}</span></div></div>`;
+  };
+  let html = "";
+  if(good.length) html += `<div class="section-label">${good.length} to add</div>` + good.map(line).join("");
+  if(bad.length)  html += `<div class="section-label">${bad.length} left out</div>` + bad.map(line).join("");
+  html += `<div class="pad">` +
+    (good.length ? `<button class="big solid" id="rmPasteAdd">Add ${good.length} to the roster</button>` : ``) +
+    `<button class="big" id="rmPasteDrop">Discard this list</button></div>`;
+  out.innerHTML = html;
+  const add = document.getElementById("rmPasteAdd");
+  if(add) add.addEventListener("click", () => {
+    for(const r of rosterAddPreview.rows){
+      if(r.problems.length) continue;
+      // A man's index and tee are COPIED onto him here and copied again onto a
+      // player when he is tapped into a round — never linked, either way.
+      addToRoster({ name: r.name, index: r.index, tee: r.tee });
+    }
+    rosterAddPreview = null;
+    renderStart();
+    drawRosterPasteBox();
+  });
+  document.getElementById("rmPasteDrop").addEventListener("click", () => {
+    rosterAddPreview = null;
+    drawRosterPasteBox();
   });
 }
 
@@ -3247,10 +3559,10 @@ function renderInvites(){
   }).join("");
 
   box.innerHTML =
-    `<div class="note">Each man gets his OWN link, carrying only his six opponents —
-      no handicap indexes travel. Tapping a button opens the message already
-      written; you still press send.<br><br>
-      Marks are kept, so you can do these over a couple of days.</div>` +
+    // One line. What each link carries and why the marks are kept is in
+    // Settings, under How to run Clubhouse.
+    `<div class="note">Tapping a button opens the message already written; you
+      still press send. Marks are kept across days.</div>` +
     rows +
     `<div class="pad"><button class="big" id="invitesForget">Forget who has been sent to</button></div>`;
 
@@ -3321,8 +3633,10 @@ function pickSlotRules(){
   return E.PICK_SLOTS.map(sl => ({ key: sl.key, label: sl.label, legal: legal[sl.key] }));
 }
 
-function readPicksPaste(){
-  const text = document.getElementById("picksPaste").value;
+function readPicksPaste(where){
+  picksWhere = PICK_BOXES[where] ? where : "picks";
+  const el = PICK_BOXES[picksWhere];
+  const text = document.getElementById(el.ta).value;
   picksPreview = IMP.parseBirdiePicks(text, {
     names: state.players.map(p => p.name),
     slots: pickSlotRules(),
@@ -3331,7 +3645,9 @@ function readPicksPaste(){
 }
 
 function drawPicksPreview(){
-  const out = document.getElementById("picksOut");
+  const el = PICK_BOXES[picksWhere];
+  const out = document.getElementById(el.out);
+  if(!out) return;
   const rows = picksPreview ? picksPreview.rows : [];
   if(rows.length === 0){
     out.innerHTML = `<div class="note warn">No picks read from that yet.</div>`;
@@ -3374,7 +3690,7 @@ function drawPicksPreview(){
   if(good.length) document.getElementById("picksApply").addEventListener("click", commitPicks);
   document.getElementById("picksDrop").addEventListener("click", () => {
     picksPreview = null;
-    document.getElementById("picksBox").innerHTML = "";
+    showPicksBox(picksWhere);
   });
 }
 
@@ -3390,10 +3706,11 @@ function commitPicks(){
     // sends his holes twice must not lose an opponent he named the first time.
     if(r.hitList != null) p.hitList = r.hitList;
   }
+  const where = picksWhere;
   picksPreview = null;
   save();
   renderSetup(); renderBoard();
-  document.getElementById("picksBox").innerHTML = "";
+  showPicksBox(where);
 }
 
 /* ---------- setup: one player's form ---------- */
@@ -3553,7 +3870,7 @@ function drawEdit(){
     }));
 
   $("fSave").addEventListener("click", saveEditing);
-  $("fCancel").addEventListener("click", () => { editing = null; renderSetup(); show("setup"); });
+  $("fCancel").addEventListener("click", () => { editing = null; renderSetup(); show("round"); });
   const rm = $("fRemove");
   if(rm) rm.addEventListener("click", removeEditing);
 }
@@ -3619,7 +3936,7 @@ function saveEditing(){
 
   editing = null;
   save();
-  renderSetup(); show("setup");
+  renderSetup(); show("round");
 }
 
 function removeEditing(){
@@ -3630,7 +3947,7 @@ function removeEditing(){
   delete state.handicaps[p.id];
   editing = null;
   save();
-  renderSetup(); show("setup");
+  renderSetup(); show("round");
 }
 
 /**
@@ -3680,26 +3997,23 @@ function skinsSectionHtml(settled){
   const word = format === "team" ? "team" : "group";
   const named = (id) => groupName(id, format);
 
-  /* WHY IT IS NOT RUNNING, when it is not. Every one of these was on the old
-     tab and every one of them still has to be said — a section that simply
-     drew nothing would read as a contest that scored the field nothing. */
+  /* WHY IT IS NOT RUNNING, when it is not — the FIGURE and what to do about
+     it, and nothing else. A section that simply drew nothing would read as a
+     contest that scored the field nothing, so each of these still has to be
+     said; the reasoning behind the floor and the format is in Settings, under
+     Questions and answers. */
   if(settled.reason === "tooFew"){
     return `<div class="note warn"><b>No skins at ${settled.fieldSize}
-      player${settled.fieldSize===1?"":"s"}.</b><br>
-      Skins needs a field of at least ${config.minPlayers}. Below that there is not
-      enough of a field to divide, and the contest is simply not played.</div>`;
+      player${settled.fieldSize===1?"":"s"}.</b> Skins starts at ${config.minPlayers}.</div>`;
   }
   if(settled.reason === "noneEntered"){
     return `<div class="note">Nobody has a ${word} yet. Give each man
-      ${format === "team" ? "a team" : "a cart number"} on the <b>Setup</b> tab and the skins
-      will run themselves. A man with no ${word} simply doesn't compete for them.</div>`;
+      ${format === "team" ? "a team" : "a cart number"} on <b>The round</b>.</div>`;
   }
   if(settled.reason === "oneGroup"){
     const only = settled.groups[0];
-    return `<div class="note warn"><b>No skins today — only one ${word} out.</b><br>
-        Skins is ${word} against ${word}, and a ${word} on its own wins every hole by
-        default. Give the men a second ${word} on the <b>Setup</b> tab and the skins
-        will run.</div>` +
+    return `<div class="note warn"><b>No skins today — only one ${word} out.</b>
+        Give the men a second ${word} on <b>The round</b>.</div>` +
       (only ? `<div class="contest"><div class="cname"><div class="cn">${esc(named(only.id))}</div>` +
         `<div class="cd">${esc(only.members.join(" & "))}</div></div>` +
         `<div class="pvt" style="text-align:right"><div class="cd">not playing for skins</div></div></div>` : ``);
@@ -3724,10 +4038,7 @@ function skinsSectionHtml(settled){
      otherwise look like the app had lost him. */
   if(settled.left.length){
     html += `<div class="note">Not in the skins: ` +
-      settled.left.map(l => `<b>${esc(l.name)}</b> — ${esc(l.why)}`).join(" · ") +
-      `.<br>A man who did not go round eighteen plays no part in his ${word}'s best
-       two, or a card that stopped at the twelfth would win holes for a ${word}
-       it then walked out on.</div>`;
+      settled.left.map(l => `<b>${esc(l.name)}</b> — ${esc(l.why)}`).join(" · ") + `.</div>`;
   }
 
   // The floor bites once the division would fall under it — at ten skins here.
@@ -3736,25 +4047,14 @@ function skinsSectionHtml(settled){
   html += `<div class="note"><b>${Math.abs(perSkin).toFixed(2)} a skin today` +
     (floored
       ? ` — the least a skin is ever worth.</b><br>
-         ${skinsWon} skins would divide ${Math.abs(config.pot).toFixed(1)} into
-         ${(Math.abs(config.pot) / skinsWon).toFixed(2)} each, which is under the
-         ${Math.abs(config.minSkin).toFixed(1)} floor, so every skin pays
-         ${Math.abs(config.minSkin).toFixed(1)}. On a day like this the round pays out
-         <b>${(skinsWon * Math.abs(config.minSkin)).toFixed(1)}</b> in all rather than
-         ${Math.abs(config.pot).toFixed(1)} — a hole won is a hole won.`
+         ${skinsWon} skins · pot ${Math.abs(config.pot).toFixed(1)} · pays
+         <b>${(skinsWon * Math.abs(config.minSkin)).toFixed(1)}</b> in all.`
       : ` — ${Math.abs(config.pot).toFixed(1)} split ${skinsWon} way${skinsWon===1?"":"s"}.</b><br>
-         The pot is ${Math.abs(config.pot).toFixed(1)} however the round falls, divided
-         among the skins actually won, so a lean day makes each one worth MORE. It never
-         drops below ${Math.abs(config.minSkin).toFixed(1)}, which it would at
-         ${Math.ceil(Math.abs(config.pot) / Math.abs(config.minSkin))} skins or more.`) +
-    `<br>Every man in a winning ${word} takes the full amount; it is not shared out
-     between them.<br>
-     This field plays <b>${format === "team" ? "TEAM" : "CART"} skins</b> —
-     ${settled.fieldSize} players, and ${format === "team"
-       ? "teams are used from " + config.teamFrom + " up"
-       : "carts run from " + config.minPlayers + " to " + (config.teamFrom - 1)}.<br>
-     <b>Skins is played across the whole field</b>, not inside a flight — flights
-     divide the placings and nothing else.</div>`;
+         Never under ${Math.abs(config.minSkin).toFixed(1)}, which it reaches at
+         ${Math.ceil(Math.abs(config.pot) / Math.abs(config.minSkin))} skins.`) +
+    `<br>Every man in a winning ${word} takes the full amount.<br>
+     ${format === "team" ? "TEAM" : "CART"} skins · ${settled.fieldSize} players.<br>` +
+    `Skins is played across the whole field, not inside a flight.</div>`;
 
   html += `<div class="section-label">Hole by hole</div>`;
   html += table.holes.map(h => {
@@ -3771,11 +4071,11 @@ function skinsSectionHtml(settled){
       `</div><div class="pvt">${right}</div></div>`;
   }).join("");
 
-  html += `<div class="note">A ${word}'s score on a hole is its <b>best two net balls</b>,
-    added. Not the average, which handed a threesome a quarter more skins than a
-    foursome — best two means every ${word} puts up exactly two scores whatever its
-    size. A man out on his own counts his ball twice. <b>A tied hole is not won by
-    anybody and nothing carries over.</b></div>`;
+  // The RULE, in a line. Why it is best two rather than the average is in
+  // Settings, under Questions and answers.
+  html += `<div class="note">A ${word}'s score on a hole is its ` +
+    `<b>best two net balls</b>, added. ` +
+    `<b>A tied hole is not won by anybody and nothing carries over.</b></div>`;
 
   return html;
 }
@@ -3802,7 +4102,10 @@ function renderImport(){
            <button type="button" data-m="gross" aria-pressed="${importMode==="gross"}">Gross</button>
          </div>
        </div>
-       <button class="big solid" id="parseBtn">Show what this contains</button>
+       <!-- "Show what this contains" never said what it was FOR. It reads the
+            paste back before a single score is written, which is the whole
+            point of it, and now the label says so. -->
+       <button class="big solid" id="parseBtn">Check paste first</button>
      </div>
      <div id="previewBox"></div>`;
 
@@ -4157,37 +4460,213 @@ function commitImport(){
     else delete state.handicaps[a.player.id];
   });
   // Score entry is the moment: the round is being scored now, and a man who has
-  // not sent his picks in by now is not going to.
+  // not sent his picks in by now is not going to. Both draws are off unless
+  // they were switched on, and each does nothing at all when it is off.
   drawMissingPicks();
+  drawMissingOpponents();
 
   importPreview = null;
   save();
+  renderRound();
   renderBoard();
-  show("board");
+  show("finish");
+}
+
+/* ---------- Settings: the reasoning ----------
+   EVERY PARAGRAPH THAT USED TO SIT ON A WORKING SCREEN IS HERE.
+
+   The three tab screens carried explanations inline — three paragraphs on the
+   skins floor, a note on best two balls, a line about flights, the measured
+   text-message lengths, what the roster is for. All of it was true and none of
+   it was what a man opening the screen was there to do, so it pushed the
+   figures down and got scrolled past.
+
+   The screens carry results. This carries reasoning. It is written to be read
+   once, in a chair, and not on the first tee. */
+
+function drawHowTo(){
+  const box = document.getElementById("howtoBody");
+  if(!box) return;
+  const base = location.href.split("?")[0].split("#")[0]
+    .replace(/leaderboard\.html$/, "picks.html");
+  const step = (n, title, body, tail) =>
+    `<div class="section-label">${n} · ${title}</div><div class="note">${body}</div>` +
+    (tail || "");
+
+  box.innerHTML =
+    step(1, "Keep a roster",
+      `The men on <b>Start a round</b> outlive a round. Building a field is
+       picking names off that list rather than typing them again — a man's index
+       and tee come with him. Correcting one <b>for a round</b> never changes him
+       on the roster, and editing him on the roster never touches a round already
+       scored.`) +
+    step(2, "Start the round, not a rename",
+      `<b>+ Start a new round</b> on Start a round gives an empty field, today's
+       date and the default rules. Renaming the round you are in is a different
+       thing: it keeps every player, every score and every pick, and only the
+       name changes. Old rounds stay in <b>Archive</b>.`) +
+    step(3, "Get the men in",
+      `On <b>The round</b>, under The players: tap the regulars in from the
+       roster, type in anybody new, or paste a tee sheet. Twenty-four is the
+       most a round holds.`) +
+    step(4, "Send the picks",
+      `One button, one link. It carries all the men and their indexes, so each
+       one taps his own name, chooses his nine holes and names his Hit List man,
+       and sends it all back in one message. Over about 219 characters the link
+       is too long to text reliably — e-mail it, the way you e-mail the results.
+       <br><br>
+       It is a snapshot of the field as it stands. Send a fresh one if men join
+       or drop out.<br><br>
+       For a field that is not settled yet there is a plain pick sheet — holes
+       only, every man types his own name, and no Hit List.`,
+      `<div class="pad"><a class="big" href="${esc(base)}">Open the plain pick sheet</a></div>`) +
+    step(5, "Read the picks back",
+      `Paste the messages in, under Watch the birdie or under Hit list — the
+       same box, because one message carries both. <b>Check paste first</b> reads
+       it back to you before a single pick is written.`) +
+    step(6, "Paste the scores",
+      `On <b>Finish a round</b>, copy the player rows out of the Golf Genius
+       leaderboard and paste them in. <b>Check paste first</b> shows what it
+       found and which player each row was matched to, and nothing is written
+       until you say so.`) +
+    step(7, "Send the results",
+      `The bar at the bottom of Finish a round. <b>Picture</b> is what you text —
+       no messenger has a length limit on a photograph, so it always arrives.
+       <b>Email link</b> carries each man's contest breakdown, which a picture
+       cannot.`) +
+    `<div class="section-label">One message a man</div>` +
+    `<div class="note">Where the one link is too much — a man who never opens a
+       link, or a field being chased over two days — <b>One message a man</b> on
+       The round sends each man his own. His link carries only his own eight
+       opponents and no handicap indexes at all, and every send is marked, so you
+       can work through the list over a couple of days and see who is left. A man
+       whose eight have changed since he was sent to is marked again.</div>` +
+    `<div class="section-label">What the men see</div>` +
+    `<div class="note">The link gives them the board, a tap for each man's
+       contest lines, and the four contest summaries. The hole-by-hole skins,
+       the group totals and everything on this screen are yours, on the
+       laptop.</div>`;
+}
+
+function drawQA(){
+  const box = document.getElementById("qaBody");
+  if(!box) return;
+  const q = (question, answer) =>
+    `<div class="section-label">${question}</div><div class="note">${answer}</div>`;
+
+  box.innerHTML =
+    q("Why four contests and not eight?",
+      `The head pro read the rules and said the game was too complicated, and the
+       numbers agreed with him. Measured over 135 rounds, most of the eight were
+       repeating the net score rather than adding to it — Six Pack at +0.69,
+       Triple Threat +0.67, Easy Street +0.38. Eight contests put seven men in
+       <b>90% the same order</b> as the Stableford result. Four takes that
+       agreement down to <b>80%</b>.<br><br>
+       Six Pack and Easy Street are out of the game, the same way Go Long and
+       Get Shorty are. Triple Threat and Bounce Back start off and can be
+       switched on under <b>The rules</b>.`) +
+    q("Why does a man who sent nothing score nothing?",
+      `On Watch the Birdie a man says in advance which holes he fancies, and a
+       drawn set is not a choice. You can switch drawing on — it stops an empty
+       contest reading as a bad round — and the board marks every drawn set as
+       drawn.<br><br>
+       The Hit List is stricter, and its draw starts off and should stay off.
+       Choosing holes affects nobody but the man choosing. Naming an opponent
+       puts <b>another man</b> in it: a drawn opponent would collect the reward
+       for a gamble the player never took, against a man who never agreed to the
+       bet.`) +
+    q("Why is there a floor on the skins?",
+      `Skins need enough of a field to divide. Under eight players there is not
+       enough to divide at all; eight to fifteen plays cart skins; sixteen and up
+       plays team skins. A round where only one group is out has nobody to win a
+       skin from, so none are paid whatever the rules say.<br><br>
+       The floor is a rule of the round rather than a number in the code, so it
+       is under <b>The rules</b> with everything else that moves a score.`) +
+    q("Why best two balls, and not the average?",
+      `A group's score on a hole is its best two net balls added. The average
+       handed a threesome a quarter more skins than a foursome; best two means
+       every group puts up exactly two scores whatever its size. A man out on his
+       own counts his ball twice.<br><br>
+       A man who did not go round eighteen plays no part in his group's best two
+       — or a card that stopped at the twelfth would win holes for a group it
+       then walked out on. A tied hole is not won by anybody and nothing carries
+       over.`) +
+    q("How is a skin priced?",
+      `The pot is the same however the round falls, divided among the skins
+       actually won — so a lean day makes each one worth <b>more</b>. It never
+       drops below the floor, which is why a heavy day pays out more than the pot
+       rather than shaving every skin: a hole won is a hole won.<br><br>
+       Skins is played across the whole field, not inside a flight.`) +
+    q("What is a flight?",
+      `A way of dividing the field so that placings are settled within a group
+       rather than across the whole round. Flights divide the placings and the
+       card match and <b>nothing else</b>: the contests are graded against fixed
+       thresholds, and skins and the Hit List are settled across the whole field.
+       A contest board cut to a flight would disagree with the figure on the
+       man's own card.`) +
+    q("Why five men on a board?",
+      `Five means something different at eight players than at eighty, which is
+       why it is a setting rather than a number in the code. The depth is a
+       <b>floor, never a ceiling</b>: every man level with the last one shown is
+       shown as well. If six share third place all six appear and the board says
+       so — cutting a tie off at five looks broken, and ties are common here. On
+       an average round 2.5 men share the top of Agony Alley, 2.8 the Hit List
+       and 4.3 Team Skins.`) +
+    q("Why does the link sometimes have to be e-mailed?",
+      `Measured on this club's own phone, through iOS Messages: links of 154,
+       159, 190 and 219 characters arrived first time; 250 and 299 each failed
+       once and arrived on a second attempt; 350 failed twice. A link that works
+       on the second try is not good enough, so anything over 219 characters is
+       an e-mail. A field link passes 219 at about six men.<br><br>
+       The board <b>picture</b> has no length limit anywhere, which is why it is
+       the thing to text.`) +
+    q("How private is a shared link?",
+      `Treat it as public. The round rides inside the address and is obfuscated,
+       not encrypted — nothing is legible at a glance, but anyone who pastes it
+       into a decoder has the names back in seconds. The same names and scores
+       are already on the club's Golf Genius portal, and a password to type would
+       defeat the one thing the link is for.`) +
+    q("Why did an old round's total move?",
+      `A round stores only what was <b>changed</b> from the default rules, not a
+       copy of all of them. When the game was cut from eight contests to four the
+       defaults changed, so a round saved before that re-opens scored under the
+       four — its Six Pack and Easy Street lines are simply gone. Switch those
+       contests back on for that event under <b>The rules</b> to score it the old
+       way; their values are unchanged from when it was played.`);
 }
 
 /* ---------- wiring ---------- */
-document.getElementById("backBtn").addEventListener("click", () => { renderBoard(); show("board"); });
-document.getElementById("editBack").addEventListener("click", () => { editing = null; renderSetup(); show("setup"); });
+document.getElementById("backBtn").addEventListener("click", () => { renderBoard(); show("finish"); });
+document.getElementById("editBack").addEventListener("click", () => { editing = null; renderSetup(); show("round"); });
 document.getElementById("addBtn").addEventListener("click", () => {
   if(state.players.length >= MAX_PLAYERS) return;
   editPlayer(null);
 });
-// The three pastes are fold contents now, built when their step is opened.
-// The roster and the rules are behind the gear now, so Back returns there.
-document.getElementById("goRoster").addEventListener("click", () => { renderRoster(); show("roster"); });
-document.getElementById("rosterBack").addEventListener("click", () => { drawFoldSubs(); show("more"); });
+
+/* STARTING A ROUND IS OUT IN THE OPEN, on Start a round, and it is static
+   markup rather than something drawn — it must be there whether or not any
+   section has been opened. */
+document.getElementById("fNewEvent").addEventListener("click", addEvent);
+
 document.getElementById("goInvites").addEventListener("click", () => {
-  // The pick-sheet links live on this screen now and are drawn with it.
-  showPickLinkBox(); renderInvites(); show("invites");
+  renderInvites(); show("invites");
 });
-document.getElementById("invitesBack").addEventListener("click", () => { renderSetup(); show("setup"); });
+document.getElementById("invitesBack").addEventListener("click", () => { renderRound(); show("round"); });
+
+/* ---- the gear ---- */
 document.getElementById("goRules").addEventListener("click", () => {
   draft = null; renderSettings(); show("settings");
 });
 document.getElementById("settingsBack").addEventListener("click", () => {
   draft = null; renderSetup(); renderBoard(); drawFoldSubs(); show("more");
 });
+document.getElementById("goHowTo").addEventListener("click", () => { drawHowTo(); show("howto"); });
+document.getElementById("howtoBack").addEventListener("click", () => show("more"));
+document.getElementById("goQA").addEventListener("click", () => { drawQA(); show("qa"); });
+document.getElementById("qaBack").addEventListener("click", () => show("more"));
+document.getElementById("goArchive").addEventListener("click", () => { renderArchive(); show("archive"); });
+document.getElementById("archiveBack").addEventListener("click", () => show("more"));
+
 // Re-fit names when the viewport changes (rotation, split-view, browser resize).
 window.addEventListener("resize", fitBoardNames);
 

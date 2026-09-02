@@ -216,17 +216,23 @@ test("a tee sheet pastes sixteen at a time, and mixes with the old shapes", () =
 
 const APP = readFileSync(new URL("../leaderboard.html", import.meta.url), "utf8");
 
-test("a new round is a visible action on Setup", () => {
+test("a new round is a visible action, out in the open on Start a round", () => {
   /* IT EXISTED AND WAS HIDDEN. "+ New event" sat in `drawMoveBox` — the
      export/copy/paste/delete box — which went behind the gear when the tabs
-     were cut to three. So starting a round was three taps from Setup under a
-     heading that reads like a file menu. Rob went looking on Setup, did not
-     find it, and renamed the round instead, which keeps every player. */
-  const box = APP.slice(APP.indexOf("function drawEventBox"), APP.indexOf("function drawMoveBox"));
-  assert.match(box, /id="fNewEvent"/, "on Setup, in Event settings");
-  assert.match(box, /Start a new round/);
-  assert.match(box, /Renaming is not starting a new round/,
-    "and the rename field must say what it is not");
+     were cut to three. So starting a round was three taps under a heading that
+     reads like a file menu. Rob went looking, did not find it, and renamed the
+     round instead, which keeps every player.
+
+     IT IS STATIC MARKUP NOW, on Start a round and outside every fold, so it is
+     on the screen whether or not a section has been opened. */
+  const screen = APP.slice(APP.indexOf('<section id="start"'), APP.indexOf('<section id="round"'));
+  assert.match(screen, /id="fNewEvent"/, "on Start a round");
+  assert.match(screen, /Start a new round/);
+  assert.match(screen, /Renaming a round is not starting one/,
+    "and the screen must say what a rename is not");
+  // Outside the folds: everything after the last </details> on that screen.
+  const afterFolds = screen.slice(screen.lastIndexOf("</details>"));
+  assert.match(afterFolds, /id="fNewEvent"/, "not inside a section that has to be opened");
 });
 
 test("only one New event control, so neither can shadow the other", () => {

@@ -150,7 +150,10 @@ test("an empty roster says so in a line, rather than leaving a blank", () => {
   const fn = html.slice(html.indexOf("function drawRosterPick"), html.indexOf("function refreshFieldBoxes"));
   assert.match(fn, /if\(men\.length === 0\)\{/);
   assert.match(fn, /Nobody on the roster yet/);
-  assert.match(fn, /⚙ Settings › The roster/, "and says where to go and what to do");
+  // The roster came out from behind the gear and onto Start a round, so the
+  // pointer had to move with it — a line that sends a man to the wrong screen
+  // is worse than no line.
+  assert.match(fn, /Start a round › The roster/, "and says where to go and what to do");
 });
 
 test("a full round says so rather than letting taps do nothing", () => {

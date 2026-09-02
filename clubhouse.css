@@ -24,8 +24,33 @@
     --tint-event: #dfeee1;   /* Event settings */
     --tint-move: #dee8f3;    /* Move this event */
     --tint-about: #eae7f2;   /* About */
+
+    /* ---- A COLOR PER TAB, CARRIED THROUGH THE SCREEN ----
+       Three tabs named for the stages of a round, and each one's color runs
+       from the lit tab into that screen's section headings, so a glance says
+       where you are before a word is read.
+
+       COLOR IS NEVER THE ONLY SIGNAL. The tab is named, the heading is named,
+       and the lit tab is also the solid one — these fills are here to make the
+       screen recognizable at arm's length in sun, not to carry meaning that is
+       written nowhere else. Every one keeps its text above the contrast the
+       rest of the app holds to.
+
+       Taken from the palette this app already uses rather than invented. */
+    --sand: #FAEEDA;   --sand-ink: #412402;  --sand-sub: #854F0B;
+    --teal: #E1F5EE;   --teal-ink: #04342C;  --teal-sub: #0F6E56;
+    --slate: #F1EFE8;  --slate-ink: #2C2C2A; --slate-sub: #5F5E5A;
+
+    /* The tab a screen is drawn in. Each `section.tab` sets these three, and
+       everything below reads them rather than naming a color of its own. */
+    --tab-fill: var(--paper);
+    --tab-ink: var(--ink);
+    --tab-sub: var(--ink);
     font-size: 20px;
   }
+  #start  { --tab-fill: var(--sand);  --tab-ink: var(--sand-ink);  --tab-sub: var(--sand-sub); }
+  #round  { --tab-fill: var(--teal);  --tab-ink: var(--teal-ink);  --tab-sub: var(--teal-sub); }
+  #finish { --tab-fill: var(--slate); --tab-ink: var(--slate-ink); --tab-sub: var(--slate-sub); }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; background: var(--paper); color: var(--ink); }
   body {
@@ -60,27 +85,47 @@
      above it. It carries the WORD as well as the shape — an unlabeled icon is
      a guess, and a tooltip is no use on a phone, where nothing hovers. */
   button.gear {
-    margin-left: auto; flex: 0 0 auto; order: 2;
+    flex: 0 0 auto;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 2px; min-height: 56px; min-width: 56px; padding: 4px 10px;
-    font: inherit; font-size: 26px; line-height: 1;
-    background: transparent; color: #fff;
-    border: 2px solid rgba(255,255,255,.55); border-radius: 10px; cursor: pointer;
+    gap: 1px; min-height: 56px; min-width: 88px; padding: 4px 10px;
+    font: inherit; font-size: 22px; line-height: 1;
+    /* The WORD has to fit beside the shape. At 64px wide the label spilled out
+       of the button on a laptop, where the tabs take the slack and this takes
+       only its minimum. */
+    white-space: nowrap;
+    background: var(--paper); color: var(--ink);
+    border: 0; border-left: 3px solid var(--ink); border-radius: 0; cursor: pointer;
   }
   button.gear span { font-size: 18px; font-weight: 800; }
-  button.gear:active { background: #fff; color: var(--band); }
+  button.gear:active { background: var(--ink); color: var(--paper); }
   button.gear:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
 
-  /* Tabs — the three places you can be */
-  nav.tabs { display: flex; border-bottom: 3px solid var(--ink); }
+  /* ---- THE BAR, FIXED AT THE TOP ----
+     It used to sit under a green band carrying a title that said the same word
+     as the lit tab below it, and the whole lot scrolled away — so switching
+     tabs from the bottom of a long board meant scrolling back up first. The
+     band is gone and the bar stays put, on the laptop and on the phone.
+
+     Sticky rather than fixed: sticky keeps its place in the flow, so nothing
+     below it has to be pushed down by a margin that has to be kept in step with
+     the bar's own height. */
+  .topbar {
+    position: sticky; top: 0; z-index: 20;
+    display: flex; align-items: stretch;
+    background: var(--tab-fill);
+    border-bottom: 3px solid var(--ink);
+  }
+  nav.tabs { display: flex; flex: 1 1 auto; min-width: 0; }
   nav.tabs button {
-    flex: 1 1 0; min-height: 56px; padding: 12px 6px;
-    font: inherit; font-size: 18px; font-weight: 800;
+    flex: 1 1 0; min-width: 0; min-height: 56px; padding: 10px 4px;
+    font: inherit; font-size: 18px; font-weight: 800; line-height: 1.15;
     background: var(--paper); color: var(--ink);
     border: 0; border-right: 3px solid var(--ink); cursor: pointer;
+    overflow-wrap: break-word;
   }
-  nav.tabs button:last-child { border-right: 0; }
   nav.tabs button[aria-current="true"] { background: var(--ink); color: var(--paper); }
+  /* The flight picker keeps the old plain bar; only the tab bar is tinted. */
+  nav.flights { background: var(--paper); }
 
   /* Flight picker — only drawn when the field is actually divided */
   nav.flights { display: flex; flex-wrap: wrap; border-bottom: 3px solid var(--ink); }
@@ -260,19 +305,6 @@
      their label on their own; anchors do not. */
   a.big { text-align: center; text-decoration: none; }
 
-  /* Setup: the two things checked first, before anything is opened — how many
-     men are in, and whether their cards have arrived. */
-  .status { display: flex; border-bottom: 3px solid var(--ink); }
-  .status .stat {
-    flex: 1 1 0; min-width: 0; padding: 12px 14px;
-    border-right: 3px solid var(--ink);
-  }
-  .status .stat:last-child { border-right: 0; }
-  .status .statn { font-size: 30px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.1; }
-  .status .statl { font-size: 18px; font-weight: 800; text-transform: uppercase; letter-spacing: .4px; margin-top: 2px; }
-  /* Amber says "not yet"; the words say it too, so the tint is never the signal. */
-  .status .stat.wait { background: var(--amberwash); box-shadow: inset 0 -6px 0 var(--amber); }
-
   /* Collapsed sections — the settings, the transfers and the build line, each
      out of the way until wanted. Native <details>, so it needs no script, works
      offline and reads correctly to VoiceOver. */
@@ -294,7 +326,6 @@
     display: block; font-size: 18px; font-weight: 700; margin-top: 3px;
   }
   details.fold > summary .fname { display: block; }
-  #foldEvent > summary { background: var(--tint-event); }
   #foldMove  > summary { background: var(--tint-move); }
   #foldAbout > summary { background: var(--tint-about); }
 
@@ -451,3 +482,85 @@
   table.card tr.hn th { background: var(--wash); font-size: 18px; }
   table.card td.blank { color: var(--ink); }
   table.card td.xup { background: var(--ink); color: var(--paper); }
+
+  /* ================= THE THREE TAB SCREENS =================
+     Each one's color runs from its lit tab into the headings under it. The
+     fills are pale enough to keep black text at full contrast in Florida sun,
+     and nothing here is the only thing saying what a section is — every
+     heading is named and every shut line says where it stands. */
+
+  /* The round this screen is about, under the bar. Not sticky: the bar has to
+     stay and this does not. */
+  .roundline {
+    padding: 12px 18px; font-size: 18px; font-weight: 800;
+    background: var(--tab-fill); color: var(--tab-ink);
+    border-bottom: 3px solid var(--ink);
+  }
+
+  /* A section heading on a tab screen takes that tab's color. */
+  section.tab details.fold > summary { background: var(--tab-fill); color: var(--tab-ink); }
+  section.tab details.fold[open] > summary { background: var(--paper); color: var(--ink); }
+  section.tab details.fold > summary .fsub { color: var(--tab-sub); }
+  section.tab details.fold[open] > summary .fsub { color: var(--ink); }
+  section.tab button.fold.go { background: var(--tab-fill); color: var(--tab-ink); }
+  section.tab button.fold.go .fsub { color: var(--tab-sub); }
+  section.tab button.fold.go:active { background: var(--ink); color: var(--paper); }
+  section.tab button.fold.go:active .fsub { color: var(--paper); }
+  section.tab .section-label { color: var(--tab-ink); }
+  /* A wrong line is red wherever it is — a tab's color must never quieten it. */
+  section.tab .fsub.wrong { color: var(--penalty); }
+
+  /* AN ACTION OUT IN THE OPEN — "Start a new round", "Send the picks". Not in a
+     fold, because a thing done every round should not have to be found first. */
+  .pad.act { background: var(--tab-fill); border-bottom: 3px solid var(--ink); }
+  .undertext {
+    margin-top: 10px; font-size: 18px; font-weight: 700; line-height: 1.35;
+    color: var(--tab-ink);
+  }
+
+  /* The explanatory line under a field. It was written inline at 18px in six
+     places and drifted; it is one rule now, and it is the ONLY prose left on a
+     working screen — a figure or a consequence, never a paragraph. */
+  .cd { margin-top: 10px; font-size: 18px; font-weight: 700; line-height: 1.35; }
+  .cd.wrong { color: var(--penalty); }
+
+  /* ---- the board's collapse control ----
+     Drawn at BOTH ends of the list. At eighty players a control only at the
+     bottom leaves a man eighty rows from the way back. */
+  button.boardmore {
+    display: block; width: 100%; min-height: 56px; padding: 14px;
+    font: inherit; font-size: 20px; font-weight: 800;
+    background: var(--tab-fill); color: var(--tab-ink);
+    border: 0; border-bottom: 3px solid var(--ink); cursor: pointer;
+  }
+  button.boardmore:active { background: var(--ink); color: var(--paper); }
+
+  /* ---- SHARE, FIXED AT THE BOTTOM OF FINISH A ROUND ----
+     It used to sit under the four contest boards, at the end of the longest
+     screen in the app, so finishing a round meant scrolling past everything to
+     reach the two buttons that end it.
+
+     FIXED, not sticky: sticky would still need the whole page scrolled to the
+     bottom before it appeared. The screen is given padding to match, so the
+     last board is never left under the bar. */
+  .sharebar { display: none; }
+  .sharebar.on {
+    display: flex; gap: 0;
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+    background: var(--paper);
+    border-top: 3px solid var(--ink);
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+  .sharebtn {
+    flex: 1 1 0; min-height: 60px; padding: 14px 8px;
+    font: inherit; font-size: 20px; font-weight: 800;
+    background: var(--paper); color: var(--ink);
+    border: 0; border-right: 3px solid var(--ink); cursor: pointer;
+  }
+  .sharebtn:last-child { border-right: 0; }
+  .sharebtn:active { background: var(--ink); color: var(--paper); }
+  /* Room for the bar, so the last thing on the screen is never under it. */
+  section.tab.hasbar { padding-bottom: 96px; }
+
+  /* The "open" mark beside the round in the Archive. */
+  button.fold.go .tag { font-size: 18px; vertical-align: 2px; }

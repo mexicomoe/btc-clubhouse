@@ -351,6 +351,7 @@ test("ordinals read the way a man says them", () => {
 /* ---- and the screen actually draws them ---- */
 
 const html = readFileSync(new URL("../leaderboard.html", import.meta.url), "utf8");
+const css = readFileSync(new URL("../clubhouse.css", import.meta.url), "utf8");
 
 test("the Leaders screen draws a board for every contest in play", () => {
   assert.match(html, /<div id="boards"><\/div>/, "there is somewhere to put them");
@@ -375,16 +376,19 @@ test("the picture carries the boards too", () => {
 });
 
 /* ---- three tabs and a gear ----
-   Setup held twelve items and one tab carried everything. The cut to four
-   contests also left the Skins tab redundant: it existed because Skins was the
-   only contest with hole-by-hole detail, and there are four contest boards on
-   Leaders now. So this removed a tab rather than adding one. */
+   The old three were named for the app's own machinery — Leaders, Setup,
+   Import — so a man had to know which one held the thing he wanted. These are
+   named for the stages of a round. */
 
-test("three tabs, and the fourth did not creep back", () => {
+test("three tabs, named for the stages of a round, and no fourth", () => {
   const tabs = html.split("\n").find((l) => l.includes("const TAB_LABELS ="))!;
   assert.equal((tabs.match(/\["/g) || []).length, 3, "three labels: " + tabs);
-  for (const label of ["Leaders", "Setup", "Import"]) assert.ok(tabs.includes(label), label);
-  assert.equal(tabs.includes("Skins"), false, "Skins is a section on Leaders now");
+  for (const label of ["Start a round", "The round", "Finish a round"]) {
+    assert.ok(tabs.includes(label), label);
+  }
+  for (const gone of ["Leaders", "Setup", "Import", "Skins"]) {
+    assert.equal(tabs.includes(gone), false, gone + " is not a tab any more");
+  }
 });
 
 test("the gear is labeled, not just an icon", () => {
@@ -394,42 +398,128 @@ test("the gear is labeled, not just an icon", () => {
   assert.equal((html.match(/class="gear"/g) || []).length, 3, "one on each of the three tabs");
 });
 
-test("every item off the old four tabs is still reachable", () => {
-  // Nothing was renamed and no action was dropped — only moved.
-  const reachable = [
-    // Setup, as it was
-    "Add player", "Paste a list of players", "Paste birdie picks", "Set the Hit List",
-    "Event settings", "Send the invitations", "The player list",
-    // moved behind the gear
-    "The roster", "The rules", "Move this event", "About",
-    // moved onto the invitations screen
-    "Open the pick sheet",
-  ];
-  for (const item of reachable) {
-    assert.ok(html.includes(">" + item + "<") || html.includes(item),
-      item + " is no longer anywhere in the app");
+test("the bar and the gear are in one sticky block, so neither scrolls away", () => {
+  // The green band used to carry the gear and scroll off with it, which put
+  // Settings out of reach from the bottom of a long board.
+  for (const id of ["start", "round", "finish"]) {
+    const screen = html.slice(html.indexOf(`<section id="${id}"`));
+    const bar = screen.slice(0, screen.indexOf("</div>", screen.indexOf('class="topbar"')) + 6);
+    assert.match(bar, /<nav class="tabs" data-tabs><\/nav>/, id + " has the tabs in the bar");
+    assert.match(bar, /class="gear"/, id + " has the gear in the same bar");
   }
-  // And the screens they live on all exist.
-  for (const id of ["board", "setup", "import", "more", "roster", "invites", "settings"]) {
-    assert.match(html, new RegExp('<section id="' + id + '"'), id);
-  }
-  assert.equal(/<section id="skins"/.test(html), false, "the Skins screen is gone");
+  assert.match(css, /\.topbar \{[^}]*position: sticky;[^}]*top: 0;/,
+    "and the bar is stuck to the top");
 });
 
-test("a tab name stored by an older build cannot white-screen the app", () => {
-  // "skins" was a tab, and every phone that opened it has the word in storage.
-  // show() runs against it before anything is drawn.
-  assert.match(html, /if\(!document\.getElementById\(id\)\) id = "board";/);
+test("every item off the old four tabs is still reachable", () => {
+  // Nothing was dropped — only moved, and renamed where the old name was the
+  // app's word for it rather than Rob's.
+  const reachable = [
+    // Start a round
+    "The roster", "Paste a list", "The round", "Start a new round",
+    // The round
+    "The players", "Type a player in", "Paste a list of players", "The player cards",
+    "Watch the birdie", "Hit list", "Draw missing picks", "One message a man",
+    // Finish a round
+    "Paste the scores", "Check paste first",
+    // behind the gear
+    "The rules and their values", "How to run Clubhouse", "Questions and answers",
+    "Move this event", "About", "Archive",
+    // and the plain sheet, which lost its button on The round
+    "Open the plain pick sheet",
+  ];
+  for (const item of reachable) {
+    assert.ok(html.includes(item), item + " is no longer anywhere in the app");
+  }
+  // And the screens they live on all exist.
+  for (const id of ["start", "round", "finish", "more", "settings", "howto", "qa",
+                    "archive", "invites", "player", "edit"]) {
+    assert.match(html, new RegExp('<section id="' + id + '"'), id);
+  }
+  for (const gone of ["skins", "board", "setup", "import", "roster"]) {
+    assert.equal(new RegExp('<section id="' + gone + '"').test(html), false,
+      gone + " is not a screen any more");
+  }
+});
+
+/* ---- THE WHITE SCREEN, THE SECOND TIME ----
+   The last restructure left a guard that rewrote an unknown tab name to
+   "board". Renaming the screens took the fallback away with everything else —
+   so the guard would have pointed at a screen that no longer existed, nothing
+   would have taken the `on` class, and the app would have drawn a white page
+   for exactly the reason it did before. */
+
+test("every tab name this app has ever stored maps to a screen that exists", () => {
+  const map = html.slice(html.indexOf("const TAB_ALIASES ="),
+                         html.indexOf("}", html.indexOf("const TAB_ALIASES =")));
+  const sections = new Set([...html.matchAll(/<section id="([a-z]+)"/g)].map((m) => m[1]));
+  for (const old of ["setup", "board", "import", "skins"]) {
+    const to = new RegExp(old + ':\\s*"([a-z]+)"').exec(map);
+    assert.ok(to, old + " has no alias, so a phone holding it has nowhere to go");
+    assert.ok(sections.has(to![1]), old + " maps to " + to![1] + ", which is not a screen");
+  }
+});
+
+test("the fallback is not a hardcoded screen name that a rename can take away", () => {
+  const fn = html.slice(html.indexOf("function screenFor("), html.indexOf("function show("));
+  assert.match(fn, /if\(document\.getElementById\(want\)\) return want;/, "the wanted screen first");
+  assert.match(fn, /TABS\[0\]/, "then the first tab, whatever it is called");
+  assert.match(fn, /SCREENS\.find\(s => document\.getElementById\(s\)\)/,
+    "and then anything at all that exists");
+  assert.equal(/return "board"/.test(fn), false, "never a name written down here");
+});
+
+test("show() cannot throw on a screen that is not in the document", () => {
+  const fn = html.slice(html.indexOf("function show(id){"), html.indexOf("/** All three, always. */"));
+  assert.match(fn, /const want = screenFor\(id\);/);
+  assert.match(fn, /if\(!want\) return;/, "nothing to show is not an exception");
+  // The old loop called .classList on whatever getElementById returned.
+  assert.match(fn, /const el = document\.getElementById\(s\);\s*\n\s*if\(el\)/,
+    "every element is checked before it is touched");
+});
+
+test("a stored tab is carried through the loader rather than thrown away", () => {
+  const fn = html.slice(html.indexOf("function normalizeEvent("), html.indexOf("function currentEvent("));
+  assert.match(fn, /tab: typeof e\.tab === "string" && e\.tab \? e\.tab : "round"/,
+    "the word survives; screenFor is the only thing that decides what it means");
+});
+
+/* ---- the board, five deep ---- */
+
+test("the board is not a fold, so the accordion cannot shut it", () => {
+  const board = html.slice(html.indexOf('<section id="finish"'), html.indexOf('<section id="more"'));
+  assert.match(board, /<div id="rows"><\/div>/, "the rows are plain markup");
+  /* AND NOT INSIDE ONE. There is a fold above the board now — Paste the scores
+     — so "is there a <details> before the rows" is no longer the question. The
+     question is whether every one of them is CLOSED before the rows begin. */
+  const before = board.slice(0, board.indexOf('<div id="rows">'));
+  assert.equal((before.match(/<details/g) || []).length,
+               (before.match(/<\/details>/g) || []).length,
+    "every section above the board is closed before the rows start");
+});
+
+test("five men, and the control at both ends of the list", () => {
+  const board = html.slice(html.indexOf('<section id="finish"'), html.indexOf('<section id="more"'));
+  assert.ok(board.indexOf('id="boardMoreTop"') < board.indexOf('id="rows"'), "one above");
+  assert.ok(board.indexOf('id="rows"') < board.indexOf('id="boardMoreBot"'), "and one below");
+
+  assert.match(html, /const BOARD_SHOWN = 5;/);
+  const fn = html.slice(html.indexOf("function drawBoardMore("), html.indexOf("/**\n * THE SHUT LINE FOR ONE CONTEST"));
+  assert.match(fn, /const label = boardOpen \? "Show fewer" : hidden \+ " more";/,
+    "it says the figure when shut and the way back when open");
+  assert.match(fn, /top\.innerHTML = html;\s*\n\s*bot\.innerHTML = html;/,
+    "both ends, in both states — a control that moves has to be found again");
+});
+
+test("the share bar is fixed at the bottom of Finish a round", () => {
+  const board = html.slice(html.indexOf('<section id="finish"'), html.indexOf('<section id="more"'));
+  assert.match(board, /<div class="sharebar" id="shareBox"><\/div>/);
+  assert.match(css, /\.sharebar\.on \{[^}]*position: fixed;[^}]*bottom: 0;/);
+  assert.match(css, /section\.tab\.hasbar \{ padding-bottom:/,
+    "and the screen leaves room, so the last board is not under it");
 });
 
 /* ---- the Leaders accordion ---- */
-
-test("the board is not a fold, so the accordion cannot shut it", () => {
-  const board = html.slice(html.indexOf('<section id="board"'), html.indexOf('<section id="more"'));
-  assert.match(board, /<div id="rows"><\/div>/, "the rows are plain markup");
-  assert.equal(/<details[^>]*>\s*<summary>[^]*?<div id="rows">/.test(board), false,
-    "and not inside a <details>");
-});
 
 test("the two accordions never close each other", () => {
   // Setup's rule closes every `details.fold.step` in the document. The Leaders
