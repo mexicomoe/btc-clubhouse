@@ -19,9 +19,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   scoreEntry,
+  scorePredictionPoints,
   inningsPitched,
   pitcherFP,
   emptyBlock,
+  type Arrival,
   type BatterBlock,
   type Entry,
 } from "./scoring.ts";
@@ -249,4 +251,55 @@ test("Block 2 for CLEANUP is impossible as entered: 2 hits in 1 at-bat", () => {
   const combined = { ...APRIL_21.batters.CLEANUP.pre };
   assert.equal(combined.ab + post.ab, 3);
   assert.ok(combined.h + post.h <= combined.ab + post.ab);
+});
+
+/* ════════════════════ 5. THE SCORE-PREDICTION RULE, PINNED ════════════════════
+ *
+ * Confirmed 11 September: the tier is measured on the MARGIN. April 21 alone
+ * cannot prove that — its margin error (3) and its best-side error (2) both land
+ * in the same band — so the cases below are chosen so the three candidate
+ * readings disagree. If someone later "fixes" the function to measure a side,
+ * these fail loudly instead of drifting.
+ */
+
+const pp = (pw: number, pl: number, aw: number, al: number, arrival: Arrival = "ON TIME") =>
+  scorePredictionPoints({ winner: pw, loser: pl }, { winner: aw, loser: al }, arrival);
+
+test("score prediction is measured on the margin, not on either team's runs", () => {
+  // Both totals off by 5, margin off by 0. Margin says 8; a side reading says 1.
+  assert.equal(pp(5, 4, 10, 9), 8);
+
+  // Margin off by 9, but the loser's total is off by only 4.
+  // Margin says 0; a best-side reading says 1.
+  assert.equal(pp(10, 0, 5, 4), 0);
+
+  // April 21 itself: margin off 3 (-> 4), worst side off 5 (-> 1), best side
+  // off 2 (-> 4). The sheet paid 4, which rules out the worst-side reading and
+  // leaves margin, now confirmed.
+  assert.equal(pp(7, 4, 12, 6), 4);
+});
+
+test("exact score is its own tier, checked before the margin", () => {
+  assert.equal(pp(12, 6, 12, 6), 12);       // both numbers right
+  assert.equal(pp(13, 7, 12, 6), 8);        // margin right, runs wrong -> 8, never 12
+  assert.equal(pp(12, 6, 12, 6, "LATE"), 6);
+});
+
+test("tier boundaries, on-time and late", () => {
+  // Actual margin 6. Walk the predicted margin out from it one run at a time.
+  assert.equal(pp(12, 6, 12, 6), 12);  // exact
+  assert.equal(pp(13, 7, 12, 6), 8);   // off 0
+  assert.equal(pp(8, 3, 12, 6), 8);    // off 1
+  assert.equal(pp(8, 4, 12, 6), 4);    // off 2
+  assert.equal(pp(7, 4, 12, 6), 4);    // off 3
+  assert.equal(pp(7, 5, 12, 6), 1);    // off 4
+  assert.equal(pp(6, 5, 12, 6), 1);    // off 5
+  assert.equal(pp(6, 6, 12, 6), 0);    // off 6 — nothing
+  assert.equal(pp(1, 6, 12, 6), 0);    // off 11 — no floor below zero either
+
+  // Late arrival halves the scale, except the 1 which has nowhere to go.
+  assert.equal(pp(13, 7, 12, 6, "LATE"), 4);
+  assert.equal(pp(7, 4, 12, 6, "LATE"), 2);
+  assert.equal(pp(6, 5, 12, 6, "LATE"), 1);
+  assert.equal(pp(6, 6, 12, 6, "LATE"), 0);
 });

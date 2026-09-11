@@ -23,15 +23,20 @@ export function winnerPoints(correct: boolean, arrival: Arrival): number {
 /**
  * Score prediction: 12 / 8 / 4 / 1 on-time, 6 / 4 / 2 / 1 late.
  *
- * THE RULEBOOK IS UNDERSPECIFIED HERE and the sheet does not say what "within
- * 3 runs" is measured against. Three readings are possible for a 7-4 call on a
- * 12-6 game — worst side error (5), best side error (2), or margin error
- * (|3-6| = 3) — and two of them land in the same tier, so one game cannot tell
- * them apart. MARGIN ERROR is implemented because it is the only reading that
- * scores a prediction as a prediction of the game rather than of one team, and
- * it reproduces the simulator here. If the Sheet formula turns out to use a
- * different measure, this is the function to change; the tier table is right
- * either way.
+ * MEASURED ON THE MARGIN. Confirmed by Rob, 11 September: "within 3 runs" means
+ * within 3 of the RUN DIFFERENTIAL, not of either team's total. A 7-4 call on a
+ * 12-6 game predicted the winner by 3 and got a winner by 6 — off by 3, so the
+ * middle tier.
+ *
+ * The two readings this is NOT are worth naming, because April 21 cannot tell
+ * them apart and a later test written from that one game could quietly adopt the
+ * wrong one: it is not the worst side error (5 here, which would pay 1) and not
+ * the best side error (2 here, which also pays 4 and is the dangerous twin).
+ * `redsRays_2026-04-21.test.ts` pins cases where all three diverge.
+ *
+ * NOTE ON THE TOP TIER: exact score is checked first and separately, so a call
+ * that nails the margin but not the runs — 13-7 on a 12-6 game — lands on the
+ * "within 1" tier at 8, not on 12. Only two matching numbers pay 12.
  */
 export function scorePredictionPoints(
   predicted: { winner: number; loser: number },
