@@ -3,9 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Beat the Crowd · Clubhouse — scoring engine",
+  "description": "Beat the Crowd \u00b7 Clubhouse \u2014 scoring engine",
   "scripts": {
-    "test": "node --test \"test/**/*.test.ts\""
+    "test": "node --test \"test/**/*.test.ts\" \"btc_baseball_scoring/**/*.test.ts\"",
+    "test:baseball": "node --test \"btc_baseball_scoring/**/*.test.ts\""
   },
   "engines": {
     "node": ">=22.6"
