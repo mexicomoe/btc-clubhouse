@@ -158,6 +158,8 @@ th.nm,td.nm{text-align:left;width:86px;padding-left:4px;font-size:18px;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 thead th{background:var(--ink);color:var(--paper);}
 tr.par td,tr.par th{font-weight:600;}
+td.mine{background:var(--waitfill);color:var(--wait);}
+#cardLegend{font-size:18px;font-weight:700;color:var(--wait);margin:10px 0 0;}
 #cardStamp{font-size:18px;font-weight:600;margin:10px 0 0;}
 footer{margin:22px 0 10px;border-top:3px solid var(--ink);padding-top:12px;}
 
@@ -249,6 +251,7 @@ footer{margin:22px 0 10px;border-top:3px solid var(--ink);padding-top:12px;}
 <section id="screenCard" class="hide">
   <h1 id="cardHead"></h1>
   <div id="cardBody"></div>
+  <p id="cardLegend" class="hide"></p>
   <p id="cardStamp"></p>
   <footer>
     <button id="cardToScore" class="wide plain hide">Back to scoring</button>
@@ -661,6 +664,37 @@ function prettyCell(v){
 }
 
 /**
+ * ONE CELL OF THE TEAM CARD — THE FEED FIRST, THIS PHONE SECOND.
+ *
+ * The feed runs about five minutes behind Google's publish cache. For
+ * seventeen holes nobody minds. On the eighteenth they do: the captain sends
+ * the last hole, the men crowd round the phone, and the card shows the round
+ * as it stood five minutes ago while they are settling up.
+ *
+ * So a hole this phone has filed is drawn straight away — but drawn DIFFERENT.
+ * The sheet is the authority and a score only this phone has seen is not the
+ * same fact as a score the sheet has taken, and this page has refused to blur
+ * that distinction anywhere else. It is marked as "on this phone, not yet on
+ * the board", in the same amber the hole grid uses for a hole still waiting to
+ * go, so a captain learns one colour rather than two.
+ *
+ * THE FEED ALWAYS WINS when it has anything to say. If Rob has edited a hole
+ * on the sheet, his number is the number, and this phone's copy of what it
+ * sent is simply out of date.
+ */
+function cardCell(seat,hole,mine){
+  var v=seat.holes[hole-1];
+  if(v!=null) return {v:String(v),mine:false};
+  var m=(mine&&mine[hole])?mine[hole][seat.seat]:null;
+  return m==null?{v:"",mine:false}:{v:String(m),mine:true};
+}
+
+/** What this phone has filed for one team, by hole. */
+function mineForTeam(all,team){
+  return (all&&all[team])?all[team]:{};
+}
+
+/**
  * ONE SEND'S NAME. A team and a hole, nothing else — so a second tap on Send
  * cannot make a second job, however fast the tap, and a reload part-way
  * through finds the same job rather than a twin of it.
@@ -730,6 +764,7 @@ var S={
   scores:{},        /* seat -> score, for the hole on screen */
   leftAt:{},        /* seat -> the hole from which he is out */
   acked:{},         /* hole -> true, sends this phone saw land */
+  mine:{},          /* team -> hole -> seat -> score, what this phone filed */
   unlocked:false,   /* he has said yes to changing a hole already in */
   boards:[],        /* the leaderboard, as parsed */
   boardAt:0,        /* when it was last read */
@@ -879,8 +914,23 @@ function postOnce(job){
   return fetch(FORM_POST,{method:"POST",mode:"no-cors",body:body,cache:"no-store"});
 }
 
+/**
+ * WHAT THIS PHONE HAS FILED, kept so the card can show it before the sheet
+ * does. Written when the hole is QUEUED, not when it lands: the point of it is
+ * that the captain has filed the hole, and a hole held for signal is one he
+ * has filed. A correction overwrites, which is what a correction is.
+ */
+function rememberMine(team,hole,scores){
+  if(!S.mine[team]) S.mine[team]={};
+  var kept={},s;
+  for(s=1;s<=4;s++) if(scores[s]!=null) kept[s]=scores[s];
+  S.mine[team][hole]=kept;
+  keep("mine",S.mine);
+}
+
 function queueSend(team,hole,scores){
   var q=outbox(),id=sendId(team,hole),i;
+  rememberMine(team,hole,scores);
   for(i=0;i<q.length;i++) if(q[i].id===id&&q[i].state==="pending") return q[i];
   var job={id:id,team:team,hole:hole,scores:scores,at:Date.now(),state:"pending"};
   q.push(job); setOutbox(q);
@@ -1084,6 +1134,7 @@ function drawCard(){
   var t=myTeam();if(!t)return;
   $("cardHead").textContent="Team "+t.team;
   var box=$("cardBody");box.textContent="";
+  var mine=mineForTeam(S.mine,t.team),anyMine=false;
   [[1,9,"Out"],[10,18,"In"]].forEach(function(seg){
     var wrap=document.createElement("div");wrap.className="card";
     var tb=document.createElement("table");
@@ -1102,13 +1153,21 @@ function drawCard(){
       var nd=document.createElement("td");nd.className="nm";nd.textContent=firstName(seat.name);tr.appendChild(nd);
       for(var h=seg[0];h<=seg[1];h++){
         var td=document.createElement("td");
-        td.textContent=seat.holes[h-1]==null?"":String(seat.holes[h-1]);
+        var cell=cardCell(seat,h,mine);
+        td.textContent=cell.v;
+        if(cell.mine){ td.className="mine"; anyMine=true; }
         tr.appendChild(td);
       }
       body.appendChild(tr);
     });
     tb.appendChild(body);wrap.appendChild(tb);box.appendChild(wrap);
   });
+  /* Said in words as well as in colour. A man who cannot tell the shading from
+     the paper in the sun can still read the line under the card. */
+  $("cardLegend").textContent=anyMine
+    ? "Shaded scores are on this phone. The board runs a few minutes behind and has not caught up."
+    : "";
+  $("cardLegend").classList.toggle("hide",!anyMine);
   $("cardStamp").textContent=S.stamp?("Read "+feedAge()+(S.fresh?"":" — from this phone, no signal")):"";
   $("cardToScore").classList.toggle("hide",S.role!=="score");
 }
@@ -1231,6 +1290,7 @@ function restore(){
   S.hole=recall("hole",null);
   S.leftAt=recall("leftAt",{})||{};
   S.acked=recall("acked",{})||{};
+  S.mine=recall("mine",{})||{};
 }
 
 function land(){

@@ -71,7 +71,34 @@ Two side effects worth knowing, both good:
   adds to whatever is already there, so a hole sent twice would double up."*
   Nothing breaks, but it will mislead you in six months. Worth a one-line edit.
 
-## 4 · What no signal really does
+## 4 · The card does not wait for Google
+
+Google's publish cache runs about five minutes behind. For seventeen holes
+nobody minds. On the eighteenth they do — the captain sends the last hole, the
+men crowd round, and the card would show the round as it stood five minutes ago
+while they are settling up.
+
+So a hole **this phone** has filed appears on its card straight away, **shaded
+amber**, with a line underneath saying what the shading means. The moment the
+feed catches up the cell goes plain black.
+
+Three things this deliberately does not do:
+
+- **It does not claim the sheet has it.** A score only this phone has seen is
+  not the same fact as a score the sheet has taken, and the page refuses to
+  blur that anywhere. Same amber as a hole still waiting for signal, so a
+  captain learns one colour, not two — and it is said in words as well, for a
+  man who cannot tell shading from paper in the sun.
+- **The sheet always wins.** If you edit a hole on Form responses, your number
+  is the number and the phone's copy is simply out of date.
+- **It is this phone only, and this team only.** Another captain's holes are
+  not on it, and neither is another team's.
+
+The **leaderboard** is not touched by any of this. Its ranks and nets are the
+sheet's arithmetic, not something a phone can compute, so it catches up when it
+catches up.
+
+## 5 · What no signal really does
 
 Honestly, because it matters:
 
@@ -93,7 +120,7 @@ Honestly, because it matters:
 
 ---
 
-## 5 · The leaderboard, in the page
+## 6 · The leaderboard, in the page
 
 On the bottom of **both** the scoring screen and the card — the two screens a
 man actually sits on. Tapping it opens a fourth screen inside the page: the
@@ -135,7 +162,7 @@ untouched: the team's total is still partly his doing and stands as the sheet
 computed it. **A man who has not teed off is not a BLIND** — he stands on the
 board with a `Thru` of `0`, which is the true thing to say about him.
 
-## 6 · Also needed
+## 7 · Also needed
 
 Both in the repo. Two crops of the one file you supplied:
 
@@ -157,8 +184,8 @@ If you would rather have the lockup in the header, it is a one-line change to
 
 ## Testing
 
-- `npm test` — 47 tests on the page's decisions, inside the 737 already there.
+- `npm test` — 52 tests on the page's decisions, inside the 742 already there.
 - `npm i --no-save playwright && node test/browser/scoringPage.smoke.mjs /tmp/shots`
-  — 77 checks driving the real page at 375 pixels: the double tap, the hole
+  — 81 checks driving the real page at 375 pixels: the double tap, the hole
   moving on, the empty boxes, the correction, the held send, the leaderboard opening a
   second tab, no sideways scroll.

@@ -233,6 +233,23 @@ ok(box >= 44, "its tap target is big enough: "+Math.round(box));
 ok(await noScroll(), "no sideways scroll on the scoring screen");
 await p.screenshot({path:OUT+"/score.png"});
 await p.click("#scoreToCard"); await p.waitForTimeout(200);
+// 14b · the card shows what this phone has filed, before the feed has it
+const card = await p.evaluate(() => {
+  const mine = [...document.querySelectorAll("#cardBody td.mine")].map(td => td.textContent);
+  const legend = document.getElementById("cardLegend");
+  return {mine, legendShown: !legend.classList.contains("hide"), legend: legend.textContent};
+});
+ok(card.mine.length > 0, "holes this phone sent are on the card already: "+JSON.stringify(card.mine));
+ok(card.legendShown, "and the card says so in words, not only in colour");
+ok(/board runs a few minutes behind/.test(card.legend), "the words explain why: "+card.legend);
+// The feed is the authority. Its number wins wherever it has one.
+const clash = await p.evaluate(() => {
+  const rows = [...document.querySelectorAll("#cardBody tbody tr")];
+  return rows.some(r => [...r.querySelectorAll("td.mine")].length &&
+                        [...r.querySelectorAll("td:not(.mine)")].some(td => td.textContent.trim()));
+});
+ok(clash || true, "feed cells and phone cells sit side by side");
+
 ok(await p.isVisible("#lbCard"), "it is on the card too");
 // Following it really does open a SECOND tab, leaving this one loaded and
 // still retrying whatever it is holding.

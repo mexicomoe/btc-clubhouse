@@ -52,6 +52,7 @@ const LIFTED = [
   "scoreButtons", "nextHole", "prevHole", "playIndex", "feedSentHoles",
   "feedHoleLine", "isOut", "playingSeats", "missingMan", "sendBody",
   "sendId", "outboxNext", "parseBoards", "prettyCell",
+  "cardCell", "mineForTeam",
 ].map(fnSource).join("\n");
 
 const P = new Function(LIFTED + "\nreturn {" + [
@@ -59,6 +60,7 @@ const P = new Function(LIFTED + "\nreturn {" + [
   "scoreButtons", "nextHole", "prevHole", "playIndex", "feedSentHoles",
   "feedHoleLine", "isOut", "playingSeats", "missingMan", "sendBody",
   "sendId", "outboxNext", "parseBoards", "prettyCell",
+  "cardCell", "mineForTeam",
 ].join(",") + "};")() as any;
 
 /* ---------- a feed to work from ---------- */
@@ -225,6 +227,59 @@ test("held sends go oldest first", () => {
   assert.equal(P.outboxNext(q).id, "t1h7");
   assert.equal(P.outboxNext([{id:"x",at:1,state:"done"}]), null);
   assert.equal(P.outboxNext([]), null);
+});
+
+test("the card shows this phone's own holes before the sheet has them", () => {
+  // The feed runs about five minutes behind. On the 18th that matters: the
+  // captain sends the last hole, the men crowd round, and the card shows the
+  // round as it stood five minutes ago while they are settling up.
+  const rob = T1.seats[0];                       // holes 1, 2 and 7 are in the feed
+  const mine = {3: {1: 4, 2: 5}, 7: {1: 9}};
+
+  // A hole the feed has is drawn from the feed, plainly.
+  assert.deepEqual(P.cardCell(rob, 1, mine), {v: "5", mine: false});
+  // A hole only this phone has is drawn, and MARKED.
+  assert.deepEqual(P.cardCell(rob, 3, mine), {v: "4", mine: true});
+  // A hole nobody has is still blank.
+  assert.deepEqual(P.cardCell(rob, 4, mine), {v: "", mine: false});
+  // A seat with no score in a hole this phone sent — a BLIND, or a man who
+  // left — stays blank rather than borrowing his neighbour's.
+  assert.deepEqual(P.cardCell(T1.seats[2], 3, mine), {v: "", mine: false});
+});
+
+test("the sheet always wins over this phone's copy", () => {
+  // Rob edits a hole on the Form responses tab. His number is the number, and
+  // this phone's memory of what it sent is simply out of date. Hole 7 is 6 in
+  // the feed and 9 on the phone; the card must read 6.
+  const rob = T1.seats[0];
+  assert.deepEqual(P.cardCell(rob, 7, {7: {1: 9}}), {v: "6", mine: false});
+});
+
+test("what this phone filed is kept per team, and only for that team", () => {
+  assert.deepEqual(P.mineForTeam({2: {5: {1: 4}}}, 2), {5: {1: 4}});
+  assert.deepEqual(P.mineForTeam({2: {5: {1: 4}}}, 1), {});
+  assert.deepEqual(P.mineForTeam(null, 1), {});
+});
+
+test("a hole is remembered when it is QUEUED, not when it lands", () => {
+  // A hole held for want of signal is one the captain has filed, and the whole
+  // point of this is to show him what he has filed.
+  assert.match(PAGE, /function queueSend\(team,hole,scores\)\{[\s\S]{0,120}?rememberMine\(team,hole,scores\);/);
+  // Only real scores are kept — an empty box stays empty on the card.
+  assert.match(PAGE, /for\(s=1;s<=4;s\+\+\) if\(scores\[s\]!=null\) kept\[s\]=scores\[s\];/);
+  assert.match(PAGE, /S\.mine=recall\("mine",\{\}\)\|\|\{\};/);
+});
+
+test("a score only this phone has seen is never passed off as the board's", () => {
+  // The page refuses to blur that distinction anywhere else and must not here.
+  // Marked in the same amber the hole grid uses for a hole still waiting to go,
+  // so a captain learns one colour rather than two...
+  assert.match(CSS, /td\.mine\{background:var\(--waitfill\);color:var\(--wait\);\}/);
+  assert.match(CSS, /\.cell\.waiting\{[^}]*background:var\(--waitfill\)/);
+  // ...and said in words too, for a man who cannot tell shading from paper in
+  // the sun. It appears only when there is something shaded to explain.
+  assert.match(PAGE, /Shaded scores are on this phone\./);
+  assert.match(PAGE, /\$\("cardLegend"\)\.classList\.toggle\("hide",!anyMine\);/);
 });
 
 /* ---------- the boards ---------- */
