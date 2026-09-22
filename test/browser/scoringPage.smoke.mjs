@@ -188,9 +188,28 @@ ok(sends.length===sentBeforeBlackout+1,
    "the held hole went on its own once there was signal: "+(sends.length-sentBeforeBlackout));
 ok(!(await p.isVisible("#queueBar")), "and the warning cleared");
 
+// 14 · the leaderboard, from both screens a man sits on
+const LB = "https://example.invalid/board";
+ok(!(await p.isVisible("#lbScore")), "an unconfigured leaderboard is not drawn");
+await p.evaluate(u => { window.LEADERBOARD_URL = u;
+  for (const id of ["lbScore","lbCard"]) {
+    const a = document.getElementById(id); a.href = u; a.classList.remove("hide");
+  } }, LB);
+ok(await p.isVisible("#lbScore"), "it is on the scoring screen");
+ok(await p.getAttribute("#lbScore","target")==="_blank", "and opens a new tab");
+const box = await p.$eval("#lbScore", e => e.getBoundingClientRect().height);
+ok(box >= 44, "its tap target is big enough: "+Math.round(box));
+
 ok(await noScroll(), "no sideways scroll on the scoring screen");
 await p.screenshot({path:OUT+"/score.png"});
 await p.click("#scoreToCard"); await p.waitForTimeout(200);
+ok(await p.isVisible("#lbCard"), "it is on the card too");
+// Following it really does open a SECOND tab, leaving this one loaded and
+// still retrying whatever it is holding.
+const [tab] = await Promise.all([ctx.waitForEvent("page"), p.click("#lbCard")]);
+ok(ctx.pages().length === 2, "a second tab opened: "+ctx.pages().length);
+ok(!p.isClosed(), "and the scoring page is still open behind it");
+await tab.close();
 ok(await noScroll(), "no sideways scroll on the card at 375");
 await p.screenshot({path:OUT+"/card.png", fullPage:true});
 await p.click("#cardTeam"); await p.waitForTimeout(200);

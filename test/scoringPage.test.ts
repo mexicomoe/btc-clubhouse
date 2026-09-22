@@ -292,6 +292,43 @@ test("a hole already in is offered, not simply reopened", () => {
   assert.match(PAGE, /would ADD to what is there/);
 });
 
+test("the logo tries both spellings before giving up", () => {
+  // Rob's file is TGIF_logo.png; the page asks for tgif_logo.png; GitHub Pages
+  // is case-sensitive. Getting that wrong is a 404 nobody ever sees.
+  assert.match(PAGE, /src="tgif_logo\.png"/);
+  assert.match(PAGE, /this\.setAttribute\("src","TGIF_logo\.png"\); return;/);
+  // And it cannot loop: the second failure hides it instead of asking again.
+  assert.match(PAGE, /if\(this\.getAttribute\("src"\)!=="TGIF_logo\.png"\)/);
+  assert.match(PAGE, /this\.style\.display="none";/);
+});
+
+test("the leaderboard is reachable from both screens a man sits on", () => {
+  // The scoring screen and the card. Not the team screen — he is not sitting
+  // there, he is passing through it once.
+  const SCORE = PAGE.slice(PAGE.indexOf('id="screenScore"'), PAGE.indexOf('id="screenReview"'));
+  const CARD  = PAGE.slice(PAGE.indexOf('id="screenCard"'), PAGE.indexOf("</section>", PAGE.indexOf('id="screenCard"')));
+  assert.match(SCORE, /<a id="lbScore"[^>]*>Leaderboard<\/a>/);
+  assert.match(CARD,  /<a id="lbCard"[^>]*>Leaderboard<\/a>/);
+  // A new tab, so following it cannot take down a page that is still holding
+  // a hole waiting for signal.
+  for (const m of PAGE.matchAll(/<a id="lb(?:Score|Card)"([^>]*)>/g)) {
+    assert.match(m[1], /target="_blank"/);
+    assert.match(m[1], /rel="noopener noreferrer"/);
+  }
+  // Dressed as a button, and held to the same floors as one.
+  assert.match(CSS, /a\.wide\{[^}]*font:800 22px/);
+  assert.match(CSS, /button\.wide,a\.wide\{[^}]*min-height:60px/);
+});
+
+test("an unconfigured leaderboard is not drawn at all", () => {
+  // A button that goes nowhere is tapped twice and then the page is not
+  // trusted. Hidden is better than dead.
+  assert.match(PAGE, /^var LEADERBOARD_URL = "[^"]*";$/m);
+  assert.match(PAGE, /if\(LEADERBOARD_URL\)\{ a\.href=LEADERBOARD_URL; a\.classList\.remove\("hide"\); \}/);
+  assert.match(PAGE, /else a\.classList\.add\("hide"\);/);
+  assert.match(PAGE, /drawLeaderboardLinks\(\);/);
+});
+
 test("the scorer feed is wired in", () => {
   const m = PAGE.match(/^var FEED_CSV = "([^"]*)";$/m);
   assert.ok(m && m[1], "FEED_CSV is empty — the page would have no teams to offer");

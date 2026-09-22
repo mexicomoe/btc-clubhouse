@@ -78,7 +78,15 @@ button{
 }
 button:disabled{opacity:.35;}
 button.on{background:var(--ink);color:var(--paper);}
-button.wide{display:block;width:100%;margin:10px 0;min-height:60px;font-size:22px;}
+button.wide,a.wide{display:block;width:100%;margin:10px 0;min-height:60px;font-size:22px;}
+/* The leaderboard is a LINK, not a button, because it leaves the page: an
+   anchor with target=_blank is the one thing iOS will never treat as a popup
+   and block, and window.open from a handler sometimes is. It has to be dressed
+   as a button so it reads as one to a man who does not know the difference. */
+a.wide{box-sizing:border-box;border:3px solid var(--ink);border-radius:8px;
+  background:var(--paper);color:var(--ink);text-decoration:none;
+  font:800 22px/1 inherit;font-family:inherit;padding:10px 12px;
+  display:flex;align-items:center;justify-content:center;}
 button.plain{border-width:3px;}
 button.go{min-height:68px;font-size:26px;}
 
@@ -177,7 +185,10 @@ footer{margin:22px 0 10px;border-top:3px solid var(--ink);padding-top:12px;}
     <div class="gridRow" id="gridTop"></div>
     <div class="gridRow" id="gridBot"></div>
   </div>
-  <footer><button id="scoreToCard" class="wide plain">See the card</button></footer>
+  <footer>
+    <button id="scoreToCard" class="wide plain">See the card</button>
+    <a id="lbScore" class="wide" target="_blank" rel="noopener noreferrer">Leaderboard</a>
+  </footer>
 </section>
 
 <!-- 4 · THE CHECK BEFORE IT GOES -->
@@ -195,6 +206,7 @@ footer{margin:22px 0 10px;border-top:3px solid var(--ink);padding-top:12px;}
   <p id="cardStamp"></p>
   <footer>
     <button id="cardToScore" class="wide plain hide">Back to scoring</button>
+    <a id="lbCard" class="wide" target="_blank" rel="noopener noreferrer">Leaderboard</a>
     <button id="cardTeam" class="wide plain">Change team</button>
   </footer>
 </section>
@@ -259,6 +271,21 @@ var SHEET_LAST_SEND_WINS = true;
 
 /* Aberdeen, in hole order. The card's own Course tab says the same. */
 var PAR = [4,4,3,5,4,4,5,3,4,4,4,4,3,4,4,5,3,5];
+
+/**
+ * THE LEADERBOARD, on the bottom of both the scoring screen and the card — the
+ * two screens a man is ever sitting on — so he never has to go back to the
+ * team screen to find it.
+ *
+ * IT OPENS IN A NEW TAB ON PURPOSE. Sent to the same tab it would take the
+ * scoring page down with it, and a captain who has a hole still waiting for
+ * signal would be closing the only thing that can send it. A new tab leaves
+ * this page loaded and retrying behind him.
+ *
+ * Left empty, the button is simply not drawn — better than a button that goes
+ * nowhere, which a man taps twice and then stops trusting the page over.
+ */
+var LEADERBOARD_URL = "";
 
 /* How often the feed is re-read while the page is open, in milliseconds. */
 var FEED_EVERY = 60000;
@@ -903,7 +930,32 @@ $("scoreToCard").addEventListener("click",function(){ drawCard();show("screenCar
 $("cardToScore").addEventListener("click",function(){ drawScore();show("screenScore"); });
 $("cardTeam").addEventListener("click",function(){ S.team=null;keep("team",null);drawHeader();drawPick();show("screenPick"); });
 
-$("logo").addEventListener("error",function(){ this.style.display="none"; });
+/**
+ * THE LOGO, AND THE ONE THING THAT WILL GO WRONG WITH IT. Rob's file is called
+ * TGIF_logo.png and this asks for tgif_logo.png. GitHub Pages serves from a
+ * case-sensitive filesystem, so the wrong spelling is a 404 that nobody sees:
+ * no error, no broken image, just a header that quietly has no logo on it and
+ * an afternoon spent wondering why.
+ *
+ * So it tries the other spelling once, and only then gives up — quietly, with
+ * the image removed rather than left as a broken-picture icon.
+ */
+$("logo").addEventListener("error",function(){
+  if(this.getAttribute("src")!=="TGIF_logo.png"){ this.setAttribute("src","TGIF_logo.png"); return; }
+  this.style.display="none";
+});
+
+/**
+ * A LINK WITH NO ADDRESS IS WORSE THAN NO LINK. Both copies are hidden until
+ * one is configured, rather than sitting there doing nothing.
+ */
+function drawLeaderboardLinks(){
+  ["lbScore","lbCard"].forEach(function(id){
+    var a=$(id);
+    if(LEADERBOARD_URL){ a.href=LEADERBOARD_URL; a.classList.remove("hide"); }
+    else a.classList.add("hide");
+  });
+}
 
 /* ---------- opening ---------- */
 
@@ -930,6 +982,7 @@ function land(){
 
 sweepOldDays();
 restore();
+drawLeaderboardLinks();
 loadFeedFromPhone();
 land();
 

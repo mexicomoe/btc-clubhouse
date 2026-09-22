@@ -93,17 +93,35 @@ Honestly, because it matters:
 
 ---
 
-## 5 · Also needed
+## 5 · The leaderboard button
 
-`tgif_logo.png` in the repo root, black and white. Until it is there the header
-simply has no logo; nothing breaks.
+On the bottom of **both** the scoring screen and the card — the two screens a
+man actually sits on. It opens in a **new tab**, so following it leaves the
+scoring page loaded behind him and still retrying anything it is holding.
+
+**It needs the address.** Paste it into one line near the top of `score.html`:
+
+```js
+var LEADERBOARD_URL = "";
+```
+
+While that is empty the button is **not drawn at all** — better than a button
+that goes nowhere, which a man taps twice and then stops trusting the page
+over. Fill it in and both copies appear.
+
+## 6 · Also needed
+
+The logo in the repo root, black and white. The page asks for
+`tgif_logo.png` and, failing that, `TGIF_logo.png` — GitHub Pages is
+case-sensitive and the wrong spelling is a 404 nobody sees. Either name works.
+Until one is there the header simply has no logo; nothing breaks.
 
 ---
 
 ## Testing
 
-- `npm test` — 28 tests on the page's decisions, inside the 718 already there.
+- `npm test` — 31 tests on the page's decisions, inside the 721 already there.
 - `npm i --no-save playwright && node test/browser/scoringPage.smoke.mjs /tmp/shots`
-  — 50 checks driving the real page at 375 pixels: the double tap, the hole
-  moving on, the empty boxes, the correction, the held send, no sideways
-  scroll.
+  — 57 checks driving the real page at 375 pixels: the double tap, the hole
+  moving on, the empty boxes, the correction, the held send, the leaderboard opening a
+  second tab, no sideways scroll.
