@@ -236,26 +236,26 @@ var FORM_SEAT = ["entry.828466984","entry.1307241763","entry.378353848","entry.1
  * Until it is filled in the page says so rather than guessing at a roster —
  * a stale roster baked into the page is the one failure nobody would notice.
  */
-var FEED_CSV = "";
+var FEED_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQg-44HCczcIAcyn9_osr4HvnniZba5IV9wKlf-uNFjz_CaGDcYRnqYVz_n4L7dsPdcUJkynwk7lx4d/pub?gid=1997697752&single=true&output=csv";
 
 /**
  * DOES THE SPREADSHEET KEEP THE LATEST SEND, OR ADD THEM UP?
  *
- * TODAY IT ADDS THEM UP. Clubhouse_Live_Scoring_FINAL says so in its own
- * words — "Sending a hole twice adds the two together" — and carries a whole
- * CHECK tab whose only job is to catch a hole sent twice. So a re-send is not
- * a correction here; it is a hole of 5 becoming a hole of 10, quietly, in the
- * money.
+ * IT KEEPS THE LATEST. The Gross tab was changed on 22 September to take the
+ * last row for a team and hole rather than the sum, so a re-send REPLACES.
+ * That is what makes a correction from the course safe, and it is also what
+ * makes a duplicate harmless: the same hole sent twice lands on the same
+ * numbers.
  *
- * While this is false the page still SHOWS what a hole already holds and still
- * warns, but it will not send that hole again. It tells the captain to tell
- * Rob, which is what the workbook itself tells him to do.
- *
- * Once the Gross tab takes the LAST row for a team and hole rather than the
- * sum, set this to true and correcting a hole from the course starts working.
- * Nothing else has to change.
+ * It was not always so. The workbook used to add a repeated send to what was
+ * there — "Sending a hole twice adds the two together", with a CHECK tab whose
+ * only job was to catch it — and a correction would have turned a 5 into a 10,
+ * quietly, in the money. THE FALSE BRANCH IS KEPT FOR THAT REASON. If the
+ * Gross tab is ever rebuilt and goes back to summing, set this to false and
+ * the page returns to showing a hole, warning, and refusing to send it again.
+ * Nothing else has to change either way.
  */
-var SHEET_LAST_SEND_WINS = false;
+var SHEET_LAST_SEND_WINS = true;
 
 /* Aberdeen, in hole order. The card's own Course tab says the same. */
 var PAR = [4,4,3,5,4,4,5,3,4,4,4,4,3,4,4,5,3,5];

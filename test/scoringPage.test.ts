@@ -275,12 +275,27 @@ test("the last feed is kept on the phone", () => {
   assert.match(PAGE, /loadFeedFromPhone\(\);/);
 });
 
-test("a hole already in is not re-sent while the sheet adds sends up", () => {
-  // Clubhouse_Live_Scoring_FINAL adds a repeated send to what is there. Until
-  // that changes, the page shows and warns but will not send the hole again.
-  assert.match(PAGE, /var SHEET_LAST_SEND_WINS = false;/);
-  assert.match(PAGE, /would ADD to what is there/);
+test("a hole already in is offered, not simply reopened", () => {
+  // The Gross tab now takes the latest send, so a correction replaces rather
+  // than doubles. It still is not one tap: the buttons stay locked until he
+  // says yes to changing the hole, because the common way to arrive on a sent
+  // hole is a mis-tap of the back arrow, not a correction.
+  assert.match(PAGE, /var SHEET_LAST_SEND_WINS = true;/);
+  assert.match(PAGE, /var locked=already&&!S\.unlocked;/);
+  assert.match(PAGE, /chg\.textContent="Change hole "\+h;/);
+  assert.match(PAGE, /S\.unlocked=true;drawScore\(\);/);
   assert.match(PAGE, /\$\("toReview"\)\.disabled=!!locked;/);
+  // Opening a hole afresh always relocks it — an unlock is for one hole only.
+  assert.match(PAGE, /S\.scores=\{\};S\.unlocked=false;/);
+  // The refusing branch is kept against the day the Gross tab is rebuilt and
+  // goes back to summing. One flag, and nothing else, chooses between them.
+  assert.match(PAGE, /would ADD to what is there/);
+});
+
+test("the scorer feed is wired in", () => {
+  const m = PAGE.match(/^var FEED_CSV = "([^"]*)";$/m);
+  assert.ok(m && m[1], "FEED_CSV is empty — the page would have no teams to offer");
+  assert.match(m![1], /\/pub\?.*output=csv/, "not a published-to-web CSV address");
 });
 
 /* ---------- eyesight ---------- */

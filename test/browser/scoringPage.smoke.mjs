@@ -35,7 +35,13 @@ const FEED = [H,
 ].join("\n");
 
 // Point the page at a feed we serve, and record every send.
-let page = readFileSync(SRC,"utf8").replace('var FEED_CSV = "";','var FEED_CSV = "/feed.csv";');
+// Point the page at a feed we serve, whatever address it is configured with —
+// pinning the old value here made this file pass by testing nothing the day
+// the real address was filled in.
+let page = readFileSync(SRC,"utf8");
+const unstubbed = page;
+page = page.replace(/^var FEED_CSV = "[^"]*";$/m, 'var FEED_CSV = "/feed.csv";');
+if (page === unstubbed) throw new Error("FEED_CSV was not stubbed — score.html has changed shape");
 
 const b = await chromium.launch(process.env.CHROME ? { executablePath: process.env.CHROME } : {});
 const ctx = await b.newContext({ viewport:{width:375,height:760}, deviceScaleFactor:2 });
@@ -141,18 +147,29 @@ ok((await p.$$(".man:nth-child(3) .scores button")).length===7, "back in — the
 // 10 · a hole already in warns and will not be re-sent
 await p.click("#holePrev"); await p.waitForTimeout(100);
 ok((await p.innerText("#sentWarn")).includes("already sent"), "hole 11 is shown as already in");
-ok(await p.isDisabled("#toReview"), "and cannot be sent again while the sheet adds sends up");
+ok(await p.isDisabled("#toReview"), "and is locked until he says he means to change it");
+ok((await p.$$(".man:nth-child(1) .scores button[disabled]")).length===7, "its buttons are locked too");
+const wasSent = sends.length;
+await p.click("#sentWarn button"); await p.waitForTimeout(150);
+ok(!(await p.isDisabled("#toReview")), "saying yes unlocks the hole");
+for (const n of [1,2,3]) await p.click(`.man:nth-child(${n}) .scores button:nth-child(2)`);
+await p.click("#toReview"); await p.waitForTimeout(100);
+await p.click("#doSend"); await p.waitForTimeout(700);
+ok(sends.length===wasSent+1, "the correction went: "+(sends.length-wasSent));
+ok(new URLSearchParams(sends.at(-1)).get("entry.605471460")==="11", "against hole 11, to replace it");
+await p.click("#holePrev"); await p.waitForTimeout(150);
+ok(await p.isDisabled("#toReview"), "and hole 11 is locked again on the way back in");
 
 // 11 · no signal: not lost, not falsely confirmed
 offline = true;
-await p.click("#holeNext"); await p.click("#holeNext"); await p.waitForTimeout(100);
+const sentBeforeBlackout = sends.length;   // relative, so adding a case above
+await p.click("#holeNext");                //  cannot silently break this one await p.click("#holeNext"); await p.waitForTimeout(100);
 const at = await p.innerText("#holeName");
 await p.click(".man:nth-child(1) .scores button:nth-child(4)");
 await p.click(".man:nth-child(2) .scores button:nth-child(4)");
 await p.click(".man:nth-child(3) .scores button:nth-child(4)");
 await p.click("#toReview"); await p.click("#doSend"); await p.waitForTimeout(900);
-const before = sends.length;
-ok(before===2, "nothing was sent with no signal: "+before);
+ok(sends.length===sentBeforeBlackout, "nothing was sent with no signal: "+(sends.length-sentBeforeBlackout));
 ok((await p.innerText("#scoreMsg")).includes("saved on this phone"), "it did NOT say sent");
 ok(await p.isVisible("#queueBar"), "the waiting hole is on screen: "+await p.innerText("#queueBar"));
 ok((await p.innerText("#queueBar")).includes(at.match(/Hole (\d+)/)[1]), "it names the hole waiting");
@@ -167,7 +184,8 @@ ok(await p.isVisible("#queueBar"), "the held hole survived the reload");
 offline = false;
 await p.evaluate(()=>window.dispatchEvent(new Event("online")));
 await p.waitForTimeout(900);
-ok(sends.length===3, "the held hole went on its own once there was signal: "+sends.length);
+ok(sends.length===sentBeforeBlackout+1,
+   "the held hole went on its own once there was signal: "+(sends.length-sentBeforeBlackout));
 ok(!(await p.isVisible("#queueBar")), "and the warning cleared");
 
 ok(await noScroll(), "no sideways scroll on the scoring screen");
