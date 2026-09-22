@@ -45,8 +45,8 @@ if (page === unstubbed) throw new Error("FEED_CSV was not stubbed — score.html
 // Blanked so the not-drawn case below is testable whatever address is shipped.
 // The shipped value's own shape is the unit tests' job, not this file's.
 const unblanked = page;
-page = page.replace(/^var LEADERBOARD_URL = "[^"]*";$/m, 'var LEADERBOARD_URL = "";');
-if (page === unblanked) throw new Error("LEADERBOARD_URL was not blanked — score.html has changed shape");
+page = page.replace(/^var LEADERBOARD_CSV = "[^"]*";$/m, 'var LEADERBOARD_CSV = "";');
+if (page === unblanked) throw new Error("LEADERBOARD_CSV was not blanked — score.html has changed shape");
 
 // The leaderboard tab as Rob lays it out — two boards, subtitles, footnotes,
 // a spacer column, a star on a Thru.
@@ -59,8 +59,8 @@ const BOARDS = [
   ",,,,", "* started on the 10th,,,,", ",,,,",
   "THE TEAM GAME,,,,", "Best 2 balls,,,,", ",,,,",
   ",Team,Players,Thru,,Total",
-  '1,2,"Granville, Loren & Levy, Rich & Wallach, Mike",18,,-6.0',
-  '2,1,"Tanenbaum, Rob & Schwartz, Harvey & Horvitz, Stu",12,,-2.0',
+  '1,2,"Granville, Loren & Levy, Rich & Wallach, Mike & BLIND",18,,-6.0',
+  '2,1,"Tanenbaum, Rob & Schwartz, Harvey & Horvitz, Stu",0,,-2.0',
 ].join("\n");
 
 const b = await chromium.launch(process.env.CHROME ? { executablePath: process.env.CHROME } : {});
@@ -77,7 +77,8 @@ await ctx.route("**/*", async route => {
     if (offline) return route.abort("internetdisconnected");
     sends.push(route.request().postData()); return route.fulfill({status:200, body:"ok"});
   }
-  if (u.includes("tgif_logo.png")) return route.abort();
+  if (u.endsWith(".png")) return route.fulfill({contentType:"image/png",
+    body: readFileSync(new URL("../../" + u.split("/").pop(), import.meta.url))});
   return route.fulfill({status:404, body:""});
 });
 const p = await ctx.newPage();
@@ -111,6 +112,19 @@ ok(await p.isVisible("#screenCard"), "a watcher comes back to his card after a r
 await p.click("#cardTeam"); await p.click(".teamBtn:nth-of-type(2)"); await p.click("#roleYes");
 await p.waitForTimeout(200);
 ok((await p.innerText("#holeName")).startsWith("Hole 10"), "team 2 opens on hole 10: "+await p.innerText("#holeName"));
+
+// 4b · the header: the flag fits inside it, and the names still fit beside it
+const hdr = await p.evaluate(() => {
+  const h = document.querySelector("header").getBoundingClientRect();
+  const l = document.getElementById("logo").getBoundingClientRect();
+  const n = document.getElementById("topNames");
+  return {logoW: l.width, logoInside: l.bottom <= h.bottom + 0.5, logoShown: l.width > 4,
+          namesCut: n.scrollWidth > n.clientWidth + 1, names: n.textContent};
+});
+ok(hdr.logoShown, "the flag is in the header");
+ok(hdr.logoInside, "and sits inside it rather than through its rule");
+ok(hdr.logoW < 40, "it costs under 40px of a 375px line: "+Math.round(hdr.logoW));
+ok(!hdr.namesCut, "and the men's names are not cut off beside it: "+JSON.stringify(hdr.names));
 
 // 5 · each par gives the right seven buttons  (10 is par 4, 13 is par 3, 16 par 5)
 const rowBtns = async () => p.$$eval(".man:first-child .scores button", e=>e.map(x=>x.textContent));
@@ -211,12 +225,6 @@ ok(sends.length===sentBeforeBlackout+1,
 ok(!(await p.isVisible("#queueBar")), "and the warning cleared");
 
 // 14 · the leaderboard, from both screens a man sits on
-const LB = "https://example.invalid/board";
-ok(!(await p.isVisible("#lbScore")), "an unconfigured leaderboard is not drawn");
-await p.evaluate(u => { window.LEADERBOARD_URL = u;
-  for (const id of ["lbScore","lbCard"]) {
-    const a = document.getElementById(id); a.href = u; a.classList.remove("hide");
-  } }, LB);
 ok(await p.isVisible("#lbScore"), "it is on the scoring screen");
 ok(await p.getAttribute("#lbScore","target")==="_blank", "and opens a new tab");
 const box = await p.$eval("#lbScore", e => e.getBoundingClientRect().height);
@@ -258,6 +266,9 @@ ok(txt.includes("Rob Tanenbaum"), "names are turned round");
 ok(txt.includes("Loren Granville · Rich Levy"), "a team's men read as men");
 ok(!txt.includes("started on the 10th"), "the footnote did not become a row");
 ok(txt.includes("-3.5"), "the scores came through");
+ok(!txt.includes("BLIND"), "a BLIND is not listed among a team's men");
+ok(txt.includes("-6.0"), "but the team's total, which is his doing, still stands");
+ok(/\b0\b/.test(txt), "a man who has not teed off keeps his Thru of 0");
 const sizes = await p.$$eval(".board td", e => e.map(x => parseFloat(getComputedStyle(x).fontSize)));
 ok(Math.min(...sizes) >= 18, "nothing on the board is under 18px: "+Math.min(...sizes));
 ok(await noScroll(), "no sideways scroll on the leaderboard at 375");
@@ -270,6 +281,18 @@ await p.click("#lbCard"); await p.waitForTimeout(300);
 ok(await p.isVisible("#screenBoard"), "it is reachable from the card too");
 await p.click("#boardBack"); await p.waitForTimeout(200);
 ok(await p.isVisible("#screenCard"), "and Back returns him to the card, not the scoring screen");
+
+// 16 · with NEITHER address there is no button at all — hidden beats dead
+page = unblanked.replace(/^var LEADERBOARD_CSV = "[^"]*";$/m, 'var LEADERBOARD_CSV = "";')
+                .replace(/^var LEADERBOARD_URL = "[^"]*";$/m, 'var LEADERBOARD_URL = "";');
+const blank = await ctx.newPage();
+await blank.goto("http://x/index.html"); await blank.waitForTimeout(400);
+// Read the class rather than visibility: this context still remembers a team
+// and a role, so which screen it lands on is not this check's business.
+const drawn = await blank.evaluate(() =>
+  ["lbScore","lbCard"].filter(id => !document.getElementById(id).classList.contains("hide")));
+ok(drawn.length === 0, "with no address at all, no button is drawn: "+JSON.stringify(drawn));
+await blank.close();
 
 await b.close();
 console.log(fails.length ? "\nFAILED: "+fails.length : "\nall browser checks passed");

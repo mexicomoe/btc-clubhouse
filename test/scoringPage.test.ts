@@ -304,7 +304,30 @@ test("scores are left alone, names are turned round", () => {
                "Loren Granville \u00b7 Rich Levy \u00b7 Mike Wallach");
   // A figure with a comma in it is not a man.
   assert.equal(P.prettyCell("1,234"), "1,234");
+  // A BLIND is a stand-in, not a man, and is dropped from the team's list —
+  // the team's total is still his doing and is not touched.
+  assert.equal(P.prettyCell("Granville, Loren & BLIND & Wallach, Mike"),
+               "Loren Granville \u00b7 Mike Wallach");
+  assert.equal(P.prettyCell("Granville, Loren & blind"), "Loren Granville");
+  // A man who has not teed off is not a BLIND. He stands there with a 0.
+  assert.equal(P.prettyCell("0"), "0");
+  assert.equal(P.prettyCell("Horvitz, Stu & Edson, Andy"), "Stu Horvitz \u00b7 Andy Edson");
   assert.equal(P.prettyCell(""), "");
+});
+
+test("a team short a man loses the BLIND, not the team", () => {
+  const short = BOARDS.replace(
+    '1,2,"Granville, Loren & Levy, Rich & Wallach, Mike",18,,-6.0',
+    '1,2,"Granville, Loren & Levy, Rich & Wallach, Mike & BLIND",18,,-6.0');
+  const x = P.parseBoards(short);
+  assert.equal(x[1].rows[0][4], "-6.0", "the team's total is the BLIND's doing and stands");
+  assert.equal(P.prettyCell(x[1].rows[0][2]).indexOf("BLIND"), -1);
+  assert.match(P.prettyCell(x[1].rows[0][2]), /Loren Granville/);
+  // And a man on nought holes is still on the board, because that is true.
+  const teed = P.parseBoards(BOARDS.replace('3,"Schwartz, Harvey",12,48,+0.5',
+                                            '3,"Schwartz, Harvey",0,0,+0.5'));
+  assert.equal(teed[0].rows.length, 3);
+  assert.equal(teed[0].rows[2][2], "0");
 });
 
 test("a board with an extra column needs no code change", () => {
@@ -397,14 +420,30 @@ test("a hole already in is offered, not simply reopened", () => {
   assert.match(PAGE, /would ADD to what is there/);
 });
 
-test("the logo tries both spellings before giving up", () => {
-  // Rob's file is TGIF_logo.png; the page asks for tgif_logo.png; GitHub Pages
-  // is case-sensitive. Getting that wrong is a 404 nobody ever sees.
-  assert.match(PAGE, /src="tgif_logo\.png"/);
-  assert.match(PAGE, /this\.setAttribute\("src","TGIF_logo\.png"\); return;/);
-  // And it cannot loop: the second failure hides it instead of asking again.
-  assert.match(PAGE, /if\(this\.getAttribute\("src"\)!=="TGIF_logo\.png"\)/);
+test("the header carries the flag, and the whole logo is shown once", () => {
+  // At the 34px the sticky header can spare, the strapline under TGIF renders
+  // three and a half pixels tall — worse than no logo. The flag is nearly
+  // square and survives being small; the lockup gets the opening screen.
+  assert.match(PAGE, /<img id="logo" src="tgif_flag\.png"/);
+  assert.match(PAGE, /<img id="bigLogo" src="tgif_logo\.png"/);
+  assert.match(CSS, /#logo\{height:34px/);
+  assert.match(CSS, /#bigLogo\{[^}]*max-width:290px/);
+  // Both files are in the repo, and both are pictures rather than promises.
+  for (const f of ["tgif_flag.png", "tgif_logo.png"]) {
+    const bytes = readFileSync(new URL("../" + f, import.meta.url));
+    assert.ok(bytes.length > 500, f + " is too small to be an image");
+    assert.equal(bytes.subarray(1, 4).toString("latin1"), "PNG", f + " is not a PNG");
+  }
+});
+
+test("a logo that will not load takes itself off the screen", () => {
+  // A broken-picture icon in the header of a page a man is scoring on is
+  // worse than a header with no logo in it.
+  assert.match(PAGE, /\["logo","bigLogo"\]\.forEach/);
   assert.match(PAGE, /this\.style\.display="none";/);
+  // The lockup tries the capitalised spelling once first — Rob's own copy is
+  // TGIF_logo.png and GitHub Pages is case-sensitive — and cannot loop.
+  assert.match(PAGE, /id==="bigLogo"&&this\.getAttribute\("src"\)!=="TGIF_logo\.png"/);
 });
 
 test("the leaderboard is reachable from both screens a man sits on", () => {
@@ -474,6 +513,22 @@ test("the leaderboard address is whole, and points at the leaderboard tab", () =
   assert.notEqual(q.get("gid"), feed.searchParams.get("gid"));
   // Without this the men get Google's tab strip and can wander into the feed.
   assert.equal(q.get("single"), "true");
+});
+
+test("the board is read from the same tab the link points at", () => {
+  // Two addresses for one tab. If they ever drift apart, the button and its
+  // fallback show different boards and nobody notices until the money is out.
+  const csv = new URL(PAGE.match(/^var LEADERBOARD_CSV = "([^"]*)";$/m)![1]);
+  const page = new URL(PAGE.match(/^var LEADERBOARD_URL = "([^"]*)";$/m)![1]);
+  assert.equal(csv.searchParams.get("output"), "csv");
+  assert.equal(csv.searchParams.get("gid"), "1476327864");
+  assert.equal(csv.searchParams.get("gid"), page.searchParams.get("gid"));
+  assert.equal(csv.pathname.split("/").slice(0, -1).join("/"),
+               page.pathname.split("/").slice(0, -1).join("/"),
+               "the two addresses are not even the same workbook");
+  // And not the Scorer feed, which is one glance away and a different tab.
+  assert.notEqual(csv.searchParams.get("gid"),
+                  new URL(PAGE.match(/^var FEED_CSV = "([^"]*)";$/m)![1]).searchParams.get("gid"));
 });
 
 test("the scorer feed is wired in", () => {

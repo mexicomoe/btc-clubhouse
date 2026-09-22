@@ -101,16 +101,12 @@ CLUBHOUSE board and THE TEAM GAME, one under the other, in the page's own
 type. No new tab, no Google, no pinch-zoom, and it keeps working off the
 phone's last copy when the signal goes.
 
-**One thing left.** Republish that tab as **CSV** (`gid=1476327864`, the same
-two clicks as the Scorer feed) and paste the address into:
+Reading `gid=1476327864` published as CSV. The published-page address is kept
+as a fallback: if `LEADERBOARD_CSV` is ever emptied, the button goes back to
+being a link out to Google rather than a button that does nothing.
 
-```js
-var LEADERBOARD_CSV = "";
-```
-
-Until then the button stays what it was — a link out to the published page —
-so nothing is broken while you republish. Set it and the button reads the
-board into the page instead.
+Both addresses point at the same tab of the same workbook, and a test asserts
+it — two addresses for one board is two things that can drift apart.
 
 ### What it will and will not cope with
 
@@ -133,19 +129,36 @@ A `Thru` of `18*` is passed through exactly as written — the star is the thing
 not dirt. Scores like `-3.5` and `+0.5` likewise. Names are turned round from
 `Surname, First` for the screen, and a team's men are split on `&`.
 
+A **BLIND** is dropped from a team's list of men — he is a stand-in, and a name
+nobody can put a face to is what gets asked about on the 4th tee. His effect is
+untouched: the team's total is still partly his doing and stands as the sheet
+computed it. **A man who has not teed off is not a BLIND** — he stands on the
+board with a `Thru` of `0`, which is the true thing to say about him.
+
 ## 6 · Also needed
 
-The logo in the repo root, black and white. The page asks for
-`tgif_logo.png` and, failing that, `TGIF_logo.png` — GitHub Pages is
-case-sensitive and the wrong spelling is a 404 nobody sees. Either name works.
-Until one is there the header simply has no logo; nothing breaks.
+Both in the repo. Two crops of the one file you supplied:
+
+- **`tgif_logo.png`** — the whole lockup, trimmed of the 44% of empty margin
+  it arrived with. Shown large on the opening screen, where there is room.
+- **`tgif_flag.png`** — the flag mark alone, in the sticky header.
+
+**Why two.** The lockup is 3.3 times as wide as it is tall. At the 34px the
+sticky header can spare, the strapline under TGIF renders three and a half
+pixels tall — a smudge, which reads worse than no logo — and the lockup would
+eat 112px of a 375px line, cutting the men's names off. Those names are what
+tells a man he is on the right team. The flag is nearly square, costs 25px,
+and a test asserts the names still fit beside it.
+
+If you would rather have the lockup in the header, it is a one-line change to
+`#logo`'s `src` — the tests will then tell you what it costs.
 
 ---
 
 ## Testing
 
-- `npm test` — 44 tests on the page's decisions, inside the 734 already there.
+- `npm test` — 47 tests on the page's decisions, inside the 737 already there.
 - `npm i --no-save playwright && node test/browser/scoringPage.smoke.mjs /tmp/shots`
-  — 70 checks driving the real page at 375 pixels: the double tap, the hole
+  — 77 checks driving the real page at 375 pixels: the double tap, the hole
   moving on, the empty boxes, the correction, the held send, the leaderboard opening a
   second tab, no sideways scroll.

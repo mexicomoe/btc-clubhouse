@@ -59,6 +59,18 @@ header{
   position:sticky;top:0;background:var(--paper);z-index:5;
 }
 #logo{height:34px;width:auto;display:block;}
+/* THE WHOLE LOCKUP, ONCE, ON THE WAY IN.
+ *
+ * It cannot go in the sticky header: at the 34px that header can spare, the
+ * strapline under TGIF comes out three and a half pixels tall — a smudge,
+ * which reads worse than no logo at all. And the full lockup is 3.3 times as
+ * wide as it is tall, so at any height worth having it eats the width the
+ * men's names need, on the one line that tells a man he is on the right team.
+ *
+ * So the header carries the flag alone, which is nearly square and survives
+ * being small, and the whole logo is shown here — big, on the screen he opens
+ * the page to, where there is room for it to be itself. */
+#bigLogo{display:block;width:100%;max-width:290px;height:auto;margin:18px auto 6px;}
 #topTeam{font-size:24px;font-weight:800;white-space:nowrap;}
 #topNames{font-size:18px;font-weight:600;flex:1;min-width:0;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -173,7 +185,7 @@ footer{margin:22px 0 10px;border-top:3px solid var(--ink);padding-top:12px;}
 <body>
 
 <header>
-  <img id="logo" src="tgif_logo.png" alt="TGIF">
+  <img id="logo" src="tgif_flag.png" alt="TGIF">
   <div id="topTeam"></div>
   <div id="topNames"></div>
 </header>
@@ -182,6 +194,7 @@ footer{margin:22px 0 10px;border-top:3px solid var(--ink);padding-top:12px;}
 
 <!-- 1 · WHICH TEAM. His own name on the button is the whole identification. -->
 <section id="screenPick" class="hide">
+  <img id="bigLogo" src="tgif_logo.png" alt="TGIF — Thank Golf It's Friday">
   <h1>Tap your team</h1>
   <div id="teamList"></div>
   <p id="pickNote"></p>
@@ -340,11 +353,10 @@ var PAR = [4,4,3,5,4,4,5,3,4,4,4,4,3,4,4,5,3,5];
  * the page's own type, and it keeps working off the phone's last copy when
  * the signal goes.
  *
- * Until this is filled in the Leaderboard button stays what it was: a link
- * out to the published page below. Nothing regresses while the tab is being
- * republished.
+ * Emptied, the Leaderboard button falls back to the published page below, so
+ * the men are never left with nothing while a tab is being republished.
  */
-var LEADERBOARD_CSV = "";
+var LEADERBOARD_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQg-44HCczcIAcyn9_osr4HvnniZba5IV9wKlf-uNFjz_CaGDcYRnqYVz_n4L7dsPdcUJkynwk7lx4d/pub?gid=1476327864&single=true&output=csv";
 
 /* The published-page address, and the fallback while LEADERBOARD_CSV is
    empty. It is also what the button falls back to if this page's script
@@ -619,7 +631,13 @@ function parseBoards(text){
  *
  * The sheet keeps men as "Surname, First" so that every tab matches; the
  * phone turns them round, here and on the card, and nowhere else. A team's
- * players arrive joined with "&" and each one is turned round in turn.
+ * players arrive joined with "&", each one turned round in turn, and a BLIND
+ * among them dropped — he is a stand-in, not a man, and he is hidden
+ * everywhere else on this page too.
+ *
+ * A MAN WHO HAS NOT TEED OFF IS NOT A BLIND. He stands on the board with a
+ * Thru of 0, which is the true thing to say about him, and nothing here
+ * touches him.
  *
  * EVERYTHING ELSE IS LEFT EXACTLY AS THE SHEET WROTE IT. A Thru of "18*" —
  * the star saying his team went off the 10th — is not a number to be tidied,
@@ -628,7 +646,16 @@ function parseBoards(text){
  */
 function prettyCell(v){
   var s=String(v==null?"":v).trim();
-  if(s.indexOf("&")>-1) return s.split("&").map(function(x){ return displayName(x.trim()); }).join(" \u00b7 ");
+  if(s.indexOf("&")>-1){
+    /* A BLIND is a stand-in for a man who is not there. He takes a net par for
+       the team game, so the team's TOTAL is his doing and must stand — but he
+       is not one of the men, and a name nobody can put a face to on the board
+       is the kind of thing that gets asked about on the 4th tee. He is dropped
+       from the list and from nothing else. */
+    return s.split("&").map(function(x){ return x.trim(); })
+            .filter(function(x){ return x!=="" && x.toUpperCase()!=="BLIND"; })
+            .map(displayName).join(" \u00b7 ");
+  }
   if(/^[^,]+,[^,]+$/.test(s) && /[A-Za-z]/.test(s) && !/[0-9]/.test(s)) return displayName(s);
   return s;
 }
@@ -1153,9 +1180,23 @@ $("cardTeam").addEventListener("click",function(){ S.team=null;keep("team",null)
  * So it tries the other spelling once, and only then gives up — quietly, with
  * the image removed rather than left as a broken-picture icon.
  */
-$("logo").addEventListener("error",function(){
-  if(this.getAttribute("src")!=="TGIF_logo.png"){ this.setAttribute("src","TGIF_logo.png"); return; }
-  this.style.display="none";
+/**
+ * A MISSING LOGO IS NOT AN ERROR ANYBODY SHOULD SEE. Either image failing
+ * takes itself off the screen rather than leaving a broken-picture icon in
+ * the header of a page a man is trying to score on.
+ *
+ * The whole lockup also tries TGIF_logo.png before giving up: Rob's own copy
+ * is named with capitals, GitHub Pages serves from a case-sensitive
+ * filesystem, and the wrong spelling is a 404 that produces no error, no
+ * broken image and no clue at all.
+ */
+["logo","bigLogo"].forEach(function(id){
+  $(id).addEventListener("error",function(){
+    if(id==="bigLogo"&&this.getAttribute("src")!=="TGIF_logo.png"){
+      this.setAttribute("src","TGIF_logo.png"); return;
+    }
+    this.style.display="none";
+  });
 });
 
 /**
