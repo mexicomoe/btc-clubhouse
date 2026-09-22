@@ -148,6 +148,26 @@ thead th{background:var(--ink);color:var(--paper);}
 tr.par td,tr.par th{font-weight:600;}
 #cardStamp{font-size:18px;font-weight:600;margin:10px 0 0;}
 footer{margin:22px 0 10px;border-top:3px solid var(--ink);padding-top:12px;}
+
+/* ---------- the boards ----------
+ * These WRAP rather than ellipsize, and are laid out by the browser rather
+ * than by fixed widths. A leaderboard is read, not scanned: a team's four
+ * names running to three lines is fine, and "Dave Finkelste…" is not. Nothing
+ * here is a number whose column I can predict, because the sheet decides the
+ * columns, so the browser is left to size them. */
+.board{margin:18px 0;}
+.board h2{font-size:23px;margin:0 0 8px;}
+.board table{table-layout:auto;}
+.board th,.board td{font-size:18px;padding:7px 3px;text-align:right;
+  white-space:normal;
+  /* overflow-wrap, NOT word-break. word-break:break-word breaks a word the
+     moment breaking would make the column narrower, so "Thru" came out as
+     "Thr/u" and a total of "-6.0" as "-6./0" — every heading and every figure
+     on the board snapped in half to save four pixels. overflow-wrap breaks
+     only a word that cannot fit at all, which here is none of them. */
+  overflow-wrap:break-word;}
+.board th:first-child,.board td:first-child{text-align:center;width:30px;}
+.board th:nth-child(2),.board td:nth-child(2){text-align:left;}
 </style>
 </head>
 <body>
@@ -204,7 +224,15 @@ footer{margin:22px 0 10px;border-top:3px solid var(--ink);padding-top:12px;}
   <button id="doChange" class="wide plain">Change a score</button>
 </section>
 
-<!-- 5 · THE CARD, TO LOOK AT -->
+<!-- 5 · THE BOARDS, IN THE PAGE -->
+<section id="screenBoard" class="hide">
+  <h1>Leaderboard</h1>
+  <div id="boardBody"></div>
+  <p id="boardStamp"></p>
+  <footer><button id="boardBack" class="wide plain">Back</button></footer>
+</section>
+
+<!-- 6 · THE CARD, TO LOOK AT -->
 <section id="screenCard" class="hide">
   <h1 id="cardHead"></h1>
   <div id="cardBody"></div>
@@ -301,6 +329,27 @@ var PAR = [4,4,3,5,4,4,5,3,4,4,4,4,3,4,4,5,3,5];
  * 1476327864 is the leaderboard tab; 1997697752 is the feed. They are one
  * digit apart in the eye and nowhere near it in effect.
  */
+/**
+ * THE LEADERBOARD, READ INTO THIS PAGE rather than handed to Google.
+ *
+ * The same tab, published as CSV instead of as a web page. Google's own
+ * rendering of a sheet on a phone is a fixed-width grid at ten or twelve
+ * pixels with pinch-to-zoom — every rule this page is built to (18px, full
+ * contrast, no sideways scroll, no Google) broken at the one moment a man
+ * actually wants to know where he stands. Read as CSV it is drawn here, in
+ * the page's own type, and it keeps working off the phone's last copy when
+ * the signal goes.
+ *
+ * Until this is filled in the Leaderboard button stays what it was: a link
+ * out to the published page below. Nothing regresses while the tab is being
+ * republished.
+ */
+var LEADERBOARD_CSV = "";
+
+/* The published-page address, and the fallback while LEADERBOARD_CSV is
+   empty. It is also what the button falls back to if this page's script
+   never runs at all — the link is real, and only intercepted once there is
+   something better to do with the tap. */
 var LEADERBOARD_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQg-44HCczcIAcyn9_osr4HvnniZba5IV9wKlf-uNFjz_CaGDcYRnqYVz_n4L7dsPdcUJkynwk7lx4d/pubhtml?gid=1476327864&single=true";
 
 /* How often the feed is re-read while the page is open, in milliseconds. */
@@ -501,6 +550,90 @@ function sendBody(team,hole,scores){
 }
 
 /**
+ * THE BOARDS, OUT OF A PUBLISHED TAB.
+ *
+ * WHY THIS READS HEADERS AND NOT ROW NUMBERS. The tab is a board Rob lays out
+ * for people, not a feed built for a machine: it grows by a row when a man
+ * joins, it carries its own titles and its own footnotes, and the day a
+ * contest is switched on it gains a column. Anything that counted rows would
+ * come apart on the first of those and come apart SILENTLY — a leaderboard
+ * showing the wrong man in first place still looks like a leaderboard.
+ *
+ * So it finds its way by shape:
+ *
+ *  · A BOARD STARTS at a lone all-capitals cell on its own row. CLUBHOUSE.
+ *    THE TEAM GAME. Rob's subtitles ("Slowest group thru 0", "Best 2 balls")
+ *    are mixed case and are skipped, which is the whole reason for the rule.
+ *  · ITS HEADER is the first row after that with three or more cells in it.
+ *  · ITS ROWS run until a row with fewer than two. That is what ends a board
+ *    at its footnotes — "* started on the 10th" is one cell, so it stops
+ *    rather than being read as a man.
+ *  · ITS COLUMNS are whichever carry anything, in header or body. That keeps
+ *    the unlabelled rank column on the left, and drops the blank spacer the
+ *    team board has between Thru and Total.
+ *
+ * Nothing here knows what "Net" MEANS, and it must not. It draws the columns
+ * the sheet names, in the sheet's order, so a contest switched on next month
+ * appears on the phone without this being touched.
+ */
+function parseBoards(text){
+  var rows=parseCsv(text),boards=[],cur=null,i,c,j;
+
+  function filled(r){ var n=0,k; for(k=0;k<r.length;k++) if(String(r[k]==null?"":r[k]).trim()!=="") n++; return n; }
+  function firstCell(r){ var k; for(k=0;k<r.length;k++){ var v=String(r[k]==null?"":r[k]).trim(); if(v!=="") return v; } return ""; }
+
+  for(i=0;i<rows.length;i++){
+    var r=rows[i],n=filled(r),head=firstCell(r);
+    if(n===1 && head.length>2 && /^[A-Z][A-Z0-9 .,'&\u00b7-]*$/.test(head)){
+      cur={title:head,header:null,rows:[],done:false}; boards.push(cur); continue;
+    }
+    if(!cur) continue;
+    if(cur.header===null){ if(n>=3) cur.header=r.slice(); continue; }
+    if(n>=2){ if(!cur.done) cur.rows.push(r.slice()); }
+    else cur.done=true;
+  }
+
+  var out=[];
+  for(i=0;i<boards.length;i++){
+    var b=boards[i];
+    if(!b.header||!b.rows.length) continue;
+    var wide=b.header.length;
+    for(j=0;j<b.rows.length;j++) if(b.rows[j].length>wide) wide=b.rows[j].length;
+    var cols=[];
+    for(c=0;c<wide;c++){
+      var has=String(b.header[c]==null?"":b.header[c]).trim()!=="";
+      if(!has) for(j=0;j<b.rows.length;j++) if(String(b.rows[j][c]==null?"":b.rows[j][c]).trim()!==""){ has=true; break; }
+      if(has) cols.push(c);
+    }
+    out.push({
+      title:b.title,
+      header:cols.map(function(k){ return String(b.header[k]==null?"":b.header[k]).trim(); }),
+      rows:b.rows.map(function(row){ return cols.map(function(k){ return String(row[k]==null?"":row[k]).trim(); }); })
+    });
+  }
+  return out;
+}
+
+/**
+ * ONE CELL, AS A MAN READS IT.
+ *
+ * The sheet keeps men as "Surname, First" so that every tab matches; the
+ * phone turns them round, here and on the card, and nowhere else. A team's
+ * players arrive joined with "&" and each one is turned round in turn.
+ *
+ * EVERYTHING ELSE IS LEFT EXACTLY AS THE SHEET WROTE IT. A Thru of "18*" —
+ * the star saying his team went off the 10th — is not a number to be tidied,
+ * it is the thing Rob asked to keep. So is a Clubhouse score of "-3.5". The
+ * digit test is what keeps a figure like "1,234" out of the name rule.
+ */
+function prettyCell(v){
+  var s=String(v==null?"":v).trim();
+  if(s.indexOf("&")>-1) return s.split("&").map(function(x){ return displayName(x.trim()); }).join(" \u00b7 ");
+  if(/^[^,]+,[^,]+$/.test(s) && /[A-Za-z]/.test(s) && !/[0-9]/.test(s)) return displayName(s);
+  return s;
+}
+
+/**
  * ONE SEND'S NAME. A team and a hole, nothing else — so a second tap on Send
  * cannot make a second job, however fast the tap, and a reload part-way
  * through finds the same job rather than a twin of it.
@@ -571,6 +704,10 @@ var S={
   leftAt:{},        /* seat -> the hole from which he is out */
   acked:{},         /* hole -> true, sends this phone saw land */
   unlocked:false,   /* he has said yes to changing a hole already in */
+  boards:[],        /* the leaderboard, as parsed */
+  boardAt:0,        /* when it was last read */
+  boardFresh:false,
+  boardFrom:"screenScore",   /* the screen Back returns him to */
   sending:false
 };
 
@@ -578,7 +715,7 @@ function teamOf(n){ for(var i=0;i<S.feed.length;i++) if(S.feed[i].team===n) retu
 function myTeam(){ return teamOf(S.team); }
 
 function show(which){
-  ["screenPick","screenRole","screenScore","screenReview","screenCard"].forEach(function(id){
+  ["screenPick","screenRole","screenScore","screenReview","screenBoard","screenCard"].forEach(function(id){
     $(id).classList.toggle("hide",id!==which);
   });
 }
@@ -627,6 +764,66 @@ function feedAge(){
   if(mins<1) return "just now";
   if(mins===1) return "1 minute ago";
   return mins+" minutes ago";
+}
+
+/* ---------- the boards ---------- */
+
+function loadBoardsFromPhone(){
+  var c=recall("board",null);
+  if(c&&c.text){ S.boards=parseBoards(c.text); S.boardAt=c.at||0; S.boardFresh=false; return true; }
+  return false;
+}
+
+function fetchBoards(){
+  if(!LEADERBOARD_CSV) return Promise.resolve(false);
+  var url=LEADERBOARD_CSV+(LEADERBOARD_CSV.indexOf("?")<0?"?":"&")+"cachebust="+Date.now();
+  return fetch(url,{cache:"no-store"}).then(function(r){
+    if(!r.ok) throw new Error("board "+r.status);
+    return r.text();
+  }).then(function(text){
+    var boards=parseBoards(text);
+    if(!boards.length) throw new Error("board empty");
+    S.boards=boards; S.boardAt=Date.now(); S.boardFresh=true;
+    keep("board",{text:text,at:S.boardAt});
+    return true;
+  }).catch(function(){ return false; });
+}
+
+function drawBoards(){
+  var box=$("boardBody");box.textContent="";
+  S.boards.forEach(function(b){
+    var wrap=document.createElement("div");wrap.className="board";
+    var h=document.createElement("h2");h.textContent=b.title;wrap.appendChild(h);
+    var t=document.createElement("table");
+    var thead=document.createElement("thead"),hr=document.createElement("tr");
+    b.header.forEach(function(label){
+      var th=document.createElement("th");th.textContent=label;hr.appendChild(th);
+    });
+    thead.appendChild(hr);t.appendChild(thead);
+    var body=document.createElement("tbody");
+    b.rows.forEach(function(row){
+      var tr=document.createElement("tr");
+      row.forEach(function(cell){
+        var td=document.createElement("td");td.textContent=prettyCell(cell);tr.appendChild(td);
+      });
+      body.appendChild(tr);
+    });
+    t.appendChild(body);wrap.appendChild(t);box.appendChild(wrap);
+  });
+  if(!S.boards.length) box.textContent="The leaderboard has not come through yet.";
+  var mins=S.boardAt?Math.max(0,Math.round((Date.now()-S.boardAt)/60000)):0;
+  $("boardStamp").textContent=S.boardAt
+    ? ("Read "+(mins<1?"just now":mins===1?"1 minute ago":mins+" minutes ago")+
+       (S.boardFresh?"":" \u2014 from this phone, no signal"))
+    : "";
+}
+
+function openBoards(from){
+  S.boardFrom=from;
+  drawBoards(); show("screenBoard");
+  fetchBoards().then(function(got){
+    if(got && !$("screenBoard").classList.contains("hide")) drawBoards();
+  });
 }
 
 /* ---------- sending ----------
@@ -966,13 +1163,24 @@ $("logo").addEventListener("error",function(){
  * one is configured, rather than sitting there doing nothing.
  */
 function drawLeaderboardLinks(){
-  var ok=/^https?:\/\/\S+$/.test(LEADERBOARD_URL||"");
-  ["lbScore","lbCard"].forEach(function(id){
-    var a=$(id);
-    if(ok){ a.href=LEADERBOARD_URL; a.classList.remove("hide"); }
-    else a.classList.add("hide");
+  var out=/^https?:\/\/\S+$/.test(LEADERBOARD_URL||"");
+  var here=/^https?:\/\/\S+$/.test(LEADERBOARD_CSV||"");
+  [["lbScore","screenScore"],["lbCard","screenCard"]].forEach(function(pair){
+    var a=$(pair[0]);
+    if(!out&&!here){ a.classList.add("hide"); return; }
+    a.classList.remove("hide");
+    /* The href stays real even when the tap is caught below. If this script
+       has died in some way nobody foresaw, the button is still a link to the
+       published page rather than a thing that does nothing. */
+    if(out) a.href=LEADERBOARD_URL; else a.removeAttribute("href");
+    if(here) a.addEventListener("click",function(e){ e.preventDefault(); openBoards(pair[1]); });
   });
 }
+
+$("boardBack").addEventListener("click",function(){
+  if(S.boardFrom==="screenCard"){ drawCard(); show("screenCard"); }
+  else { drawScore(); show("screenScore"); }
+});
 
 /* ---------- opening ---------- */
 
@@ -1001,6 +1209,7 @@ sweepOldDays();
 restore();
 drawLeaderboardLinks();
 loadFeedFromPhone();
+loadBoardsFromPhone();
 land();
 
 fetchFeed().then(function(got){
@@ -1017,6 +1226,8 @@ setInterval(function(){
     if(!$("screenScore").classList.contains("hide")) drawGrid();
     if(!$("screenPick").classList.contains("hide")) drawPick();
   });
+  if(!$("screenBoard").classList.contains("hide"))
+    fetchBoards().then(function(got){ if(got) drawBoards(); });
 },FEED_EVERY);
 
 setInterval(function(){ if(outboxNext(outbox())) drainOutbox(); },RETRY_EVERY);

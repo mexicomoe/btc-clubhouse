@@ -48,6 +48,21 @@ const unblanked = page;
 page = page.replace(/^var LEADERBOARD_URL = "[^"]*";$/m, 'var LEADERBOARD_URL = "";');
 if (page === unblanked) throw new Error("LEADERBOARD_URL was not blanked — score.html has changed shape");
 
+// The leaderboard tab as Rob lays it out — two boards, subtitles, footnotes,
+// a spacer column, a star on a Thru.
+const BOARDS = [
+  "CLUBHOUSE,,,,", "Slowest group thru 12,,,,", ",,,,",
+  ",Player,Thru,Net,Clubhouse",
+  '1,"Tanenbaum, Rob",18,71,-3.5',
+  '2,"Granville, Loren",18*,74,-1.0',
+  '3,"Schwartz, Harvey",12,48,+0.5',
+  ",,,,", "* started on the 10th,,,,", ",,,,",
+  "THE TEAM GAME,,,,", "Best 2 balls,,,,", ",,,,",
+  ",Team,Players,Thru,,Total",
+  '1,2,"Granville, Loren & Levy, Rich & Wallach, Mike",18,,-6.0',
+  '2,1,"Tanenbaum, Rob & Schwartz, Harvey & Horvitz, Stu",12,,-2.0',
+].join("\n");
+
 const b = await chromium.launch(process.env.CHROME ? { executablePath: process.env.CHROME } : {});
 const ctx = await b.newContext({ viewport:{width:375,height:760}, deviceScaleFactor:2 });
 const sends = []; let offline = false;
@@ -56,6 +71,8 @@ await ctx.route("**/*", async route => {
   if (u.endsWith("/index.html") || u.endsWith("/")) return route.fulfill({contentType:"text/html", body:page});
   if (u.includes("/feed.csv")) return offline ? route.abort("internetdisconnected")
                                               : route.fulfill({contentType:"text/csv", body:FEED});
+  if (u.includes("/board.csv")) return offline ? route.abort("internetdisconnected")
+                                               : route.fulfill({contentType:"text/csv", body:BOARDS});
   if (u.includes("formResponse")) {
     if (offline) return route.abort("internetdisconnected");
     sends.push(route.request().postData()); return route.fulfill({status:200, body:"ok"});
@@ -219,6 +236,40 @@ ok(await noScroll(), "no sideways scroll on the card at 375");
 await p.screenshot({path:OUT+"/card.png", fullPage:true});
 await p.click("#cardTeam"); await p.waitForTimeout(200);
 await p.screenshot({path:OUT+"/teams.png"});
+
+// 15 · the leaderboard read INTO the page, rather than handed to Google
+// An ABSOLUTE address, because the page refuses anything else — a relative
+// one is indistinguishable from a paste that lost its front half. The route
+// above catches it by path, so nothing leaves the machine.
+page = unblanked.replace(/^var LEADERBOARD_CSV = "[^"]*";$/m,
+                         'var LEADERBOARD_CSV = "https://sheets.invalid/board.csv";');
+if (page === unblanked) throw new Error("LEADERBOARD_CSV was not stubbed");
+await p.goto("http://x/index.html"); await p.waitForTimeout(500);
+await p.click(".teamBtn:nth-of-type(1)"); await p.click("#roleYes"); await p.waitForTimeout(300);
+const tabsBefore = ctx.pages().length;
+await p.click("#lbScore"); await p.waitForTimeout(400);
+ok(await p.isVisible("#screenBoard"), "the leaderboard opens IN the page");
+ok(ctx.pages().length === tabsBefore, "and does not hand him to Google: "+ctx.pages().length);
+const boards = await p.$$eval(".board h2", e => e.map(x => x.textContent));
+ok(JSON.stringify(boards) === '["CLUBHOUSE","THE TEAM GAME"]', "both boards are there: "+boards);
+const txt = await p.innerText("#boardBody");
+ok(txt.includes("18*"), "the star on a Thru survived");
+ok(txt.includes("Rob Tanenbaum"), "names are turned round");
+ok(txt.includes("Loren Granville · Rich Levy"), "a team's men read as men");
+ok(!txt.includes("started on the 10th"), "the footnote did not become a row");
+ok(txt.includes("-3.5"), "the scores came through");
+const sizes = await p.$$eval(".board td", e => e.map(x => parseFloat(getComputedStyle(x).fontSize)));
+ok(Math.min(...sizes) >= 18, "nothing on the board is under 18px: "+Math.min(...sizes));
+ok(await noScroll(), "no sideways scroll on the leaderboard at 375");
+await p.screenshot({path:OUT+"/board.png", fullPage:true});
+
+await p.click("#boardBack"); await p.waitForTimeout(200);
+ok(await p.isVisible("#screenScore"), "Back returns him to the scoring screen");
+await p.click("#scoreToCard"); await p.waitForTimeout(200);
+await p.click("#lbCard"); await p.waitForTimeout(300);
+ok(await p.isVisible("#screenBoard"), "it is reachable from the card too");
+await p.click("#boardBack"); await p.waitForTimeout(200);
+ok(await p.isVisible("#screenCard"), "and Back returns him to the card, not the scoring screen");
 
 await b.close();
 console.log(fails.length ? "\nFAILED: "+fails.length : "\nall browser checks passed");

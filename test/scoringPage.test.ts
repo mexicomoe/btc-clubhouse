@@ -51,14 +51,14 @@ const LIFTED = [
   "parseCsv", "parseFeed", "isEmptySeat", "displayName", "firstName", "parOf",
   "scoreButtons", "nextHole", "prevHole", "playIndex", "feedSentHoles",
   "feedHoleLine", "isOut", "playingSeats", "missingMan", "sendBody",
-  "sendId", "outboxNext",
+  "sendId", "outboxNext", "parseBoards", "prettyCell",
 ].map(fnSource).join("\n");
 
 const P = new Function(LIFTED + "\nreturn {" + [
   "parseCsv", "parseFeed", "isEmptySeat", "displayName", "firstName", "parOf",
   "scoreButtons", "nextHole", "prevHole", "playIndex", "feedSentHoles",
   "feedHoleLine", "isOut", "playingSeats", "missingMan", "sendBody",
-  "sendId", "outboxNext",
+  "sendId", "outboxNext", "parseBoards", "prettyCell",
 ].join(",") + "};")() as any;
 
 /* ---------- a feed to work from ---------- */
@@ -227,6 +227,111 @@ test("held sends go oldest first", () => {
   assert.equal(P.outboxNext([]), null);
 });
 
+/* ---------- the boards ---------- */
+
+/** The leaderboard tab as Rob lays it out: titles, subtitles, a spacer column,
+ *  footnotes under the first board, and a second board below. */
+const BOARDS = [
+  "CLUBHOUSE,,,,",
+  "Slowest group thru 12,,,,",
+  ",,,,",
+  ",Player,Thru,Net,Clubhouse",
+  '1,"Tanenbaum, Rob",18,71,-3.5',
+  '2,"Granville, Loren",18*,74,-1.0',
+  '3,"Schwartz, Harvey",12,48,+0.5',
+  ",,,,",
+  "Two men on the same score are listed in whatever order the sheet reaches them.,,,,",
+  "* started on the 10th,,,,",
+  ",,,,",
+  "THE TEAM GAME,,,,",
+  "Best 2 balls,,,,",
+  ",,,,",
+  ",Team,Players,Thru,,Total",
+  '1,2,"Granville, Loren & Levy, Rich & Wallach, Mike",18,,-6.0',
+  '2,1,"Tanenbaum, Rob & Schwartz, Harvey & Horvitz, Stu",12,,-2.0',
+].join("\n");
+
+const B = P.parseBoards(BOARDS);
+
+test("the board breaks lines between words, not inside them", () => {
+  // word-break:break-word snaps a word as soon as it would narrow the column:
+  // "Thru" became "Thr/u", "Total" became "To/tal", "-6.0" became "-6./0".
+  // Every heading and every figure on the board, halved to save four pixels.
+  assert.match(CSS, /\.board th,\.board td\{[^}]*overflow-wrap:break-word/);
+  assert.equal(/\.board th,\.board td\{[^}]*word-break:/.test(RULES), false,
+    "word-break is back on the board and will halve its headings again");
+});
+
+test("both boards come out of the tab", () => {
+  assert.equal(B.length, 2);
+  assert.deepEqual(B.map((b: any) => b.title), ["CLUBHOUSE", "THE TEAM GAME"]);
+});
+
+test("Rob's subtitles are not mistaken for boards or for men", () => {
+  // "Slowest group thru 12" and "Best 2 balls" sit alone on a row exactly as a
+  // board title does. Mixed case is the only thing telling them apart.
+  assert.equal(B.some((b: any) => /Slowest|Best 2/.test(b.title)), false);
+  for (const b of B) for (const r of b.rows) assert.equal(/Slowest|Best 2/.test(r.join(" ")), false);
+});
+
+test("the footnotes end the board rather than joining it", () => {
+  // "* started on the 10th" is one cell on a row, like a title, but lower case
+  // and not a board. Read as a man it would have appeared in 4th place.
+  assert.equal(B[0].rows.length, 3);
+  assert.equal(JSON.stringify(B).indexOf("started on the 10th"), -1);
+});
+
+test("the columns are whichever carry anything", () => {
+  // The rank column has no header and must survive; the team board's spacer
+  // between Thru and Total has neither header nor body and must not.
+  assert.deepEqual(B[0].header, ["", "Player", "Thru", "Net", "Clubhouse"]);
+  assert.deepEqual(B[1].header, ["", "Team", "Players", "Thru", "Total"]);
+  assert.deepEqual(B[1].rows[0].length, 5);
+});
+
+test("a star on a Thru is kept exactly as the sheet wrote it", () => {
+  // The star says his team went off the 10th. It is the one thing on the board
+  // that looks like dirt and is not.
+  assert.equal(B[0].rows[1][2], "18*");
+  assert.equal(P.prettyCell("18*"), "18*");
+});
+
+test("scores are left alone, names are turned round", () => {
+  assert.equal(P.prettyCell("-3.5"), "-3.5");
+  assert.equal(P.prettyCell("+0.5"), "+0.5");
+  assert.equal(P.prettyCell("Tanenbaum, Rob"), "Rob Tanenbaum");
+  assert.equal(P.prettyCell("Granville, Loren & Levy, Rich & Wallach, Mike"),
+               "Loren Granville \u00b7 Rich Levy \u00b7 Mike Wallach");
+  // A figure with a comma in it is not a man.
+  assert.equal(P.prettyCell("1,234"), "1,234");
+  assert.equal(P.prettyCell(""), "");
+});
+
+test("a board with an extra column needs no code change", () => {
+  // The day a contest is switched on the tab gains a column. Nothing here
+  // knows what the columns MEAN, so it simply appears.
+  const withSkins = BOARDS
+    .replace(",Player,Thru,Net,Clubhouse", ",Player,Thru,Net,Skins,Clubhouse")
+    .replace('1,"Tanenbaum, Rob",18,71,-3.5', '1,"Tanenbaum, Rob",18,71,-1.2,-3.5');
+  const x = P.parseBoards(withSkins);
+  assert.deepEqual(x[0].header, ["", "Player", "Thru", "Net", "Skins", "Clubhouse"]);
+  assert.equal(x[0].rows[0][4], "-1.2");
+});
+
+test("a tab that has not come through gives nothing rather than half a board", () => {
+  assert.deepEqual(P.parseBoards(""), []);
+  assert.deepEqual(P.parseBoards("CLUBHOUSE,,,,"), []);          // a title and no rows
+  assert.deepEqual(P.parseBoards("<!DOCTYPE html><html>"), []);  // an error page
+});
+
+test("the last board is kept on the phone", () => {
+  assert.match(PAGE, /keep\("board",\{text:text,at:S\.boardAt\}\)/);
+  assert.match(PAGE, /function loadBoardsFromPhone/);
+  assert.match(PAGE, /loadBoardsFromPhone\(\);/);
+  // And it says which it is showing, so a stale board is never passed off as live.
+  assert.match(PAGE, /from this phone, no signal/);
+});
+
 /* ---------- the promises the page makes about signal ---------- */
 
 test("a score is written down before it is sent, and never falsely confirmed", () => {
@@ -334,13 +439,27 @@ test("a half-pasted leaderboard address is not drawn either", () => {
   assert.equal(test1("javascript:alert(1)"), false);
 });
 
-test("an unconfigured leaderboard is not drawn at all", () => {
+test("with neither address the leaderboard is not drawn at all", () => {
   // A button that goes nowhere is tapped twice and then the page is not
   // trusted. Hidden is better than dead.
   assert.match(PAGE, /^var LEADERBOARD_URL = "[^"]*";$/m);
-  assert.match(PAGE, /if\(ok\)\{ a\.href=LEADERBOARD_URL; a\.classList\.remove\("hide"\); \}/);
-  assert.match(PAGE, /else a\.classList\.add\("hide"\);/);
+  assert.match(PAGE, /^var LEADERBOARD_CSV = "[^"]*";$/m);
+  assert.match(PAGE, /if\(!out&&!here\)\{ a\.classList\.add\("hide"\); return; \}/);
   assert.match(PAGE, /drawLeaderboardLinks\(\);/);
+});
+
+test("the button reads the board into the page, and still degrades to the link", () => {
+  // With a CSV it is caught and drawn here. Without one it stays the link out
+  // to Google, so republishing the tab cannot leave the men with nothing.
+  assert.match(PAGE, /if\(here\) a\.addEventListener\("click",function\(e\)\{ e\.preventDefault\(\); openBoards\(pair\[1\]\); \}\);/);
+  assert.match(PAGE, /if\(out\) a\.href=LEADERBOARD_URL; else a\.removeAttribute\("href"\);/);
+  // The href is set even when the tap is caught, so a script that dies in some
+  // way nobody foresaw still leaves a link rather than a dead button.
+  const draw = PAGE.slice(PAGE.indexOf("function drawLeaderboardLinks"));
+  assert.ok(draw.indexOf("a.href=LEADERBOARD_URL") < draw.indexOf("preventDefault"),
+    "the real href is not set before the tap is intercepted");
+  // Back goes where he came from, not to a fixed screen.
+  assert.match(PAGE, /if\(S\.boardFrom==="screenCard"\)/);
 });
 
 test("the leaderboard address is whole, and points at the leaderboard tab", () => {

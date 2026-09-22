@@ -93,29 +93,45 @@ Honestly, because it matters:
 
 ---
 
-## 5 · The leaderboard button
+## 5 · The leaderboard, in the page
 
 On the bottom of **both** the scoring screen and the card — the two screens a
-man actually sits on. It opens in a **new tab**, so following it leaves the
-scoring page loaded behind him and still retrying anything it is holding.
+man actually sits on. Tapping it opens a fourth screen inside the page: the
+CLUBHOUSE board and THE TEAM GAME, one under the other, in the page's own
+type. No new tab, no Google, no pinch-zoom, and it keeps working off the
+phone's last copy when the signal goes.
 
-Pointed at the published leaderboard tab, `gid=1476327864`:
+**One thing left.** Republish that tab as **CSV** (`gid=1476327864`, the same
+two clicks as the Scorer feed) and paste the address into:
 
+```js
+var LEADERBOARD_CSV = "";
 ```
-…YVz_n4L7dsPdcUJkynwk7lx4d/pubhtml?gid=1476327864&single=true
-```
 
-`single=true` keeps Google's tab strip off the bottom, so the men land on the
-leaderboard and cannot wander into the Scorer feed. The feed is `gid=1997697752`
-— worth keeping the two straight.
+Until then the button stays what it was — a link out to the published page —
+so nothing is broken while you republish. Set it and the button reads the
+board into the page instead.
 
-If `LEADERBOARD_URL` is ever emptied, or holds anything that is not a whole
-`http`/`https` address, the button is **not drawn at all** rather than drawn
-dead. A pasted address arrived here once cut off after `/p`.
+### What it will and will not cope with
 
-**Tap it once before Friday.** Publishing the Scorer feed did not publish this
-tab; if that tab was never published, the link is a Google error page and the
-page has no way to know.
+It finds its way by **shape**, not by row numbers, because that tab is a board
+laid out for people: it grows a row when a man joins, and gains a column when a
+contest is switched on.
+
+- A board starts at a lone **ALL-CAPITALS** cell on its own row. That is the
+  one rule that matters. `CLUBHOUSE` and `THE TEAM GAME` are boards; *Slowest
+  group thru 12* and *Best 2 balls* are mixed case and are skipped as
+  subtitles. **If you ever retitle a board in mixed case, it disappears.**
+- Its header is the first row after that with three or more cells.
+- Its rows stop at the first row with fewer than two — which is what keeps
+  *"\* started on the 10th"* out of 4th place.
+- Its columns are whichever carry anything, so the unlabelled rank column
+  survives and the team board's blank spacer is dropped.
+- **A new column just appears.** Nothing in the page knows what "Net" means.
+
+A `Thru` of `18*` is passed through exactly as written — the star is the thing,
+not dirt. Scores like `-3.5` and `+0.5` likewise. Names are turned round from
+`Surname, First` for the screen, and a team's men are split on `&`.
 
 ## 6 · Also needed
 
@@ -128,8 +144,8 @@ Until one is there the header simply has no logo; nothing breaks.
 
 ## Testing
 
-- `npm test` — 31 tests on the page's decisions, inside the 721 already there.
+- `npm test` — 44 tests on the page's decisions, inside the 734 already there.
 - `npm i --no-save playwright && node test/browser/scoringPage.smoke.mjs /tmp/shots`
-  — 57 checks driving the real page at 375 pixels: the double tap, the hole
+  — 70 checks driving the real page at 375 pixels: the double tap, the hole
   moving on, the empty boxes, the correction, the held send, the leaderboard opening a
   second tab, no sideways scroll.
