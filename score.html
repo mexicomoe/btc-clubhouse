@@ -71,7 +71,12 @@ header{
 
 /* ---------- buttons ---------- */
 button{
-  font:800 20px/1 inherit;font-family:inherit;color:var(--ink);background:var(--paper);
+  /* NOT the `font:` shorthand. `inherit` is not a legal family inside it, so
+     `font:800 20px/1 inherit` is thrown away whole and every button on the page
+     falls back to the browser's own weight — lighter than anything else here,
+     on the one screen where weight IS the contrast. Written out, it sticks. */
+  font-family:inherit;font-weight:800;font-size:20px;line-height:1;
+  color:var(--ink);background:var(--paper);
   border:3px solid var(--ink);border-radius:8px;
   min-height:48px;min-width:44px;padding:10px 12px;cursor:pointer;
   appearance:none;
@@ -85,7 +90,7 @@ button.wide,a.wide{display:block;width:100%;margin:10px 0;min-height:60px;font-s
    as a button so it reads as one to a man who does not know the difference. */
 a.wide{box-sizing:border-box;border:3px solid var(--ink);border-radius:8px;
   background:var(--paper);color:var(--ink);text-decoration:none;
-  font:800 22px/1 inherit;font-family:inherit;padding:10px 12px;
+  font-family:inherit;font-weight:800;font-size:22px;line-height:1;padding:10px 12px;
   display:flex;align-items:center;justify-content:center;}
 button.plain{border-width:3px;}
 button.go{min-height:68px;font-size:26px;}

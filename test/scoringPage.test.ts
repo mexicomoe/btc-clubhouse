@@ -316,7 +316,7 @@ test("the leaderboard is reachable from both screens a man sits on", () => {
     assert.match(m[1], /rel="noopener noreferrer"/);
   }
   // Dressed as a button, and held to the same floors as one.
-  assert.match(CSS, /a\.wide\{[^}]*font:800 22px/);
+  assert.match(CSS, /a\.wide\{[^}]*font-weight:800/);
   assert.match(CSS, /button\.wide,a\.wide\{[^}]*min-height:60px/);
 });
 
@@ -338,6 +338,9 @@ test("the scorer feed is wired in", () => {
 /* ---------- eyesight ---------- */
 
 const CSS = PAGE.slice(PAGE.indexOf("<style>"), PAGE.indexOf("</style>"));
+/** The same, with the comments taken out — several of these checks hunt for a
+ *  pattern that the comment WARNING about that pattern also contains. */
+const RULES = CSS.replace(/\/\*[\s\S]*?\*\//g, "");
 
 test("nothing on the page is under 18 pixels", () => {
   const sizes = [...CSS.matchAll(/font-size:\s*(\d+)px/g)].map(m => Number(m[1]));
@@ -347,6 +350,11 @@ test("nothing on the page is under 18 pixels", () => {
   // The shorthand `font:` lines carry a size too, and are just as easy to shrink.
   const short = [...CSS.matchAll(/font:\s*\d+\s+(\d+)px/g)].map(m => Number(m[1]));
   assert.deepEqual(short.filter(n => n < 18), []);
+  // And no `font:` shorthand may end in `inherit`. It is not a legal family
+  // there, so the browser drops the WHOLE declaration — weight, size and all —
+  // without a word. It cost the buttons their weight once already.
+  assert.deepEqual([...RULES.matchAll(/font:[^;]*\binherit\b[^;]*;/g)].map(m => m[0]), [],
+    "a font: shorthand ending in inherit is silently thrown away");
 });
 
 test("no tap target is under 44 pixels", () => {
