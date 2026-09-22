@@ -1,0 +1,959 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="TGIF">
+<meta name="theme-color" content="#ffffff">
+<title>TGIF — Scoring</title>
+<!--
+  THE SCORING PAGE. One link, saved to the home screen, used every week.
+
+  WHY IT IS ONE FILE. Aberdeen has holes with no signal. A page that pulls in a
+  stylesheet and a script is three round trips that can each fail separately,
+  and a phone that holds new HTML against an old script fails SILENTLY — the
+  app has been bitten by exactly that (see .githooks/pre-commit). Everything
+  here is inline, so the page either arrives whole or does not arrive, and once
+  it is in the phone's cache it opens with no network at all.
+
+  It is deliberately NOT part of the Clubhouse app. It shares no code with
+  engine.js and loads nothing the app loads, because the men open it in the
+  middle of a round and it must not be able to break when the app changes.
+-->
+<style>
+/*
+ * SEVENTY-FIVE-YEAR-OLD MEN, OUTDOORS, IN FLORIDA SUN.
+ *
+ * Pure black on pure white. Not a shade of grey anywhere that carries meaning
+ * — grey is the first thing to disappear behind a phone screen's glare, and
+ * the whole card would go with it. The one colour is the burnt orange that
+ * marks a hole still waiting for signal, chosen because it survives being
+ * washed out AND is still distinguishable when it is the only thing on screen.
+ *
+ * Nothing is under 18px. No tap target is under 44px. Both are enforced by a
+ * test that reads this stylesheet, so neither can drift.
+ */
+:root{
+  --ink:#000;
+  --paper:#fff;
+  --wait:#8a3b00;
+  --waitfill:#ffe9d6;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;overflow-x:hidden;background:var(--paper);color:var(--ink);}
+body{
+  font:600 19px/1.35 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+  -webkit-text-size-adjust:100%;
+  padding:0 12px env(safe-area-inset-bottom) 12px;
+  max-width:560px;margin:0 auto;
+}
+h1,h2{margin:0;font-size:24px;letter-spacing:.01em;}
+p{margin:.6em 0;font-size:19px;}
+.hide{display:none !important;}
+
+/* ---------- the top of every screen ---------- */
+header{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 0 8px;border-bottom:3px solid var(--ink);
+  position:sticky;top:0;background:var(--paper);z-index:5;
+}
+#logo{height:34px;width:auto;display:block;}
+#topTeam{font-size:24px;font-weight:800;white-space:nowrap;}
+#topNames{font-size:18px;font-weight:600;flex:1;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+/* ---------- the standing word on unsent holes ---------- */
+#queueBar{
+  margin:8px 0 0;padding:12px;border:3px solid var(--wait);
+  background:var(--waitfill);color:var(--wait);font-size:19px;font-weight:800;
+}
+
+/* ---------- buttons ---------- */
+button{
+  font:800 20px/1 inherit;font-family:inherit;color:var(--ink);background:var(--paper);
+  border:3px solid var(--ink);border-radius:8px;
+  min-height:48px;min-width:44px;padding:10px 12px;cursor:pointer;
+  appearance:none;
+}
+button:disabled{opacity:.35;}
+button.on{background:var(--ink);color:var(--paper);}
+button.wide{display:block;width:100%;margin:10px 0;min-height:60px;font-size:22px;}
+button.plain{border-width:3px;}
+button.go{min-height:68px;font-size:26px;}
+
+/* ---------- picking a team ---------- */
+.teamBtn{
+  display:block;width:100%;margin:12px 0;padding:14px;min-height:88px;
+  text-align:left;font-size:20px;
+}
+.teamBtn .n{display:block;font-size:28px;font-weight:800;margin-bottom:4px;}
+.teamBtn .m{display:block;font-size:18px;font-weight:600;line-height:1.3;}
+
+/* ---------- the hole ---------- */
+#holeBar{display:flex;align-items:center;gap:10px;margin:12px 0 4px;}
+#holeBar button{width:64px;min-height:64px;font-size:30px;padding:0;}
+#holeName{flex:1;text-align:center;font-size:27px;font-weight:800;}
+
+/* ---------- one row a man ---------- */
+.man{border-top:3px solid var(--ink);padding:10px 0 12px;}
+.manTop{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.manName{flex:1;font-size:21px;font-weight:800;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.outBtn{font-size:18px;min-height:44px;padding:8px 10px;border-width:3px;}
+.scores{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
+.scores button{min-height:52px;padding:0;font-size:23px;}
+.gone{font-size:19px;font-weight:700;padding:8px 0;}
+
+/* ---------- already in ---------- */
+#sentWarn{margin:10px 0;padding:12px;border:3px solid var(--ink);background:var(--paper);font-size:19px;}
+
+/* ---------- the hole grid ---------- */
+#gridWrap{margin:18px 0 4px;border-top:3px solid var(--ink);padding-top:12px;}
+.gridRow{display:grid;grid-template-columns:repeat(9,1fr);gap:4px;margin-bottom:4px;}
+.cell{
+  min-height:44px;display:flex;align-items:center;justify-content:center;
+  font-size:18px;font-weight:800;border:3px solid var(--ink);border-radius:6px;
+  background:var(--paper);color:var(--ink);
+}
+.cell.in{background:var(--ink);color:var(--paper);}
+.cell.waiting{border-color:var(--wait);background:var(--waitfill);color:var(--wait);}
+.cell.now{outline:4px solid var(--ink);outline-offset:2px;}
+
+/* ---------- the check screen ---------- */
+#reviewList{margin:12px 0;}
+#reviewList div{font-size:22px;font-weight:700;padding:8px 0;border-bottom:3px solid var(--ink);}
+#saidNo{font-size:21px;font-weight:800;padding:10px 0;}
+
+/* ---------- the card ---------- */
+.card{margin:14px 0;}
+table{border-collapse:collapse;width:100%;table-layout:fixed;}
+th,td{border:2px solid var(--ink);padding:5px 1px;text-align:center;font-size:18px;font-weight:700;}
+th.nm,td.nm{text-align:left;width:86px;padding-left:4px;font-size:18px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+thead th{background:var(--ink);color:var(--paper);}
+tr.par td,tr.par th{font-weight:600;}
+#cardStamp{font-size:18px;font-weight:600;margin:10px 0 0;}
+footer{margin:22px 0 10px;border-top:3px solid var(--ink);padding-top:12px;}
+</style>
+</head>
+<body>
+
+<header>
+  <img id="logo" src="tgif_logo.png" alt="TGIF">
+  <div id="topTeam"></div>
+  <div id="topNames"></div>
+</header>
+
+<div id="queueBar" class="hide"></div>
+
+<!-- 1 · WHICH TEAM. His own name on the button is the whole identification. -->
+<section id="screenPick" class="hide">
+  <h1>Tap your team</h1>
+  <div id="teamList"></div>
+  <p id="pickNote"></p>
+</section>
+
+<!-- 2 · SCORER OR WATCHER -->
+<section id="screenRole" class="hide">
+  <h1>Are you keeping score today?</h1>
+  <button id="roleYes" class="wide go">Yes — I'm keeping score</button>
+  <button id="roleNo" class="wide go">No — just show me the card</button>
+  <button id="roleBack" class="wide plain">Wrong team</button>
+</section>
+
+<!-- 3 · SCORING -->
+<section id="screenScore" class="hide">
+  <div id="holeBar">
+    <button id="holePrev" aria-label="Hole before">&#8592;</button>
+    <div id="holeName"></div>
+    <button id="holeNext" aria-label="Hole after">&#8594;</button>
+  </div>
+  <div id="sentWarn" class="hide"></div>
+  <div id="menList"></div>
+  <button id="toReview" class="wide go">Review</button>
+  <p id="scoreMsg"></p>
+  <div id="gridWrap">
+    <div class="gridRow" id="gridTop"></div>
+    <div class="gridRow" id="gridBot"></div>
+  </div>
+  <footer><button id="scoreToCard" class="wide plain">See the card</button></footer>
+</section>
+
+<!-- 4 · THE CHECK BEFORE IT GOES -->
+<section id="screenReview" class="hide">
+  <h1 id="reviewHead"></h1>
+  <div id="reviewList"></div>
+  <button id="doSend" class="wide go">Send</button>
+  <button id="doChange" class="wide plain">Change a score</button>
+</section>
+
+<!-- 5 · THE CARD, TO LOOK AT -->
+<section id="screenCard" class="hide">
+  <h1 id="cardHead"></h1>
+  <div id="cardBody"></div>
+  <p id="cardStamp"></p>
+  <footer>
+    <button id="cardToScore" class="wide plain hide">Back to scoring</button>
+    <button id="cardTeam" class="wide plain">Change team</button>
+  </footer>
+</section>
+
+<script>
+"use strict";
+/* ==================================================================
+ * WHAT ROB HAS TO FILL IN
+ * ================================================================== */
+
+/**
+ * WHERE A HOLE IS FILED. Read straight off the Clubhouse_Scorecard form's own
+ * HTML, so these are the real boxes and not a transcription of them.
+ *
+ *   entry.571884128   Team            dropdown 1-6, REQUIRED
+ *   entry.605471460   Holes           dropdown 1-18, REQUIRED
+ *   entry.828466984   Scores Player A  radio 1-9, not required
+ *   entry.1307241763  Scores Player B  radio 1-9, not required
+ *   entry.378353848   Scores Player C  radio 1-9, not required
+ *   entry.1378388490  Scores Player D  radio 1-9, not required
+ *
+ * The four score rows are NOT required — that is what lets a BLIND, a
+ * threesome, and a man who has left the round go in with an empty box. A box
+ * is left empty by leaving its key OFF the body entirely, which is what a real
+ * browser does with an untouched radio.
+ */
+var FORM_POST = "https://docs.google.com/forms/d/e/1FAIpQLSemQD14_d1-F0Xfn1GYQF3rfH1Jb-W3CbuXwHIsfxbkciCoIQ/formResponse";
+var FORM_TEAM = "entry.571884128";
+var FORM_HOLE = "entry.605471460";
+var FORM_SEAT = ["entry.828466984","entry.1307241763","entry.378353848","entry.1378388490"];
+
+/**
+ * THE SCORER FEED. Rob publishes one tab to the web as CSV and pastes its
+ * address here. File > Share > Publish to web > the tab > Comma-separated
+ * values. The tab is one row a seat:
+ *
+ *     team,start,seat,name,h1,h2, ... ,h18
+ *
+ * Until it is filled in the page says so rather than guessing at a roster —
+ * a stale roster baked into the page is the one failure nobody would notice.
+ */
+var FEED_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQg-44HCczcIAcyn9_osr4HvnniZba5IV9wKlf-uNFjz_CaGDcYRnqYVz_n4L7dsPdcUJkynwk7lx4d/pub?gid=1997697752&single=true&output=csv";
+
+/**
+ * DOES THE SPREADSHEET KEEP THE LATEST SEND, OR ADD THEM UP?
+ *
+ * IT KEEPS THE LATEST. The Gross tab was changed on 22 September to take the
+ * last row for a team and hole rather than the sum, so a re-send REPLACES.
+ * That is what makes a correction from the course safe, and it is also what
+ * makes a duplicate harmless: the same hole sent twice lands on the same
+ * numbers.
+ *
+ * It was not always so. The workbook used to add a repeated send to what was
+ * there — "Sending a hole twice adds the two together", with a CHECK tab whose
+ * only job was to catch it — and a correction would have turned a 5 into a 10,
+ * quietly, in the money. THE FALSE BRANCH IS KEPT FOR THAT REASON. If the
+ * Gross tab is ever rebuilt and goes back to summing, set this to false and
+ * the page returns to showing a hole, warning, and refusing to send it again.
+ * Nothing else has to change either way.
+ */
+var SHEET_LAST_SEND_WINS = true;
+
+/* Aberdeen, in hole order. The card's own Course tab says the same. */
+var PAR = [4,4,3,5,4,4,5,3,4,4,4,4,3,4,4,5,3,5];
+
+/* How often the feed is re-read while the page is open, in milliseconds. */
+var FEED_EVERY = 60000;
+/* How often a held send is tried again while the page is open. */
+var RETRY_EVERY = 20000;
+
+/* ==================================================================
+ * THE PARTS WITH NO SCREEN IN THEM
+ *
+ * Everything below this line to the next banner is a plain function of its
+ * arguments. They are lifted out of this file and run by the tests, which is
+ * why they are top-level `function` declarations and touch no globals but the
+ * constants above.
+ * ================================================================== */
+
+/**
+ * CSV, WITH QUOTED FIELDS. Not optional: every man in the sheet is stored
+ * "Surname, First", so a split on commas tears each name in half and shifts
+ * all eighteen of his holes one column to the left. It would score the round
+ * wrong rather than fail.
+ */
+function parseCsv(text){
+  var rows=[],row=[],field="",quoted=false,i;
+  text = String(text||"").replace(/\r\n/g,"\n").replace(/\r/g,"\n");
+  for(i=0;i<text.length;i++){
+    var c=text[i];
+    if(quoted){
+      if(c==='"'){ if(text[i+1]==='"'){field+='"';i++;} else quoted=false; }
+      else field+=c;
+    } else if(c==='"'){ quoted=true; }
+    else if(c===","){ row.push(field);field=""; }
+    else if(c==="\n"){ row.push(field);field="";rows.push(row);row=[]; }
+    else field+=c;
+  }
+  row.push(field);
+  if(row.length>1||row[0]!=="") rows.push(row);
+  return rows;
+}
+
+/**
+ * THE FEED, AS TEAMS. A header row is expected and skipped; anything that is
+ * not a team number 1-6 with a seat 1-4 is ignored rather than trusted, so a
+ * note typed at the bottom of the tab cannot put a phantom man on a card.
+ *
+ * A seat with no name at all is an empty seat. A seat reading BLIND is a
+ * stand-in. Both are carried, because both have to be sent as an empty box —
+ * the difference only matters to what is drawn on the screen.
+ */
+function parseFeed(text){
+  var rows=parseCsv(text),teams={},order=[],r,i;
+  for(r=0;r<rows.length;r++){
+    var c=rows[r];
+    if(!c||c.length<4) continue;
+    var team=parseInt(String(c[0]).trim(),10);
+    var start=parseInt(String(c[1]).trim(),10);
+    var seat=parseInt(String(c[2]).trim(),10);
+    if(!(team>=1&&team<=6)||!(seat>=1&&seat<=4)) continue;
+    if(start!==1&&start!==10) start=1;
+    if(!teams[team]){ teams[team]={team:team,start:start,seats:[null,null,null,null]}; order.push(team); }
+    teams[team].start=start;
+    var holes=[];
+    for(i=0;i<18;i++){
+      var v=String(c[4+i]==null?"":c[4+i]).trim();
+      var n=v===""?null:parseInt(v,10);
+      holes.push(isNaN(n)?null:n);
+    }
+    teams[team].seats[seat-1]={seat:seat,name:String(c[3]||"").trim(),holes:holes};
+  }
+  order.sort(function(a,b){return a-b;});
+  return order.map(function(t){return teams[t];});
+}
+
+/** A seat nobody is sitting in. BLIND counts — he has no score to give. */
+function isEmptySeat(seat){
+  if(!seat) return true;
+  var n=(seat.name||"").trim();
+  return n==="" || n.toUpperCase()==="BLIND";
+}
+
+/**
+ * "Tanenbaum, Rob" is how the spreadsheet keeps him and how it must stay, so
+ * that every tab matches. It is not how he knows himself on a phone in the
+ * sun, so it is turned round here and only here.
+ */
+function displayName(name){
+  var n=String(name||"").trim();
+  var at=n.indexOf(",");
+  if(at<0) return n;
+  return (n.slice(at+1).trim()+" "+n.slice(0,at).trim()).trim();
+}
+
+/** The short form for a header, where four names have to fit across a phone. */
+function firstName(name){
+  var d=displayName(name);
+  var sp=d.indexOf(" ");
+  return sp<0?d:d.slice(0,sp);
+}
+
+/** Par for a hole numbered 1-18. */
+function parOf(hole){ return PAR[hole-1]; }
+
+/**
+ * THE SEVEN BUTTONS. One rule rather than a table: the lowest is two under
+ * par, and there are always seven. Par 3 gives 1-7, par 4 gives 2-8, par 5
+ * gives 3-9 — which is also exactly the 1-9 the form's grid will accept.
+ */
+function scoreButtons(par){
+  var lo=par-2,out=[],i;
+  for(i=0;i<7;i++) out.push(lo+i);
+  return out;
+}
+
+/** 18 comes round to 1. */
+function nextHole(h){ return h===18?1:h+1; }
+function prevHole(h){ return h===1?18:h-1; }
+
+/**
+ * HOW FAR INTO HIS ROUND A HOLE IS. A team off the 10th plays 10..18 then
+ * 1..9, so "after hole 16" is not "a bigger number than 16". Everything that
+ * has to know what came first — chiefly a man who left the round — asks this.
+ */
+function playIndex(hole,start){ return ((hole-start)%18+18)%18; }
+
+/** Which holes the feed says this team has already filed. */
+function feedSentHoles(team){
+  var got={},h,s;
+  if(!team) return got;
+  for(h=1;h<=18;h++){
+    for(s=0;s<4;s++){
+      var seat=team.seats[s];
+      if(!seat||isEmptySeat(seat)) continue;
+      if(seat.holes[h-1]!=null){ got[h]=true; break; }
+    }
+  }
+  return got;
+}
+
+/** What the feed holds for one hole, as "Rob 5, Harvey 6, Stu 4". */
+function feedHoleLine(team,hole){
+  var bits=[],s;
+  for(s=0;s<4;s++){
+    var seat=team.seats[s];
+    if(!seat||isEmptySeat(seat)) continue;
+    var v=seat.holes[hole-1];
+    if(v!=null) bits.push(firstName(seat.name)+" "+v);
+  }
+  return bits.join(", ");
+}
+
+/** Is this man out of the round by the time the team reaches this hole? */
+function isOut(leftAt,seatNo,hole,start){
+  var from=leftAt&&leftAt[seatNo];
+  if(!from) return false;
+  return playIndex(hole,start)>=playIndex(from,start);
+}
+
+/** The seats that owe a score on this hole. */
+function playingSeats(team,hole,leftAt){
+  var out=[],s;
+  for(s=0;s<4;s++){
+    var seat=team.seats[s];
+    if(!seat||isEmptySeat(seat)) continue;
+    if(isOut(leftAt,seat.seat,hole,team.start)) continue;
+    out.push(seat);
+  }
+  return out;
+}
+
+/**
+ * THE MAN WHO IS MISSING. Named, not counted — "someone has no score" sends a
+ * captain back through four rows squinting; "Harvey has no score" does not.
+ * The first one in seat order, because that is the order on his screen.
+ */
+function missingMan(team,hole,scores,leftAt){
+  var seats=playingSeats(team,hole,leftAt),i;
+  for(i=0;i<seats.length;i++){
+    var v=scores?scores[seats[i].seat]:null;
+    if(v==null) return displayName(seats[i].name);
+  }
+  return null;
+}
+
+/**
+ * THE BODY OF ONE SEND. A seat with no score contributes NO KEY AT ALL, which
+ * is how an untouched radio behaves and how the sheet is told "empty box".
+ * Team and hole are always there; the form requires both.
+ */
+function sendBody(team,hole,scores){
+  var body={},s;
+  body[FORM_TEAM]=String(team);
+  body[FORM_HOLE]=String(hole);
+  for(s=1;s<=4;s++){
+    var v=scores?scores[s]:null;
+    if(v!=null) body[FORM_SEAT[s-1]]=String(v);
+  }
+  return body;
+}
+
+/**
+ * ONE SEND'S NAME. A team and a hole, nothing else — so a second tap on Send
+ * cannot make a second job, however fast the tap, and a reload part-way
+ * through finds the same job rather than a twin of it.
+ */
+function sendId(team,hole){ return "t"+team+"h"+hole; }
+
+/** The next held send to try, or nothing. Oldest first: the round's order. */
+function outboxNext(queue){
+  var i,best=null;
+  for(i=0;i<(queue||[]).length;i++){
+    var q=queue[i];
+    if(q&&q.state==="pending"&&(best===null||q.at<best.at)) best=q;
+  }
+  return best;
+}
+
+/* ==================================================================
+ * THE SCREEN
+ * ================================================================== */
+
+var $=function(id){return document.getElementById(id);};
+
+/* ---------- what is remembered, and for how long ----------
+ *
+ * Everything about today is filed under today's date, and every key from
+ * another date is thrown away as the page opens. That is what makes the next
+ * round start clean without anybody having to clear anything — and it is also
+ * why a phone that sat in a drawer for a week cannot wake up believing it is
+ * on the 7th of a round that finished.
+ *
+ * THE OUTBOX IS THE ONE EXCEPTION. A send that has not gone yet is not about
+ * today, it is about a score that a man in a cart believes he has filed. It
+ * outlives the date, so that midnight, a dead battery, and a reload cannot be
+ * the thing that loses it.
+ */
+var DAY=(function(){var d=new Date();
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");})();
+var NS="tgif.";
+var OUTBOX_KEY=NS+"outbox";
+
+function keep(k,v){ try{localStorage.setItem(NS+DAY+"."+k,JSON.stringify(v));}catch(e){} }
+function recall(k,dflt){
+  try{var s=localStorage.getItem(NS+DAY+"."+k);return s==null?dflt:JSON.parse(s);}catch(e){return dflt;}
+}
+function sweepOldDays(){
+  try{
+    var kill=[],i,k;
+    for(i=0;i<localStorage.length;i++){
+      k=localStorage.key(i);
+      if(k&&k.indexOf(NS)===0&&k!==OUTBOX_KEY&&k.indexOf(NS+DAY+".")!==0) kill.push(k);
+    }
+    for(i=0;i<kill.length;i++) localStorage.removeItem(kill[i]);
+  }catch(e){}
+}
+
+function outbox(){ try{return JSON.parse(localStorage.getItem(OUTBOX_KEY)||"[]");}catch(e){return [];} }
+function setOutbox(q){ try{localStorage.setItem(OUTBOX_KEY,JSON.stringify(q));}catch(e){} }
+
+/* ---------- state ---------- */
+var S={
+  feed:[],          /* teams, as parsed */
+  stamp:0,          /* when the feed was last read */
+  fresh:false,      /* was that read from the network, or the phone's copy */
+  team:null,        /* the team number he tapped */
+  role:null,        /* "score" or "watch" */
+  hole:null,        /* the hole on screen */
+  scores:{},        /* seat -> score, for the hole on screen */
+  leftAt:{},        /* seat -> the hole from which he is out */
+  acked:{},         /* hole -> true, sends this phone saw land */
+  unlocked:false,   /* he has said yes to changing a hole already in */
+  sending:false
+};
+
+function teamOf(n){ for(var i=0;i<S.feed.length;i++) if(S.feed[i].team===n) return S.feed[i]; return null; }
+function myTeam(){ return teamOf(S.team); }
+
+function show(which){
+  ["screenPick","screenRole","screenScore","screenReview","screenCard"].forEach(function(id){
+    $(id).classList.toggle("hide",id!==which);
+  });
+}
+
+function drawHeader(){
+  var t=myTeam();
+  $("topTeam").textContent=t?("Team "+t.team):"";
+  $("topNames").textContent=t?t.seats.filter(function(s){return !isEmptySeat(s);})
+    .map(function(s){return firstName(s.name);}).join(" · "):"";
+}
+
+/* ---------- the feed ---------- */
+
+/**
+ * READ THE FEED, AND KEEP A COPY ON THE PHONE.
+ *
+ * The copy is the point. A man who walks into the dead patch by the 12th and
+ * reopens the page must not find an empty screen where his team was; he finds
+ * the last thing that was true, with the time it was true written under it.
+ * A screen that goes blank is a screen a captain stops trusting.
+ */
+function loadFeedFromPhone(){
+  var c=recall("feed",null);
+  if(c&&c.text){ S.feed=parseFeed(c.text); S.stamp=c.at||0; S.fresh=false; return true; }
+  return false;
+}
+
+function fetchFeed(){
+  if(!FEED_CSV) return Promise.resolve(false);
+  var url=FEED_CSV+(FEED_CSV.indexOf("?")<0?"?":"&")+"cachebust="+Date.now();
+  return fetch(url,{cache:"no-store"}).then(function(r){
+    if(!r.ok) throw new Error("feed "+r.status);
+    return r.text();
+  }).then(function(text){
+    var teams=parseFeed(text);
+    if(!teams.length) throw new Error("feed empty");
+    S.feed=teams; S.stamp=Date.now(); S.fresh=true;
+    keep("feed",{text:text,at:S.stamp});
+    return true;
+  }).catch(function(){ return false; });
+}
+
+function feedAge(){
+  if(!S.stamp) return "";
+  var mins=Math.max(0,Math.round((Date.now()-S.stamp)/60000));
+  if(mins<1) return "just now";
+  if(mins===1) return "1 minute ago";
+  return mins+" minutes ago";
+}
+
+/* ---------- sending ----------
+ *
+ * THE ORDER HERE IS THE WHOLE SAFETY OF THE PAGE, and it is: write it down
+ * first, try to send it second, tell him last, and only ever tell him what
+ * actually happened.
+ *
+ * WHAT THE BROWSER WILL AND WILL NOT GIVE US. The post is cross-origin to a
+ * form that sends no CORS headers, so it goes no-cors and the reply is opaque:
+ * we cannot read Google's status. What we CAN read is whether the request
+ * completed at all. A resolved promise means the phone reached Google and
+ * Google answered. A rejection means it did not leave. That distinction is the
+ * difference between "sent" and "waiting", and it is the only honest one
+ * available.
+ *
+ * WHY NOT sendBeacon, WHICH picks.html USES. sendBeacon returns the moment the
+ * phone has queued the bytes — true even with the radio off. picks.html can
+ * live with that because a man's text message is his real receipt. Here there
+ * is no text message; the page IS the receipt, so it must not be told "sent"
+ * by something that only means "accepted for sending".
+ */
+function postOnce(job){
+  var body=new URLSearchParams(),k,b=sendBody(job.team,job.hole,job.scores);
+  for(k in b) if(Object.prototype.hasOwnProperty.call(b,k)) body.set(k,b[k]);
+  return fetch(FORM_POST,{method:"POST",mode:"no-cors",body:body,cache:"no-store"});
+}
+
+function queueSend(team,hole,scores){
+  var q=outbox(),id=sendId(team,hole),i;
+  for(i=0;i<q.length;i++) if(q[i].id===id&&q[i].state==="pending") return q[i];
+  var job={id:id,team:team,hole:hole,scores:scores,at:Date.now(),state:"pending"};
+  q.push(job); setOutbox(q);
+  return job;
+}
+
+function markDone(job){
+  var q=outbox().filter(function(x){return !(x.id===job.id&&x.at===job.at);});
+  setOutbox(q);
+  S.acked[job.hole]=true; keep("acked",S.acked);
+}
+
+function drainOutbox(){
+  var job=outboxNext(outbox());
+  if(!job) { drawQueueBar(); return Promise.resolve(); }
+  return postOnce(job).then(function(){
+    markDone(job); drawQueueBar(); drawGrid();
+    return drainOutbox();
+  }).catch(function(){ drawQueueBar(); });
+}
+
+function waitingHoles(){
+  var m={},q=outbox(),i;
+  for(i=0;i<q.length;i++) if(q[i].state==="pending"&&q[i].team===S.team) m[q[i].hole]=true;
+  return m;
+}
+
+function drawQueueBar(){
+  var q=outbox().filter(function(x){return x.state==="pending";});
+  var bar=$("queueBar");
+  if(!q.length){ bar.classList.add("hide"); return; }
+  bar.classList.remove("hide");
+  var holes=q.map(function(x){return x.hole;}).sort(function(a,b){return a-b;});
+  bar.textContent=(q.length===1?"Hole "+holes[0]+" has not gone yet":
+    q.length+" holes have not gone yet: "+holes.join(", "))+" — no signal. Keep this page open; it goes on its own.";
+}
+
+/* ---------- picking a team ---------- */
+
+function drawPick(){
+  var box=$("teamList");box.textContent="";
+  var live=S.feed.filter(function(t){return t.seats.some(function(s){return !isEmptySeat(s);});});
+  if(!live.length){
+    $("pickNote").textContent=FEED_CSV
+      ? "No teams yet. The sheet has not been filled in, or there is no signal."
+      : "The scorer feed has not been set up yet. Tell Rob.";
+    return;
+  }
+  $("pickNote").textContent=S.stamp?("Teams as of "+feedAge()+(S.fresh?"":" — from this phone, no signal")):"";
+  live.forEach(function(t){
+    var b=document.createElement("button");
+    b.className="teamBtn";
+    var n=document.createElement("span");n.className="n";
+    n.textContent="TEAM "+t.team+(t.start===10?"  ·  starts on 10":"");
+    var m=document.createElement("span");m.className="m";
+    m.textContent=t.seats.filter(function(s){return !isEmptySeat(s);})
+      .map(function(s){return displayName(s.name);}).join("  ·  ");
+    b.appendChild(n);b.appendChild(m);
+    b.addEventListener("click",function(){
+      S.team=t.team;keep("team",S.team);
+      S.hole=null;S.role=null;keep("role",null);
+      drawHeader();show("screenRole");
+    });
+    box.appendChild(b);
+  });
+}
+
+/* ---------- the scoring screen ---------- */
+
+function openHole(h){
+  S.hole=h;keep("hole",h);
+  S.scores={};S.unlocked=false;
+  $("scoreMsg").textContent="";
+  drawScore();
+}
+
+function drawScore(){
+  var t=myTeam();if(!t)return;
+  var h=S.hole,par=parOf(h);
+  $("holeName").textContent="Hole "+h+" · Par "+par;
+
+  var sent=feedSentHoles(t),already=sent[h]||S.acked[h];
+  var warn=$("sentWarn");
+  if(already){
+    warn.classList.remove("hide");
+    var line=feedHoleLine(t,h);
+    if(S.unlocked){
+      warn.textContent="Hole "+h+" is being changed. What is in now: "+(line||"—")+".";
+    } else if(SHEET_LAST_SEND_WINS){
+      warn.textContent="Hole "+h+" already sent"+(line?": "+line:"")+".";
+      var chg=document.createElement("button");
+      chg.className="wide plain";chg.textContent="Change hole "+h;
+      chg.addEventListener("click",function(){ S.unlocked=true;drawScore(); });
+      warn.appendChild(chg);
+    } else {
+      warn.textContent="Hole "+h+" already sent"+(line?": "+line:"")+
+        ". Sending it again would ADD to what is there, not replace it — tell Rob instead.";
+    }
+  } else warn.classList.add("hide");
+
+  var locked=already&&!S.unlocked;
+  var box=$("menList");box.textContent="";
+  t.seats.forEach(function(seat){
+    if(!seat||isEmptySeat(seat)) return;       /* BLIND and empty seats show nothing */
+    var out=isOut(S.leftAt,seat.seat,h,t.start);
+    var row=document.createElement("div");row.className="man";
+    var top=document.createElement("div");top.className="manTop";
+    var nm=document.createElement("div");nm.className="manName";nm.textContent=displayName(seat.name);
+    var ob=document.createElement("button");ob.className="outBtn";
+    /* "Left" on its own reads as a direction on a screen full of arrows.
+       It says what it does instead, and it is the only ambiguous word here. */
+    ob.textContent=out?"Back in":"Left the round";
+    ob.addEventListener("click",function(){ toggleLeft(seat,out); });
+    top.appendChild(nm);top.appendChild(ob);row.appendChild(top);
+
+    if(out){
+      var g=document.createElement("div");g.className="gone";
+      g.textContent="Left the round at hole "+S.leftAt[seat.seat]+" — his box goes in empty.";
+      row.appendChild(g);
+    } else {
+      var grid=document.createElement("div");grid.className="scores";
+      scoreButtons(par).forEach(function(n){
+        var b=document.createElement("button");
+        b.textContent=String(n);
+        b.disabled=!!locked;
+        if(S.scores[seat.seat]===n) b.className="on";
+        b.addEventListener("click",function(){
+          S.scores[seat.seat]=(S.scores[seat.seat]===n?null:n);
+          if(S.scores[seat.seat]==null) delete S.scores[seat.seat];
+          drawScore();
+        });
+        grid.appendChild(b);
+      });
+      row.appendChild(grid);
+    }
+    box.appendChild(row);
+  });
+
+  $("toReview").disabled=!!locked;
+  drawGrid();
+}
+
+/**
+ * LEAVING THE ROUND, AND COMING BACK. Confirmed because it is destructive to
+ * his card, and undoable because it is a small control next to a row of score
+ * buttons on a phone in a moving cart.
+ */
+function toggleLeft(seat,isCurrentlyOut){
+  var who=displayName(seat.name);
+  if(isCurrentlyOut){
+    if(!confirm(who+" is playing again from hole "+S.hole+"?")) return;
+    delete S.leftAt[seat.seat];
+  } else {
+    if(!confirm(who+" has left the round? From hole "+S.hole+" on, his box goes in empty.")) return;
+    S.leftAt[seat.seat]=S.hole;
+    delete S.scores[seat.seat];
+  }
+  keep("leftAt",S.leftAt);
+  drawScore();
+}
+
+function drawGrid(){
+  var t=myTeam();if(!t)return;
+  var sent=feedSentHoles(t),waiting=waitingHoles();
+  [[1,9,"gridTop"],[10,18,"gridBot"]].forEach(function(seg){
+    var box=$(seg[2]);box.textContent="";
+    for(var h=seg[0];h<=seg[1];h++){
+      var c=document.createElement("div");
+      c.className="cell"+((sent[h]||S.acked[h])?" in":(waiting[h]?" waiting":""))+(h===S.hole?" now":"");
+      c.textContent=String(h);
+      box.appendChild(c);
+    }
+  });
+}
+
+/* ---------- the check screen ---------- */
+
+function drawReview(){
+  var t=myTeam(),h=S.hole;
+  $("reviewHead").textContent="Hole "+h+" · par "+parOf(h);
+  var box=$("reviewList");box.textContent="";
+  playingSeats(t,h,S.leftAt).forEach(function(seat){
+    var d=document.createElement("div");
+    d.textContent=displayName(seat.name)+"  "+S.scores[seat.seat];
+    box.appendChild(d);
+  });
+  t.seats.forEach(function(seat){
+    if(!seat||isEmptySeat(seat)) return;
+    if(!isOut(S.leftAt,seat.seat,h,t.start)) return;
+    var d=document.createElement("div");
+    d.textContent=displayName(seat.name)+"  — empty";
+    box.appendChild(d);
+  });
+  $("doSend").disabled=false;
+  $("doSend").textContent="Send";
+}
+
+/* ---------- the card ---------- */
+
+function drawCard(){
+  var t=myTeam();if(!t)return;
+  $("cardHead").textContent="Team "+t.team;
+  var box=$("cardBody");box.textContent="";
+  [[1,9,"Out"],[10,18,"In"]].forEach(function(seg){
+    var wrap=document.createElement("div");wrap.className="card";
+    var tb=document.createElement("table");
+    var head=document.createElement("thead"),hr=document.createElement("tr");
+    var th=document.createElement("th");th.className="nm";th.textContent=seg[2];hr.appendChild(th);
+    for(var h=seg[0];h<=seg[1];h++){var c=document.createElement("th");c.textContent=String(h);hr.appendChild(c);}
+    head.appendChild(hr);tb.appendChild(head);
+    var body=document.createElement("tbody");
+    var pr=document.createElement("tr");pr.className="par";
+    var pn=document.createElement("td");pn.className="nm";pn.textContent="Par";pr.appendChild(pn);
+    for(h=seg[0];h<=seg[1];h++){var pc=document.createElement("td");pc.textContent=String(parOf(h));pr.appendChild(pc);}
+    body.appendChild(pr);
+    t.seats.forEach(function(seat){
+      if(!seat||isEmptySeat(seat)) return;
+      var tr=document.createElement("tr");
+      var nd=document.createElement("td");nd.className="nm";nd.textContent=firstName(seat.name);tr.appendChild(nd);
+      for(var h=seg[0];h<=seg[1];h++){
+        var td=document.createElement("td");
+        td.textContent=seat.holes[h-1]==null?"":String(seat.holes[h-1]);
+        tr.appendChild(td);
+      }
+      body.appendChild(tr);
+    });
+    tb.appendChild(body);wrap.appendChild(tb);box.appendChild(wrap);
+  });
+  $("cardStamp").textContent=S.stamp?("Read "+feedAge()+(S.fresh?"":" — from this phone, no signal")):"";
+  $("cardToScore").classList.toggle("hide",S.role!=="score");
+}
+
+/* ---------- wiring ---------- */
+
+$("roleYes").addEventListener("click",function(){
+  S.role="score";keep("role","score");
+  var t=myTeam();
+  if(S.hole==null) openHole(t?t.start:1); else drawScore();
+  show("screenScore");
+});
+$("roleNo").addEventListener("click",function(){
+  S.role="watch";keep("role","watch");
+  drawCard();show("screenCard");
+});
+$("roleBack").addEventListener("click",function(){ S.team=null;keep("team",null);drawHeader();drawPick();show("screenPick"); });
+
+$("holePrev").addEventListener("click",function(){ openHole(prevHole(S.hole)); });
+$("holeNext").addEventListener("click",function(){ openHole(nextHole(S.hole)); });
+
+$("toReview").addEventListener("click",function(){
+  var t=myTeam(),who=missingMan(t,S.hole,S.scores,S.leftAt);
+  if(who){ $("scoreMsg").textContent=who+" has no score yet."; return; }
+  $("scoreMsg").textContent="";
+  drawReview();show("screenReview");
+});
+$("doChange").addEventListener("click",function(){ show("screenScore");drawScore(); });
+
+/**
+ * SEND. Disabled on the way in, so the second half of a double tap lands on a
+ * dead button; and even if it did not, queueSend refuses a second job for a
+ * team and hole that already has one pending.
+ */
+$("doSend").addEventListener("click",function(){
+  if(S.sending) return;
+  S.sending=true;
+  var btn=$("doSend");btn.disabled=true;btn.textContent="Sending…";
+  var hole=S.hole,job=queueSend(S.team,hole,S.scores);
+  drawQueueBar();
+  postOnce(job).then(function(){
+    markDone(job);
+    return "Hole "+hole+" sent.";
+  }).catch(function(){
+    return "Hole "+hole+" saved on this phone — no signal. It goes as soon as you have one. Do not send it again.";
+  }).then(function(word){
+    S.sending=false;
+    /* THE ORDER MATTERS. Moving to the next hole wipes the board, and the
+       standing word with it — so the word for THIS send is written AFTER the
+       move, not before, or the captain is moved on with nothing said to him. */
+    openHole(nextHole(hole));
+    $("scoreMsg").textContent=word;
+    drawQueueBar();
+    show("screenScore");
+  });
+});
+
+$("scoreToCard").addEventListener("click",function(){ drawCard();show("screenCard"); });
+$("cardToScore").addEventListener("click",function(){ drawScore();show("screenScore"); });
+$("cardTeam").addEventListener("click",function(){ S.team=null;keep("team",null);drawHeader();drawPick();show("screenPick"); });
+
+$("logo").addEventListener("error",function(){ this.style.display="none"; });
+
+/* ---------- opening ---------- */
+
+function restore(){
+  S.team=recall("team",null);
+  S.role=recall("role",null);
+  S.hole=recall("hole",null);
+  S.leftAt=recall("leftAt",{})||{};
+  S.acked=recall("acked",{})||{};
+}
+
+function land(){
+  drawHeader();
+  drawQueueBar();
+  if(S.team==null||!myTeam()){ drawPick();show("screenPick");return; }
+  if(S.role==="watch"){ drawCard();show("screenCard");return; }
+  if(S.role==="score"){
+    var t=myTeam();
+    if(S.hole==null) S.hole=t.start;
+    drawScore();show("screenScore");return;
+  }
+  show("screenRole");
+}
+
+sweepOldDays();
+restore();
+loadFeedFromPhone();
+land();
+
+fetchFeed().then(function(got){
+  if(got){ drawHeader(); if(!$("screenPick").classList.contains("hide")) drawPick();
+           if(!$("screenCard").classList.contains("hide")) drawCard();
+           if(!$("screenScore").classList.contains("hide")) drawScore(); }
+});
+drainOutbox();
+
+setInterval(function(){
+  fetchFeed().then(function(got){
+    if(!got) return;
+    if(!$("screenCard").classList.contains("hide")) drawCard();
+    if(!$("screenScore").classList.contains("hide")) drawGrid();
+    if(!$("screenPick").classList.contains("hide")) drawPick();
+  });
+},FEED_EVERY);
+
+setInterval(function(){ if(outboxNext(outbox())) drainOutbox(); },RETRY_EVERY);
+window.addEventListener("online",function(){ drainOutbox(); fetchFeed(); });
+document.addEventListener("visibilitychange",function(){
+  if(!document.hidden){ drainOutbox(); fetchFeed(); }
+});
+</script>
+</body>
+</html>
