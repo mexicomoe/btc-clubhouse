@@ -99,15 +99,23 @@ On the bottom of **both** the scoring screen and the card — the two screens a
 man actually sits on. It opens in a **new tab**, so following it leaves the
 scoring page loaded behind him and still retrying anything it is holding.
 
-**It needs the address.** Paste it into one line near the top of `score.html`:
+Pointed at the published leaderboard tab, `gid=1476327864`:
 
-```js
-var LEADERBOARD_URL = "";
+```
+…YVz_n4L7dsPdcUJkynwk7lx4d/pubhtml?gid=1476327864&single=true
 ```
 
-While that is empty the button is **not drawn at all** — better than a button
-that goes nowhere, which a man taps twice and then stops trusting the page
-over. Fill it in and both copies appear.
+`single=true` keeps Google's tab strip off the bottom, so the men land on the
+leaderboard and cannot wander into the Scorer feed. The feed is `gid=1997697752`
+— worth keeping the two straight.
+
+If `LEADERBOARD_URL` is ever emptied, or holds anything that is not a whole
+`http`/`https` address, the button is **not drawn at all** rather than drawn
+dead. A pasted address arrived here once cut off after `/p`.
+
+**Tap it once before Friday.** Publishing the Scorer feed did not publish this
+tab; if that tab was never published, the link is a Google error page and the
+page has no way to know.
 
 ## 6 · Also needed
 

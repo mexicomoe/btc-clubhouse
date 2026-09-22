@@ -343,6 +343,20 @@ test("an unconfigured leaderboard is not drawn at all", () => {
   assert.match(PAGE, /drawLeaderboardLinks\(\);/);
 });
 
+test("the leaderboard address is whole, and points at the leaderboard tab", () => {
+  const url = PAGE.match(/^var LEADERBOARD_URL = "([^"]*)";$/m)![1];
+  assert.match(url, /^https:\/\/docs\.google\.com\/spreadsheets\/d\/e\/[^/]+\/pubhtml\?/,
+    "not a whole published-to-web page address");
+  const q = new URLSearchParams(url.slice(url.indexOf("?") + 1));
+  // The two tabs of this workbook that the page knows about are one glance
+  // apart and nowhere near it in effect. The leaderboard is not the feed.
+  const feed = new URL(PAGE.match(/^var FEED_CSV = "([^"]*)";$/m)![1]);
+  assert.equal(q.get("gid"), "1476327864");
+  assert.notEqual(q.get("gid"), feed.searchParams.get("gid"));
+  // Without this the men get Google's tab strip and can wander into the feed.
+  assert.equal(q.get("single"), "true");
+});
+
 test("the scorer feed is wired in", () => {
   const m = PAGE.match(/^var FEED_CSV = "([^"]*)";$/m);
   assert.ok(m && m[1], "FEED_CSV is empty — the page would have no teams to offer");

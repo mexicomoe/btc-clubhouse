@@ -42,6 +42,11 @@ let page = readFileSync(SRC,"utf8");
 const unstubbed = page;
 page = page.replace(/^var FEED_CSV = "[^"]*";$/m, 'var FEED_CSV = "/feed.csv";');
 if (page === unstubbed) throw new Error("FEED_CSV was not stubbed — score.html has changed shape");
+// Blanked so the not-drawn case below is testable whatever address is shipped.
+// The shipped value's own shape is the unit tests' job, not this file's.
+const unblanked = page;
+page = page.replace(/^var LEADERBOARD_URL = "[^"]*";$/m, 'var LEADERBOARD_URL = "";');
+if (page === unblanked) throw new Error("LEADERBOARD_URL was not blanked — score.html has changed shape");
 
 const b = await chromium.launch(process.env.CHROME ? { executablePath: process.env.CHROME } : {});
 const ctx = await b.newContext({ viewport:{width:375,height:760}, deviceScaleFactor:2 });

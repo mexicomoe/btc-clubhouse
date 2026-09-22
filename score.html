@@ -295,8 +295,13 @@ var PAR = [4,4,3,5,4,4,5,3,4,4,4,4,3,4,4,5,3,5];
  * arrives is pasted, and the way a pasted address fails is TRUNCATED: a link
  * copied out of a chat window lost everything after "/p" on its first trip
  * here. Half an address still looks like an address in a source file.
+ *
+ * `single=true` is what keeps Google's tab strip off the bottom of it, so the
+ * men land on the leaderboard and cannot wander into the Scorer feed. gid
+ * 1476327864 is the leaderboard tab; 1997697752 is the feed. They are one
+ * digit apart in the eye and nowhere near it in effect.
  */
-var LEADERBOARD_URL = "";
+var LEADERBOARD_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQg-44HCczcIAcyn9_osr4HvnniZba5IV9wKlf-uNFjz_CaGDcYRnqYVz_n4L7dsPdcUJkynwk7lx4d/pubhtml?gid=1476327864&single=true";
 
 /* How often the feed is re-read while the page is open, in milliseconds. */
 var FEED_EVERY = 60000;
