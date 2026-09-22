@@ -320,11 +320,25 @@ test("the leaderboard is reachable from both screens a man sits on", () => {
   assert.match(CSS, /button\.wide,a\.wide\{[^}]*min-height:60px/);
 });
 
+test("a half-pasted leaderboard address is not drawn either", () => {
+  // The way this address arrives is pasted, and the way a pasted address fails
+  // is truncated — one arrived here cut off after "/p". Half an address still
+  // looks like an address in a source file, so the shape is checked.
+  const lift = PAGE.slice(PAGE.indexOf("function drawLeaderboardLinks"));
+  const test1 = new Function("u", "return " + lift.match(/\/\^https\?[^;]*\.test\(/)![0] + "u||\"\");");
+  assert.equal(test1("https://docs.google.com/spreadsheets/d/e/2PACX-1x/pubhtml?gid=7"), true);
+  assert.equal(test1("https://docs.google.com/spreadsheets/d/e/2PACX-1x/p"), true); // shape is all we can judge
+  assert.equal(test1(""), false);
+  assert.equal(test1("[paste your published leaderboard link]"), false);
+  assert.equal(test1("docs.google.com/x"), false);
+  assert.equal(test1("javascript:alert(1)"), false);
+});
+
 test("an unconfigured leaderboard is not drawn at all", () => {
   // A button that goes nowhere is tapped twice and then the page is not
   // trusted. Hidden is better than dead.
   assert.match(PAGE, /^var LEADERBOARD_URL = "[^"]*";$/m);
-  assert.match(PAGE, /if\(LEADERBOARD_URL\)\{ a\.href=LEADERBOARD_URL; a\.classList\.remove\("hide"\); \}/);
+  assert.match(PAGE, /if\(ok\)\{ a\.href=LEADERBOARD_URL; a\.classList\.remove\("hide"\); \}/);
   assert.match(PAGE, /else a\.classList\.add\("hide"\);/);
   assert.match(PAGE, /drawLeaderboardLinks\(\);/);
 });

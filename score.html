@@ -287,8 +287,14 @@ var PAR = [4,4,3,5,4,4,5,3,4,4,4,4,3,4,4,5,3,5];
  * signal would be closing the only thing that can send it. A new tab leaves
  * this page loaded and retrying behind him.
  *
- * Left empty, the button is simply not drawn — better than a button that goes
- * nowhere, which a man taps twice and then stops trusting the page over.
+ * Left empty — OR HOLDING SOMETHING THAT IS NOT A WHOLE ADDRESS — the button
+ * is simply not drawn. Better than a button that goes nowhere, which a man
+ * taps twice and then stops trusting the page over.
+ *
+ * The shape is checked rather than assumed because the way this address
+ * arrives is pasted, and the way a pasted address fails is TRUNCATED: a link
+ * copied out of a chat window lost everything after "/p" on its first trip
+ * here. Half an address still looks like an address in a source file.
  */
 var LEADERBOARD_URL = "";
 
@@ -955,9 +961,10 @@ $("logo").addEventListener("error",function(){
  * one is configured, rather than sitting there doing nothing.
  */
 function drawLeaderboardLinks(){
+  var ok=/^https?:\/\/\S+$/.test(LEADERBOARD_URL||"");
   ["lbScore","lbCard"].forEach(function(id){
     var a=$(id);
-    if(LEADERBOARD_URL){ a.href=LEADERBOARD_URL; a.classList.remove("hide"); }
+    if(ok){ a.href=LEADERBOARD_URL; a.classList.remove("hide"); }
     else a.classList.add("hide");
   });
 }
