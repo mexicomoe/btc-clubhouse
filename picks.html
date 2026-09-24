@@ -66,6 +66,8 @@
   }
   #send[disabled]{border-color:#2c4433;color:#7f9186;cursor:default}
   #send:focus-visible{outline:3px solid #fff;outline-offset:2px}
+  /* Once the text button is known not to work here, Copy takes its look. */
+  #send.lead{background:var(--gold);color:#1a1305;border-color:var(--gold)}
   #copied{font-size:15px;margin:10px 0 0;min-height:20px}
   /* The way back out. It lives on the page, NOT in the fixed tray — the tray
      steals that much height from every screen, and the last pick box is what
@@ -520,8 +522,43 @@ function fileWithRob(text){
 // Filed on the way out to Messages, and on the copy fallback too — a man who
 // copies and texts by hand should not go missing from the Sheet.
 sendsms.addEventListener("click", () => {
-  if (sendsms.getAttribute("href")) fileWithRob(filedLine());
+  if (!sendsms.getAttribute("href")) return;
+  fileWithRob(filedLine());
+  watchForMessages();
 });
+
+/**
+ * DID MESSAGES OPEN? A browser built into another app (Outlook, Gmail,
+ * Facebook) can drop an sms: link without a word: no Messages, no error,
+ * nothing. That was found on an Android phone opened from Outlook, but it is
+ * the app, not the phone, so no platform is sniffed for it.
+ *
+ * The failure is watched for instead. When Messages opens, this page goes into
+ * the background. If it is still in front after a couple of seconds, nothing
+ * took the link, and Copy is offered as the way through.
+ *
+ * The words are a question on purpose. On an iPhone, "Open in Messages?" can
+ * still be on screen when the time runs out, and "Messages did not open" would
+ * be wrong there; asking is true either way.
+ */
+const NO_MESSAGES_AFTER = 2500;
+let waitingForMessages = null;
+function messagesOpened(){
+  clearTimeout(waitingForMessages);
+  waitingForMessages = null;
+}
+function watchForMessages(){
+  messagesOpened();
+  waitingForMessages = setTimeout(() => {
+    waitingForMessages = null;
+    if (document.visibilityState !== "visible") return;
+    copied.textContent = "Messages did not open? Tap Copy my picks, then paste it into a text to Rob.";
+    send.classList.add("lead");
+  }, NO_MESSAGES_AFTER);
+}
+document.addEventListener("visibilitychange", () => { if (document.hidden) messagesOpened(); });
+addEventListener("pagehide", messagesOpened);
+addEventListener("blur", messagesOpened);
 
 send.addEventListener("click", async () => {
   const text = line();
