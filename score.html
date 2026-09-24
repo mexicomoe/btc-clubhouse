@@ -969,14 +969,43 @@ function waitingHoles(){
   return m;
 }
 
+/**
+ * WHAT THE WAITING BAR SAYS. Every held hole is named, whichever team it is
+ * for: a hole held for another team is a score not yet in the sheet, and it
+ * only goes if this page stays open, so hiding it would be worse than a
+ * puzzle. But a bare "10" read on Team 3's screen looks like Team 3's hole 10.
+ * So when any held hole is not the team on screen, every hole carries its team.
+ */
+function queueWords(pending,team){
+  if(!pending.length) return "";
+  var tail=" — no signal. Keep this page open; it goes on its own.";
+  var byHole=function(a,b){return a-b;};
+  var mixed=pending.some(function(x){return x.team!==team;});
+  if(!mixed){
+    var holes=pending.map(function(x){return x.hole;}).sort(byHole);
+    return (holes.length===1?"Hole "+holes[0]+" has not gone yet":
+      holes.length+" holes have not gone yet: "+holes.join(", "))+tail;
+  }
+  var teams={},order=[],i;
+  for(i=0;i<pending.length;i++){
+    var t=pending[i].team;
+    if(!teams[t]){ teams[t]=[]; order.push(t); }
+    teams[t].push(pending[i].hole);
+  }
+  order.sort(function(a,b){ return (a===team?-1:b===team?1:a-b); });
+  return (pending.length===1?"1 hole has":pending.length+" holes have")+" not gone yet: "+
+    order.map(function(t){
+      var h=teams[t].sort(byHole);
+      return "Team "+t+" "+(h.length===1?"hole ":"holes ")+h.join(", ");
+    }).join("; ")+tail;
+}
+
 function drawQueueBar(){
   var q=outbox().filter(function(x){return x.state==="pending";});
   var bar=$("queueBar");
   if(!q.length){ bar.classList.add("hide"); return; }
   bar.classList.remove("hide");
-  var holes=q.map(function(x){return x.hole;}).sort(function(a,b){return a-b;});
-  bar.textContent=(q.length===1?"Hole "+holes[0]+" has not gone yet":
-    q.length+" holes have not gone yet: "+holes.join(", "))+" — no signal. Keep this page open; it goes on its own.";
+  bar.textContent=queueWords(q,S.team);
 }
 
 /* ---------- picking a team ---------- */
@@ -1003,7 +1032,7 @@ function drawPick(){
     b.addEventListener("click",function(){
       S.team=t.team;keep("team",S.team);
       S.hole=null;S.role=null;keep("role",null);
-      drawHeader();show("screenRole");
+      drawHeader();drawQueueBar();show("screenRole");
     });
     box.appendChild(b);
   });
@@ -1195,7 +1224,7 @@ $("roleNo").addEventListener("click",function(){
   S.role="watch";keep("role","watch");
   drawCard();show("screenCard");
 });
-$("roleBack").addEventListener("click",function(){ S.team=null;keep("team",null);drawHeader();drawPick();show("screenPick"); });
+$("roleBack").addEventListener("click",function(){ S.team=null;keep("team",null);drawHeader();drawQueueBar();drawPick();show("screenPick"); });
 
 $("holePrev").addEventListener("click",function(){ openHole(prevHole(S.hole)); });
 $("holeNext").addEventListener("click",function(){ openHole(nextHole(S.hole)); });
@@ -1238,7 +1267,7 @@ $("doSend").addEventListener("click",function(){
 
 $("scoreToCard").addEventListener("click",function(){ drawCard();show("screenCard"); });
 $("cardToScore").addEventListener("click",function(){ drawScore();show("screenScore"); });
-$("cardTeam").addEventListener("click",function(){ S.team=null;keep("team",null);drawHeader();drawPick();show("screenPick"); });
+$("cardTeam").addEventListener("click",function(){ S.team=null;keep("team",null);drawHeader();drawQueueBar();drawPick();show("screenPick"); });
 
 /**
  * THE LOGO, AND THE ONE THING THAT WILL GO WRONG WITH IT. Rob's file is called

@@ -241,6 +241,27 @@ await p.click("#scoreToCard"); await p.click("#cardTeam");
 await p.click(".teamBtn:nth-of-type(2)"); await p.click("#roleYes"); await p.waitForTimeout(200);
 ok((await inCells()).includes("10")&&(await inCells()).includes("11"), "back on team 2, its holes are still in: "+await inCells());
 
+// 13c · a hole held for another team is still shown, and says whose it is
+offline = true;
+const heldBefore = sends.length;
+for(let i=0;i<18&&await p.isDisabled("#toReview");i++) await p.click("#holeNext");
+await p.click(".man:nth-child(1) .scores button:nth-child(4)");
+await p.click(".man:nth-child(2) .scores button:nth-child(4)");
+await p.click(".man:nth-child(3) .scores button:nth-child(4)");
+await p.click("#toReview"); await p.click("#doSend"); await p.waitForTimeout(700);
+const heldHole = (await p.innerText("#queueBar")).match(/Hole (\d+)/)?.[1];
+ok(heldHole && !/Team/.test(await p.innerText("#queueBar")), "held on its own team, the bar needs no team: "+await p.innerText("#queueBar"));
+await p.click("#scoreToCard"); await p.click("#cardTeam");
+await p.click(".teamBtn:nth-of-type(3)"); await p.click("#roleYes"); await p.waitForTimeout(200);
+ok((await p.innerText("#queueBar")).includes("Team 2 hole "+heldHole), "on team 3 it says the hole is team 2's: "+await p.innerText("#queueBar"));
+await p.click("#scoreToCard"); await p.click("#cardTeam");
+await p.click(".teamBtn:nth-of-type(2)"); await p.click("#roleYes"); await p.waitForTimeout(200);
+offline = false;
+await p.evaluate(()=>window.dispatchEvent(new Event("online")));
+await p.waitForTimeout(900);
+ok(sends.length===heldBefore+1, "and it still went once there was signal: "+(sends.length-heldBefore));
+ok(!(await p.isVisible("#queueBar")), "and the bar cleared");
+
 // 14 · the leaderboard, from both screens a man sits on
 ok(await p.isVisible("#lbScore"), "it is on the scoring screen");
 ok(await p.getAttribute("#lbScore","target")==="_blank", "and opens a new tab");

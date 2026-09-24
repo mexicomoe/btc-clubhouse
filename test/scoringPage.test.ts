@@ -52,7 +52,7 @@ const LIFTED = [
   "scoreButtons", "nextHole", "prevHole", "playIndex", "feedSentHoles",
   "feedHoleLine", "isOut", "playingSeats", "missingMan", "sendBody",
   "sendId", "outboxNext", "parseBoards", "prettyCell",
-  "cardCell", "mineForTeam", "ackedForTeam",
+  "cardCell", "mineForTeam", "ackedForTeam", "queueWords",
 ].map(fnSource).join("\n");
 
 const P = new Function(LIFTED + "\nreturn {" + [
@@ -60,7 +60,7 @@ const P = new Function(LIFTED + "\nreturn {" + [
   "scoreButtons", "nextHole", "prevHole", "playIndex", "feedSentHoles",
   "feedHoleLine", "isOut", "playingSeats", "missingMan", "sendBody",
   "sendId", "outboxNext", "parseBoards", "prettyCell",
-  "cardCell", "mineForTeam", "ackedForTeam",
+  "cardCell", "mineForTeam", "ackedForTeam", "queueWords",
 ].join(",") + "};")() as any;
 
 /* ---------- a feed to work from ---------- */
@@ -272,6 +272,21 @@ test("sent holes are kept per team: switching teams unlocks nothing and locks no
   assert.doesNotMatch(PAGE, /S\.acked\[(h|job\.hole)\]/);
   // The old hole-only record is not read back as if it were per team.
   assert.match(PAGE, /S\.acked=recall\("ackedBy",\{\}\)\|\|\{\};/);
+});
+
+test("the waiting bar names the team only when a held hole is not this team's", () => {
+  const job = (team:number, hole:number) => ({team, hole, state: "pending"});
+  const TAIL = " — no signal. Keep this page open; it goes on its own.";
+  assert.equal(P.queueWords([], 2), "");
+  // One team, the one on screen: the words a captain in a real round sees.
+  assert.equal(P.queueWords([job(2, 10)], 2), "Hole 10 has not gone yet" + TAIL);
+  assert.equal(P.queueWords([job(2, 11), job(2, 10)], 2), "2 holes have not gone yet: 10, 11" + TAIL);
+  // Another team's hole is still shown, never hidden, and says whose it is.
+  assert.equal(P.queueWords([job(2, 10)], 3), "1 hole has not gone yet: Team 2 hole 10" + TAIL);
+  // Mixed: the team on screen first, then the rest in order.
+  assert.equal(P.queueWords([job(1, 5), job(3, 2), job(2, 10), job(3, 1)], 3),
+    "4 holes have not gone yet: Team 3 holes 1, 2; Team 1 hole 5; Team 2 hole 10" + TAIL);
+  assert.match(PAGE, /bar\.textContent=queueWords\(q,S\.team\);/);
 });
 
 test("a hole is remembered when it is QUEUED, not when it lands", () => {
