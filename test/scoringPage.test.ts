@@ -52,7 +52,7 @@ const LIFTED = [
   "scoreButtons", "nextHole", "prevHole", "playIndex", "feedSentHoles",
   "feedHoleLine", "isOut", "playingSeats", "missingMan", "sendBody",
   "sendId", "outboxNext", "parseBoards", "prettyCell",
-  "cardCell", "mineForTeam",
+  "cardCell", "mineForTeam", "ackedForTeam",
 ].map(fnSource).join("\n");
 
 const P = new Function(LIFTED + "\nreturn {" + [
@@ -60,7 +60,7 @@ const P = new Function(LIFTED + "\nreturn {" + [
   "scoreButtons", "nextHole", "prevHole", "playIndex", "feedSentHoles",
   "feedHoleLine", "isOut", "playingSeats", "missingMan", "sendBody",
   "sendId", "outboxNext", "parseBoards", "prettyCell",
-  "cardCell", "mineForTeam",
+  "cardCell", "mineForTeam", "ackedForTeam",
 ].join(",") + "};")() as any;
 
 /* ---------- a feed to work from ---------- */
@@ -259,6 +259,19 @@ test("what this phone filed is kept per team, and only for that team", () => {
   assert.deepEqual(P.mineForTeam({2: {5: {1: 4}}}, 2), {5: {1: 4}});
   assert.deepEqual(P.mineForTeam({2: {5: {1: 4}}}, 1), {});
   assert.deepEqual(P.mineForTeam(null, 1), {});
+});
+
+test("sent holes are kept per team: switching teams unlocks nothing and locks nothing", () => {
+  // Holes 1 and 10 landed for Teams 1 and 2; the captain then moves to Team 3.
+  const acked = {1: {1: true, 10: true}, 2: {1: true, 10: true}};
+  assert.deepEqual(P.ackedForTeam(acked, 3), {});
+  assert.deepEqual(P.ackedForTeam(acked, 1), {1: true, 10: true});
+  assert.deepEqual(P.ackedForTeam(null, 3), {});
+  // A landed send is filed under ITS team, and nothing reads the record by hole alone.
+  assert.match(PAGE, /S\.acked\[job\.team\]\[job\.hole\]=true;/);
+  assert.doesNotMatch(PAGE, /S\.acked\[(h|job\.hole)\]/);
+  // The old hole-only record is not read back as if it were per team.
+  assert.match(PAGE, /S\.acked=recall\("ackedBy",\{\}\)\|\|\{\};/);
 });
 
 test("a hole is remembered when it is QUEUED, not when it lands", () => {

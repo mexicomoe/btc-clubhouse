@@ -695,6 +695,16 @@ function mineForTeam(all,team){
 }
 
 /**
+ * THE HOLES THIS PHONE SAW LAND, FOR ONE TEAM. Kept team -> hole, because a
+ * captain who switches teams must not find the last team's holes locked on
+ * the new one. Keyed by hole alone it did exactly that: holes 1 and 10 sent
+ * for Team 1 came up "already sent" for Team 3, who had sent neither.
+ */
+function ackedForTeam(all,team){
+  return (all&&all[team])?all[team]:{};
+}
+
+/**
  * ONE SEND'S NAME. A team and a hole, nothing else — so a second tap on Send
  * cannot make a second job, however fast the tap, and a reload part-way
  * through finds the same job rather than a twin of it.
@@ -763,7 +773,7 @@ var S={
   hole:null,        /* the hole on screen */
   scores:{},        /* seat -> score, for the hole on screen */
   leftAt:{},        /* seat -> the hole from which he is out */
-  acked:{},         /* hole -> true, sends this phone saw land */
+  acked:{},         /* team -> hole -> true, sends this phone saw land */
   mine:{},          /* team -> hole -> seat -> score, what this phone filed */
   unlocked:false,   /* he has said yes to changing a hole already in */
   boards:[],        /* the leaderboard, as parsed */
@@ -940,7 +950,8 @@ function queueSend(team,hole,scores){
 function markDone(job){
   var q=outbox().filter(function(x){return !(x.id===job.id&&x.at===job.at);});
   setOutbox(q);
-  S.acked[job.hole]=true; keep("acked",S.acked);
+  if(!S.acked[job.team]) S.acked[job.team]={};
+  S.acked[job.team][job.hole]=true; keep("ackedBy",S.acked);
 }
 
 function drainOutbox(){
@@ -1012,7 +1023,7 @@ function drawScore(){
   var h=S.hole,par=parOf(h);
   $("holeName").textContent="Hole "+h+" · Par "+par;
 
-  var sent=feedSentHoles(t),already=sent[h]||S.acked[h];
+  var sent=feedSentHoles(t),already=sent[h]||ackedForTeam(S.acked,S.team)[h];
   var warn=$("sentWarn");
   if(already){
     warn.classList.remove("hide");
@@ -1094,12 +1105,12 @@ function toggleLeft(seat,isCurrentlyOut){
 
 function drawGrid(){
   var t=myTeam();if(!t)return;
-  var sent=feedSentHoles(t),waiting=waitingHoles();
+  var sent=feedSentHoles(t),waiting=waitingHoles(),acked=ackedForTeam(S.acked,S.team);
   [[1,9,"gridTop"],[10,18,"gridBot"]].forEach(function(seg){
     var box=$(seg[2]);box.textContent="";
     for(var h=seg[0];h<=seg[1];h++){
       var c=document.createElement("div");
-      c.className="cell"+((sent[h]||S.acked[h])?" in":(waiting[h]?" waiting":""))+(h===S.hole?" now":"");
+      c.className="cell"+((sent[h]||acked[h])?" in":(waiting[h]?" waiting":""))+(h===S.hole?" now":"");
       c.textContent=String(h);
       box.appendChild(c);
     }
@@ -1289,7 +1300,10 @@ function restore(){
   S.role=recall("role",null);
   S.hole=recall("hole",null);
   S.leftAt=recall("leftAt",{})||{};
-  S.acked=recall("acked",{})||{};
+  /* "ackedBy", not "acked": the old key held hole -> true for no team in
+     particular, and read as team -> hole it would lock the wrong holes. It is
+     dropped, not guessed at; the feed still greys every hole the sheet has. */
+  S.acked=recall("ackedBy",{})||{};
   S.mine=recall("mine",{})||{};
 }
 

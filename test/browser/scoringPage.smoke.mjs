@@ -224,6 +224,23 @@ ok(sends.length===sentBeforeBlackout+1,
    "the held hole went on its own once there was signal: "+(sends.length-sentBeforeBlackout));
 ok(!(await p.isVisible("#queueBar")), "and the warning cleared");
 
+// 13b · sent holes belong to the team that sent them. Team 2's 10 and 11 are
+// in only on this phone (the feed never has them), so this is the phone's own
+// record: switching to Team 3 must not find them locked, and coming back to
+// Team 2 must still find them in.
+const inCells = async () => p.$$eval(".cell.in", e => e.map(x => x.textContent));
+ok((await inCells()).includes("10"), "team 2's hole 10 is in: "+await inCells());
+await p.click("#scoreToCard"); await p.click("#cardTeam");
+await p.click(".teamBtn:nth-of-type(3)"); await p.click("#roleYes"); await p.waitForTimeout(200);
+ok((await inCells()).length===0, "team 3 inherits none of team 2's holes: "+await inCells());
+for(let i=0;i<9;i++) await p.click("#holeNext");
+ok((await p.innerText("#holeName")).startsWith("Hole 10"), "on team 3's hole 10");
+ok(!(await p.isVisible("#sentWarn")), "and it is not called already sent");
+ok(!(await p.isDisabled("#toReview")), "nor locked");
+await p.click("#scoreToCard"); await p.click("#cardTeam");
+await p.click(".teamBtn:nth-of-type(2)"); await p.click("#roleYes"); await p.waitForTimeout(200);
+ok((await inCells()).includes("10")&&(await inCells()).includes("11"), "back on team 2, its holes are still in: "+await inCells());
+
 // 14 · the leaderboard, from both screens a man sits on
 ok(await p.isVisible("#lbScore"), "it is on the scoring screen");
 ok(await p.getAttribute("#lbScore","target")==="_blank", "and opens a new tab");
