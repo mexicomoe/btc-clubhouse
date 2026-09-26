@@ -196,7 +196,7 @@ footer{margin:22px 0 10px;border-top:3px solid var(--ink);padding-top:12px;}
 
 <!-- 1 · WHICH TEAM. His own name on the button is the whole identification. -->
 <section id="screenPick" class="hide">
-  <img id="bigLogo" src="tgif_logo.png" alt="TGIF — Thank Golf It's Friday">
+  <img id="bigLogo" src="TGIF_logo.png" alt="TGIF — Thank Golf It's Friday">
   <h1>Tap your team</h1>
   <div id="teamList"></div>
   <p id="pickNote"></p>
@@ -1270,29 +1270,20 @@ $("cardToScore").addEventListener("click",function(){ drawScore();show("screenSc
 $("cardTeam").addEventListener("click",function(){ S.team=null;keep("team",null);drawHeader();drawQueueBar();drawPick();show("screenPick"); });
 
 /**
- * THE LOGO, AND THE ONE THING THAT WILL GO WRONG WITH IT. Rob's file is called
- * TGIF_logo.png and this asks for tgif_logo.png. GitHub Pages serves from a
- * case-sensitive filesystem, so the wrong spelling is a 404 that nobody sees:
- * no error, no broken image, just a header that quietly has no logo on it and
- * an afternoon spent wondering why.
- *
- * So it tries the other spelling once, and only then gives up — quietly, with
- * the image removed rather than left as a broken-picture icon.
- */
-/**
  * A MISSING LOGO IS NOT AN ERROR ANYBODY SHOULD SEE. Either image failing
  * takes itself off the screen rather than leaving a broken-picture icon in
  * the header of a page a man is trying to score on.
  *
- * The whole lockup also tries TGIF_logo.png before giving up: Rob's own copy
- * is named with capitals, GitHub Pages serves from a case-sensitive
- * filesystem, and the wrong spelling is a 404 that produces no error, no
- * broken image and no clue at all.
+ * The file in the repo is TGIF_logo.png, capitals and all, and that is what
+ * the page asks for. GitHub Pages serves from a case-sensitive filesystem,
+ * where the wrong spelling is a 404 with no error and no clue, so the lockup
+ * tries the lowercase spelling once before giving up, in case the file is
+ * ever uploaded under that name again.
  */
 ["logo","bigLogo"].forEach(function(id){
   $(id).addEventListener("error",function(){
-    if(id==="bigLogo"&&this.getAttribute("src")!=="TGIF_logo.png"){
-      this.setAttribute("src","TGIF_logo.png"); return;
+    if(id==="bigLogo"&&this.getAttribute("src")!=="tgif_logo.png"){
+      this.setAttribute("src","tgif_logo.png"); return;
     }
     this.style.display="none";
   });

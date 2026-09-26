@@ -508,11 +508,11 @@ test("the header carries the flag, and the whole logo is shown once", () => {
   // three and a half pixels tall — worse than no logo. The flag is nearly
   // square and survives being small; the lockup gets the opening screen.
   assert.match(PAGE, /<img id="logo" src="tgif_flag\.png"/);
-  assert.match(PAGE, /<img id="bigLogo" src="tgif_logo\.png"/);
+  assert.match(PAGE, /<img id="bigLogo" src="TGIF_logo\.png"/);
   assert.match(CSS, /#logo\{height:34px/);
   assert.match(CSS, /#bigLogo\{[^}]*max-width:290px/);
   // Both files are in the repo, and both are pictures rather than promises.
-  for (const f of ["tgif_flag.png", "tgif_logo.png"]) {
+  for (const f of ["tgif_flag.png", "TGIF_logo.png"]) {
     const bytes = readFileSync(new URL("../" + f, import.meta.url));
     assert.ok(bytes.length > 500, f + " is too small to be an image");
     assert.equal(bytes.subarray(1, 4).toString("latin1"), "PNG", f + " is not a PNG");
@@ -524,9 +524,9 @@ test("a logo that will not load takes itself off the screen", () => {
   // worse than a header with no logo in it.
   assert.match(PAGE, /\["logo","bigLogo"\]\.forEach/);
   assert.match(PAGE, /this\.style\.display="none";/);
-  // The lockup tries the capitalised spelling once first — Rob's own copy is
-  // TGIF_logo.png and GitHub Pages is case-sensitive — and cannot loop.
-  assert.match(PAGE, /id==="bigLogo"&&this\.getAttribute\("src"\)!=="TGIF_logo\.png"/);
+  // The lockup tries the lowercase spelling once — GitHub Pages is
+  // case-sensitive, and the file has been uploaded under both — and cannot loop.
+  assert.match(PAGE, /id==="bigLogo"&&this\.getAttribute\("src"\)!=="tgif_logo\.png"/);
 });
 
 test("the leaderboard is reachable from both screens a man sits on", () => {
@@ -665,7 +665,7 @@ test("no Google branding, no sign-in, no email box, no codes", () => {
   const BODY = PAGE.slice(PAGE.indexOf("<body"));
   assert.equal(/Google/i.test(BODY.replace(/<script[\s\S]*<\/script>/, "")), false);
   assert.equal(/type="email"|sign in|password|<input/i.test(BODY), false);
-  assert.match(PAGE, /src="tgif_logo\.png"/);
+  assert.match(PAGE, /src="TGIF_logo\.png"/);
 });
 
 test("the page loads nothing — it arrives whole or not at all", () => {

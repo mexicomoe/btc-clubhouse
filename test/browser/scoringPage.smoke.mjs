@@ -17,7 +17,7 @@
  * The second argument is where it leaves screenshots of the three screens.
  */
 import { chromium } from "playwright";
-import { readFileSync } from "fs";
+import { readFileSync, existsSync } from "fs";
 
 const SRC = new URL("../../score.html", import.meta.url);
 const OUT = process.argv[2] || ".";
@@ -77,8 +77,12 @@ await ctx.route("**/*", async route => {
     if (offline) return route.abort("internetdisconnected");
     sends.push(route.request().postData()); return route.fulfill({status:200, body:"ok"});
   }
-  if (u.endsWith(".png")) return route.fulfill({contentType:"image/png",
-    body: readFileSync(new URL("../../" + u.split("/").pop(), import.meta.url))});
+  // A picture that is not in the repo is a 404, as GitHub Pages would give.
+  if (u.endsWith(".png")) {
+    const f = new URL("../../" + u.split("/").pop(), import.meta.url);
+    return existsSync(f) ? route.fulfill({contentType:"image/png", body: readFileSync(f)})
+                         : route.fulfill({status:404, body:""});
+  }
   return route.fulfill({status:404, body:""});
 });
 const p = await ctx.newPage();
