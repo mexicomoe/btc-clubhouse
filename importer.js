@@ -819,11 +819,133 @@
     return { rows, ignored };
   }
 
+  /* ---- the Index sheet ----
+     Rob's own sheet is the master copy of who is playing and off what. Its
+     Roster tab is published as CSV with the header row, exactly:
+
+         name,index,tee,playing
+
+     "Surname, First" names, the same as the Scorer feed; an index as a plain
+     number, a plus handicap written as a minus; a tee such as IV; and playing
+     TRUE or blank. Only a TRUE man counts toward anybody's six.
+
+     This decides; the leaderboard applies. Nothing here is guessed. A row that
+     cannot be read, or a name that might be one of two men, is REFUSED and
+     named, because a wrong index moves six other men's Hit Lists and a wrong
+     add puts a second copy of a man in the round. */
+
+  const INDEX_FEED_HEADER = "name,index,tee,playing";
+
+  /**
+   * Read the Index sheet against the round.
+   *
+   * `players` is the round's [{ id, name, index, tee }]. `opts.tees` is the
+   * list of legal tees and `opts.parseIndex` the engine's parseHandicapIndex,
+   * passed in so this file keeps no second copy of either rule.
+   *
+   * Returns:
+   *   ok         false when the header is wrong, and then nothing else is read
+   *   updates    [{ id, name, index, tee, was:{ index, tee } }] TRUE men whose
+   *              index or tee in the round differs from the sheet
+   *   adds       [{ name, index, tee }] TRUE men not in the round
+   *   notPlaying [{ id, name, why }] round men the sheet does not mark TRUE.
+   *              Listed only: taking a man out deletes his picks, so it is asked
+   *   refused    [{ name, why }]
+   *   playing    ids of round men the sheet marks TRUE, after updates
+   */
+  function readIndexFeed(text, players, opts) {
+    const tees = (opts && opts.tees) || [];
+    const parseIndex = opts && opts.parseIndex;
+    const out = { ok: true, problem: null, updates: [], adds: [], notPlaying: [],
+                  refused: [], playing: [] };
+    const lines = String(text == null ? "" : text).replace(/^﻿/, "")
+      .split(/\r?\n/).filter((l) => l.trim() !== "");
+    const head = (lines.shift() || "").split(",").map((c) => c.trim().toLowerCase()).join(",");
+    if (head !== INDEX_FEED_HEADER) {
+      out.ok = false;
+      out.problem = "The Index sheet's first row should be " + INDEX_FEED_HEADER +
+        " and is “" + head + "”. Nothing was read from it.";
+      return out;
+    }
+
+    // Every row, with the round player its name is (exactly, or turned round).
+    const names = players.map((p) => p.name || "");
+    const rows = lines.map((line) => {
+      const c = splitCsvLine(line).map((x) => String(x == null ? "" : x).trim());
+      const flag = (c[3] || "").toUpperCase();
+      const row = { name: c[0] || "", indexText: c[1] || "", tee: c[2] || "",
+                    playing: flag === "TRUE", why: null, at: -1 };
+      if (flag !== "" && flag !== "TRUE" && flag !== "FALSE") {
+        row.why = "playing says “" + c[3] + "”, not TRUE or blank";
+      }
+      if (row.name === "") return null;
+      const hits = [];
+      const key = normalizeName(canonicalName(row.name));
+      names.forEach((n, i) => { if (normalizeName(canonicalName(n)) === key) hits.push(i); });
+      if (hits.length > 1) row.why = row.why || "matches more than one man in the round";
+      else if (hits.length === 1) row.at = hits[0];
+      return row;
+    }).filter(Boolean);
+
+    // The same man twice on the sheet: neither row can be trusted over the other.
+    const seen = {};
+    rows.forEach((r) => {
+      const k = normalizeName(canonicalName(r.name));
+      seen[k] = (seen[k] || 0) + 1;
+    });
+    rows.forEach((r) => {
+      if (seen[normalizeName(canonicalName(r.name))] > 1) r.why = r.why || "is on the sheet twice";
+    });
+
+    // A TRUE man must be readable whole, or he is not used at all.
+    rows.forEach((r) => {
+      if (r.why || !r.playing) return;
+      const idx = parseIndex ? parseIndex(r.indexText) : { ok: false, error: "no index rule" };
+      if (!idx.ok) r.why = "index “" + r.indexText + "”: " + idx.error;
+      else if (idx.value == null) r.why = "no index";
+      else r.index = idx.value;
+      if (!r.why && r.tee === "") r.why = "no tee";
+      if (!r.why && tees.indexOf(r.tee) === -1) r.why = "no tee called “" + r.tee + "”";
+    });
+
+    // A new name that is a near miss for a round man the sheet has NOT already
+    // accounted for is a spelling, not a second man. Refused, with who it could be.
+    const claimed = {};
+    rows.forEach((r) => { if (r.at !== -1) claimed[r.at] = true; });
+    const unclaimed = players.map((p, i) => i).filter((i) => !claimed[i]);
+    rows.forEach((r) => {
+      if (r.why || !r.playing || r.at !== -1) return;
+      const near = nearestName(r.name, unclaimed.map((i) => names[i]));
+      if (near.index !== -1) {
+        r.why = "could be " + names[unclaimed[near.index]] + " in the round — spell it the same in both";
+      }
+    });
+
+    rows.forEach((r) => {
+      if (r.why) { out.refused.push({ name: r.name, why: r.why }); return; }
+      if (!r.playing) return;
+      if (r.at === -1) { out.adds.push({ name: r.name, index: r.index, tee: r.tee }); return; }
+      const p = players[r.at];
+      out.playing.push(p.id);
+      if (p.index !== r.index || p.tee !== r.tee) {
+        out.updates.push({ id: p.id, name: p.name, index: r.index, tee: r.tee,
+                           was: { index: p.index, tee: p.tee } });
+      }
+    });
+    players.forEach((p, i) => {
+      const r = rows.find((x) => x.at === i);
+      if (r && r.why) return;          // refused above, and named there
+      if (!r) out.notPlaying.push({ id: p.id, name: p.name, why: "not on the Index sheet" });
+      else if (!r.playing) out.notPlaying.push({ id: p.id, name: p.name, why: "not marked TRUE" });
+    });
+    return out;
+  }
+
   globalThis.ClubhouseImporter = {
     parseRoster, splitCsvLine, parseBirdiePicks,
     parseScores, splitName, grossCardToPlayer,
     normalizeName, unreverseName, stripHandicap, canonicalName, initialKey, matchName,
-    nearestName, editDistance,
+    nearestName, editDistance, readIndexFeed, INDEX_FEED_HEADER,
     PICKED_UP,
   };
 })();

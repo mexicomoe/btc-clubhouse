@@ -75,12 +75,14 @@ function summaries(opts: {
   const { written, document } = stubDoc(SUB_IDS);
   const src = fnSource("drawFoldSubs") + "\n" + fnSource("dayAndDate") + "\ndrawFoldSubs();";
   const run = new Function(
-    "state", "readyPlayers", "rosterMen", "inField", "playerFor", "DEFAULT_FORMAT",
+    "state", "readyPlayers", "sixPlayers", "rosterMen", "inField", "playerFor", "DEFAULT_FORMAT",
     "skinsOn", "rosterPreview", "picksPreview", "E", "hasScores", "sixKey",
     "rulesChanged", "changedRulesNote", "store", "exportNote", "document", "window",
     "MONTHS", "DAYS", src);
   run(
     state,
+    () => players.filter((p: any) => p.ready !== false),
+    // No Index sheet in these rounds, so the six are the ready men.
     () => players.filter((p: any) => p.ready !== false),
     () => roster,
     (m: any) => players.some((p: any) => p.name === m.name),

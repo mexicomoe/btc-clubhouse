@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="theme-color" content="#0b2e13">
 <title>Beat the Crowd · Clubhouse</title>
-<link rel="stylesheet" href="clubhouse.css?v=87090ca">
+<link rel="stylesheet" href="clubhouse.css?v=0ec656c">
 </head>
 <body>
 
@@ -234,14 +234,14 @@
   <div id="editBody"></div>
 </section>
 
-<script src="engine.js?v=87090ca"></script>
-<script src="importer.js?v=87090ca"></script>
-<script src="exporter.js?v=87090ca"></script>
-<script src="results.js?v=87090ca"></script>
-<script src="fieldlink.js?v=87090ca"></script>
-<script src="boardimage.js?v=87090ca"></script>
-<script src="version.js?v=87090ca"></script>
-<script src="display.js?v=87090ca"></script>
+<script src="engine.js?v=0ec656c"></script>
+<script src="importer.js?v=0ec656c"></script>
+<script src="exporter.js?v=0ec656c"></script>
+<script src="results.js?v=0ec656c"></script>
+<script src="fieldlink.js?v=0ec656c"></script>
+<script src="boardimage.js?v=0ec656c"></script>
+<script src="version.js?v=0ec656c"></script>
+<script src="display.js?v=0ec656c"></script>
 <script>
 "use strict";
 /* Rendering and setup only — every number comes from engine.js
@@ -424,6 +424,7 @@ function blankEvent(name, date){
     autoPicks: false, autoHitList: false,
     allowancePercent: 100, flight: "", lastTee: "IV", tab: "round",
     invitesSent: {},
+    indexSheet: null,
     // Null means the defaults. A diff, never a copy — see mergeContests.
     contests: null,
     exportedAt: null, exportedSignature: null,
@@ -520,6 +521,9 @@ function normalizeEvent(e, fallbackName){
        Thursday looked unsent on Friday, which is exactly the two-day case they
        exist for. */
     invitesSent: e.invitesSent && typeof e.invitesSent === "object" ? e.invitesSent : {},
+    // What the Index sheet last said, carried through for the same reason: who
+    // it does not mark TRUE must still be left out of the six after a reload.
+    indexSheet: e.indexSheet && typeof e.indexSheet === "object" ? e.indexSheet : null,
     // Carried through, or the delete warning would forget an export had happened.
     exportedAt: typeof e.exportedAt === "string" ? e.exportedAt : null,
     exportedSignature: typeof e.exportedSignature === "string" ? e.exportedSignature : null,
@@ -1033,6 +1037,16 @@ function cardOf(p){
   };
 }
 function readyPlayers(){ return state.players.filter(isReady); }
+/**
+ * The men who count toward anybody's six, and who are sent a link. Ready, and
+ * not left out by the Index sheet's last reading: only a man it marks TRUE
+ * plays. With no sheet read yet, every ready man counts, as before there was one.
+ */
+function sixPlayers(){
+  const out = state.indexSheet && Array.isArray(state.indexSheet.notPlaying)
+    ? state.indexSheet.notPlaying.map(n => n.id) : [];
+  return readyPlayers().filter(p => out.indexOf(p.id) === -1);
+}
 
 /* ---------- screen routing ---------- */
 const SCREENS = ["start","round","finish","player","edit","more","settings",
@@ -2038,7 +2052,7 @@ function drawFoldSubs(){
     false);
 
   const sent = state.invitesSent || {};
-  const inviteable = readyPlayers();
+  const inviteable = sixPlayers();
   const sentCount = inviteable.filter(p => sent[p.id] && sent[p.id].six === sixKey(p)).length;
   const stale = inviteable.filter(p => sent[p.id] && sent[p.id].six !== sixKey(p)).length;
   say("goInvitesSub",
@@ -3176,7 +3190,9 @@ function showPickLinkBox(){
   if(!box) return;
   const base = location.href.split("?")[0].split("#")[0]
     .replace(/leaderboard\.html$/, "picks.html");
-  const men = readyPlayers();
+  // The same men as Invites: the picks page works each man's six out of this
+  // list, so a man the Index sheet leaves out must not be in it.
+  const men = sixPlayers();
   // The eight cannot be worked out without an index, so a man without one is
   // NAMED and the link refused rather than quietly leaving him off it.
   const noIndex = state.players.filter(p => p.index == null);
@@ -3471,7 +3487,7 @@ function editRosterMan(i){
 function sixFor(p){
   const cfg = contestConfig().hitList;
   if(!cfg) return [];
-  const others = readyPlayers().filter(o => o.id !== p.id && o.index != null);
+  const others = sixPlayers().filter(o => o.id !== p.id && o.index != null);
   return E.nearestByIndex(p.index, others, cfg.offer).map(o => ({
     name: displayName(o),
     band: p.index == null || o.index == null ? "e"
@@ -3505,11 +3521,14 @@ function markSent(p, how){
 
 function renderInvites(){
   const box = document.getElementById("invitesScreen");
-  const men = readyPlayers();
+  const men = sixPlayers();
   const sent = state.invitesSent || {};
+  const sheet = indexSheetNote();
 
   if(men.length === 0){
-    box.innerHTML = `<div class="note warn">Nobody in this round has an index and a tee yet.</div>`;
+    box.innerHTML = sheet.html +
+      `<div class="note warn">Nobody in this round has an index and a tee yet.</div>`;
+    sheet.wire(box);
     return;
   }
   if(!contestConfig().hitList){
@@ -3558,7 +3577,7 @@ function renderInvites(){
       `</div>`;
   }).join("");
 
-  box.innerHTML =
+  box.innerHTML = sheet.html +
     // One line. What each link carries and why the marks are kept is in
     // Settings, under How to run Clubhouse.
     `<div class="note">Tapping a button opens the message already written; you
@@ -3574,6 +3593,123 @@ function renderInvites(){
   document.getElementById("invitesForget").addEventListener("click", () => {
     state.invitesSent = {}; save(); renderInvites(); renderSetup();
   });
+  sheet.wire(box);
+}
+
+/* ---- the Index sheet ----
+   Rob's sheet is the master copy of who plays and off what. Its Roster tab,
+   published as CSV, is read each time Invites opens, so an edit to the sheet
+   is all it takes for a man's six to move and his row to say "send again".
+   The rules for reading it are in importer.js, readIndexFeed; this applies
+   them. Blank, and nothing is read: Invites works exactly as it did. */
+const INDEX_CSV = "";
+
+let indexSheetBusy = false;
+let indexSheetFailed = false;
+
+async function readIndexSheet(){
+  if(!INDEX_CSV || indexSheetBusy) return;
+  indexSheetBusy = true;
+  try {
+    const res = await fetch(INDEX_CSV, { cache: "no-store" });
+    if(!res.ok) throw new Error("HTTP " + res.status);
+    applyIndexSheet(await res.text());
+    indexSheetFailed = false;
+  } catch(e) {
+    indexSheetFailed = true;
+  } finally {
+    indexSheetBusy = false;
+  }
+}
+
+/** Apply what the sheet says. Updates and adds go in; nobody comes out. */
+function applyIndexSheet(text){
+  const read = IMP.readIndexFeed(text, state.players,
+    { tees: E.TEE_IDS, parseIndex: E.parseHandicapIndex });
+  const at = new Date().toISOString();
+  if(!read.ok){
+    // A sheet that cannot be read changes nothing, and keeps what the last
+    // good reading left out, out.
+    state.indexSheet = Object.assign({}, state.indexSheet || { notPlaying: [] },
+      { at, problem: read.problem, refused: [], changed: [], added: [] });
+    save();
+    return;
+  }
+  read.updates.forEach(u => {
+    const p = state.players.find(x => x.id === u.id);
+    if(p){ p.index = u.index; p.tee = u.tee; }
+  });
+  const full = [];
+  read.adds.forEach(a => {
+    // The round's cap holds for the sheet too. A man it cannot fit is named.
+    if(state.players.length >= MAX_PLAYERS){ full.push({ name: a.name,
+      why: "the round already has " + MAX_PLAYERS + " players" }); return; }
+    // His roster entry, where there is one, so his mobile and e-mail come too.
+    const m = rosterMen().find(x => IMP.normalizeName(IMP.canonicalName(x.name)) ===
+                                    IMP.normalizeName(IMP.canonicalName(a.name)));
+    // Through addFromRoster, the one way a roster man becomes a player; the
+    // sheet's index and tee then win over the roster's, as the sheet is master.
+    let p = null;
+    if(m && addFromRoster(m)) p = playerFor(m);
+    if(!p){ p = blankPlayer(); p.name = a.name; state.players.push(p); }
+    p.index = a.index; p.tee = a.tee;
+  });
+  state.indexSheet = {
+    at, problem: null,
+    notPlaying: read.notPlaying,
+    refused: read.refused.concat(full),
+    changed: read.updates.map(u => ({ name: u.name, was: u.was, index: u.index, tee: u.tee })),
+    added: read.adds.filter(a => !full.some(f => f.name === a.name)).map(a => a.name),
+  };
+  save();
+}
+
+/** What the last reading said, at the top of Invites, and its buttons. */
+function indexSheetNote(){
+  const none = { html: "", wire: () => {} };
+  if(!INDEX_CSV) return none;
+  const s = state.indexSheet;
+  const bits = [];
+  if(indexSheetBusy && !s) bits.push(`<div class="note">Reading the Index sheet…</div>`);
+  if(indexSheetFailed) bits.push(`<div class="note warn">Could not read the Index sheet — no signal,
+    or it is not published. These are the indexes this phone already had.</div>`);
+  if(!s) return { html: bits.join(""), wire: () => {} };
+
+  const when = new Date(s.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const idx = (v) => v == null ? "none" : E.formatHandicapIndex(v);
+  if(s.problem) bits.push(`<div class="note warn">${esc(s.problem)}</div>`);
+  const said = [];
+  if(s.changed && s.changed.length) said.push(s.changed.map(c =>
+    esc(c.name) + " " + idx(c.was.index) + (c.was.tee !== c.tee ? " " + esc(c.was.tee || "") : "") +
+    " → " + idx(c.index) + (c.was.tee !== c.tee ? " " + esc(c.tee) : "")).join("; "));
+  if(s.added && s.added.length) said.push("added " + s.added.map(esc).join(", "));
+  bits.push(`<div class="note">Index sheet read at ${esc(when)}. ` +
+    (said.length ? said.join(" · ") + "." : "Nothing had changed.") + `</div>`);
+  if(s.refused && s.refused.length){
+    bits.push(`<div class="note warn"><b>Not used — fix these on the sheet:</b><br>` +
+      s.refused.map(x => esc(x.name) + ": " + esc(x.why)).join("<br>") + `</div>`);
+  }
+  const out = (s.notPlaying || []).filter(n => state.players.some(p => p.id === n.id));
+  if(out.length){
+    bits.push(`<div class="note warn"><b>In this round but not playing on the sheet.</b>
+      Left out of everybody's six and sent nothing. Taking a man out deletes his picks,
+      so it is yours to do:</div>` +
+      `<div class="pad" style="padding-top:0">` + out.map(n =>
+        `<button class="big" data-sheet-out="${esc(n.id)}">Take ${esc(n.name)} out — ${esc(n.why)}</button>`
+      ).join("") + `</div>`);
+  }
+  return {
+    html: bits.join(""),
+    wire: (box) => box.querySelectorAll("[data-sheet-out]").forEach(b =>
+      b.addEventListener("click", () => {
+        const p = state.players.find(x => x.id === b.dataset.sheetOut);
+        if(!p) return;
+        // One question either way: removeFromRound asks its own when he has
+        // picks or scores to lose, so this asks only when he has none.
+        if(!hasWork(p) && !window.confirm("Take " + p.name + " out of the round?")) return;
+        if(removeFromRound(p)){ renderInvites(); renderSetup(); }
+      })),
+  };
 }
 
 const firstNameOf = (p) => displayName(p).split(/\s+/)[0] || displayName(p);
@@ -4650,6 +4786,8 @@ document.getElementById("fNewEvent").addEventListener("click", addEvent);
 
 document.getElementById("goInvites").addEventListener("click", () => {
   renderInvites(); show("invites");
+  // Drawn at once from what the phone has, then again once the sheet is read.
+  if(INDEX_CSV){ readIndexSheet().then(() => { renderInvites(); renderSetup(); }); renderInvites(); }
 });
 document.getElementById("invitesBack").addEventListener("click", () => { renderRound(); show("round"); });
 

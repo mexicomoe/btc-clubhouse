@@ -75,8 +75,8 @@ test("there is ONE way a roster man becomes a player", () => {
   assert.equal((html.match(/playerFromRoster\(/g) || []).length, 2,
     "defined once, called once — from addFromRoster");
   assert.match(html, /function addFromRoster\(m\)\{/);
-  // Both screens go through it.
-  assert.equal((html.match(/addFromRoster\(/g) || []).length, 4);
+  // Both screens go through it, and so does a man the Index sheet adds.
+  assert.equal((html.match(/addFromRoster\(/g) || []).length, 5);
 });
 
 test("his index and tee are COPIED, never linked", () => {
