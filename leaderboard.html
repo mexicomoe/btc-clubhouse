@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="theme-color" content="#0b2e13">
 <title>Beat the Crowd · Clubhouse</title>
-<link rel="stylesheet" href="clubhouse.css?v=79f0f43">
+<link rel="stylesheet" href="clubhouse.css?v=6263077">
 </head>
 <body>
 
@@ -234,14 +234,14 @@
   <div id="editBody"></div>
 </section>
 
-<script src="engine.js?v=79f0f43"></script>
-<script src="importer.js?v=79f0f43"></script>
-<script src="exporter.js?v=79f0f43"></script>
-<script src="results.js?v=79f0f43"></script>
-<script src="fieldlink.js?v=79f0f43"></script>
-<script src="boardimage.js?v=79f0f43"></script>
-<script src="version.js?v=79f0f43"></script>
-<script src="display.js?v=79f0f43"></script>
+<script src="engine.js?v=6263077"></script>
+<script src="importer.js?v=6263077"></script>
+<script src="exporter.js?v=6263077"></script>
+<script src="results.js?v=6263077"></script>
+<script src="fieldlink.js?v=6263077"></script>
+<script src="boardimage.js?v=6263077"></script>
+<script src="version.js?v=6263077"></script>
+<script src="display.js?v=6263077"></script>
 <script>
 "use strict";
 /* Rendering and setup only — every number comes from engine.js
@@ -3252,6 +3252,90 @@ function showLink(url){
 
 /* ---------- the roster screen ---------- */
 
+/* ---- mobiles and e-mails, pasted in ----
+   Kept on this phone only. They are NOT read from the Index feed, because a
+   published tab is readable by anybody with its address and that address is
+   in a public repository. The rules are readContacts, in importer.js. */
+let contactsPreview = null;
+
+function showContactsBox(){
+  contactsPreview = null;
+  document.getElementById("contactsBox").innerHTML =
+    `<div class="pad"><div class="field"><label for="contactsPaste">From your Roster tab</label>
+       <textarea id="contactsPaste" spellcheck="false" autocorrect="off"
+         autocapitalize="off" autocomplete="off"
+         placeholder="Tanenbaum, Rob   rob@example.com   845-555-0101"></textarea>
+       <div class="cd">Copy the whole Roster tab, or just Name, Email and Mobile.
+         Kept on this phone only.</div></div>
+     <div style="padding:0 0 12px"><button class="big solid" id="contactsRead">Check paste first</button></div>
+     <div id="contactsOut"></div></div>`;
+  document.getElementById("contactsRead").addEventListener("click", readContactsPaste);
+}
+
+function readContactsPaste(){
+  contactsPreview = IMP.readContacts(document.getElementById("contactsPaste").value,
+    rosterMen().map(m => m.name || ""), state.players.map(p => p.name || ""));
+  drawContactsPreview();
+}
+
+function drawContactsPreview(){
+  const out = document.getElementById("contactsOut");
+  const rows = contactsPreview ? contactsPreview.rows : [];
+  if(rows.length === 0){
+    out.innerHTML = `<div class="note warn">No mobiles or e-mails read from that yet.</div>`;
+    return;
+  }
+  const good = rows.filter(r => !r.why), bad = rows.filter(r => r.why);
+  const line = (r) => {
+    const said = r.why ? r.why
+      : [r.mobile || "no mobile", r.email || "no e-mail"].join(" · ") +
+        (r.at === -1 ? " · new to the roster" : "");
+    return `<div class="prev"><div class="pv">` +
+      `<div class="pvn">${esc(r.name)}</div><div class="pvd">${esc(said)}</div></div>` +
+      `<div class="pvt"><span class="tag${r.why ? " no" : ""}">${r.why ? "skip" : "set"}</span></div></div>`;
+  };
+  let html = "";
+  if(good.length) html += `<div class="section-label">${good.length} to set</div>` + good.map(line).join("");
+  if(bad.length) html += `<div class="section-label">${bad.length} left out</div>` + bad.map(line).join("");
+  if(contactsPreview.ignored){
+    html += `<div class="note">${contactsPreview.ignored} line${contactsPreview.ignored === 1 ? "" : "s"}
+      ignored: a title, a heading row, or a man with no mobile or e-mail.</div>`;
+  }
+  html += `<div style="padding:12px 0"><button class="big solid" id="contactsSet"${good.length ? "" : " disabled"}>` +
+    (good.length ? "Set " + good.length + " m" + (good.length === 1 ? "an" : "en") : "Nothing to set") + `</button>` +
+    `<button class="big" id="contactsCancel">Discard this list</button></div>`;
+  out.innerHTML = html;
+  const set = document.getElementById("contactsSet");
+  if(set) set.addEventListener("click", commitContacts);
+  document.getElementById("contactsCancel").addEventListener("click", () => {
+    contactsPreview = null;
+    document.getElementById("contactsBox").innerHTML = "";
+  });
+}
+
+/**
+ * Fill them in. A blank in the paste leaves what the roster already holds: a
+ * missing cell on the sheet is not an instruction to forget a number.
+ */
+function commitContacts(){
+  const roster = rosterMen();
+  const byIndex = roster.slice();          // readContacts' `at` is into this order
+  contactsPreview.rows.filter(r => !r.why).forEach(r => {
+    let m = r.at !== -1 ? byIndex[r.at] : null;
+    if(!m){
+      const p = r.round !== -1 ? state.players[r.round] : null;
+      m = addToRoster(p ? { name: r.name, index: p.index, tee: p.tee, gender: p.gender }
+                        : { name: r.name });
+      if(p && !p.rosterId) p.rosterId = m.id;
+    }
+    if(r.mobile) m.mobile = r.mobile;
+    if(r.email) m.email = r.email;
+  });
+  save();
+  contactsPreview = null;
+  renderRoster();
+}
+
 function renderRoster(){
   const box = document.getElementById("rosterScreen");
   if(!box) return;
@@ -3287,7 +3371,9 @@ function renderRoster(){
     `<div class="pad">` +
       `<button class="big solid" id="rosterNew">+ Add a man to the roster</button>` +
       `<button class="big" id="rosterFromField">Save this round's players to the roster</button>` +
+      `<button class="big" id="contactsOpen">Paste mobiles and e-mails</button>` +
     `</div>` +
+    `<div id="contactsBox"></div>` +
     `<div id="rosterEdit"></div>`;
 
   box.querySelectorAll("[data-add]").forEach(b =>
@@ -3312,6 +3398,7 @@ function renderRoster(){
     editRosterMan(rosterMen().findIndex(m => m.name === ""));
   });
   drawFoldSubs();
+  document.getElementById("contactsOpen").addEventListener("click", showContactsBox);
 
   document.getElementById("rosterFromField").addEventListener("click", () => {
     // Anybody in the round who is not yet saved. One tap, because the usual way
@@ -3714,9 +3801,19 @@ function indexSheetNote(){
 }
 
 const firstNameOf = (p) => displayName(p).split(/\s+/)[0] || displayName(p);
+/**
+ * His roster entry: by the id he was added with, else by name EITHER WAY
+ * ROUND. By exact name alone, a round player "Alan Smith" never found the
+ * roster's "Smith, Alan", and his mobile read as missing when it was there.
+ */
+function rosterManFor(p){
+  const key = IMP.normalizeName(IMP.canonicalName(p.name || ""));
+  return rosterMen().find(r => p.rosterId && r.id === p.rosterId) ||
+         (key ? rosterMen().find(r => IMP.normalizeName(IMP.canonicalName(r.name || "")) === key) : null) ||
+         null;
+}
 function rosterEmail(p){
-  const m = rosterMen().find(r => r.id === p.rosterId) ||
-            rosterMen().find(r => IMP.normalizeName(r.name) === IMP.normalizeName(p.name || ""));
+  const m = rosterManFor(p);
   return m && m.email ? m.email : "";
 }
 
@@ -3759,8 +3856,7 @@ function tel(raw){
 
 /** His mobile, from the roster. The twin of rosterEmail, which existed alone. */
 function rosterMobile(p){
-  const m = rosterMen().find(r => r.id === p.rosterId) ||
-            rosterMen().find(r => IMP.normalizeName(r.name) === IMP.normalizeName(p.name || ""));
+  const m = rosterManFor(p);
   return m && m.mobile ? m.mobile : "";
 }
 

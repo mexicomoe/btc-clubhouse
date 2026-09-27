@@ -941,11 +941,122 @@
     return out;
   }
 
+  /* ---- mobiles and e-mails, pasted from Rob's Roster tab ----
+     Contacts are NOT carried by the Index feed: a published tab is readable by
+     anybody holding its address, and that address sits in a public repository.
+     So they are pasted in on the one phone that sends the invitations and kept
+     there.
+
+     The Roster tab's columns are Name, Handicap index, Tee, Email, Mobile, but
+     a paste may be the whole tab, titles and all, or just three columns in any
+     order. So a cell is read by WHAT IT IS, not where it sits: an e-mail has an
+     @, a mobile is ten digits, and the name is what comes before either. */
+
+  const EMAIL_CELL = /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/;
+  /** Phone punctuation only, and enough digits that it cannot be an index. */
+  const PHONE_CHARS = /^[\d\s().+-]+$/;
+
+  function contactCell(c) {
+    if (EMAIL_CELL.test(c)) return "email";
+    const digits = c.replace(/\D/g, "");
+    if (PHONE_CHARS.test(c) && digits.length >= 7) return "phone";
+    return null;
+  }
+
+  /**
+   * Read a pasted block of contacts against the app's roster.
+   *
+   * `roster` is the roster's names, in its own order; `round` is this round's
+   * player names. Returns { rows, ignored }, a row being
+   *   { name, mobile, email, at, round, why }
+   * where `at` is the roster man it fills (-1 for a new roster man), `round`
+   * the round player a new man is (-1 for none), and `why` the reason it is
+   * refused. Nothing is guessed: a name that could be one of two men, or is a
+   * near miss for a man already there, is refused and named.
+   */
+  function readContacts(text, roster, round) {
+    roster = roster || []; round = round || [];
+    const keyOf = (n) => normalizeName(canonicalName(n));
+    const rows = [];
+    let ignored = 0;
+
+    String(text == null ? "" : text).split(/\r?\n/).forEach((line) => {
+      if (line.trim() === "") return;
+      const cells = (line.indexOf("\t") !== -1 ? line.split("\t") : splitCsvLine(line))
+        .map((c) => String(c == null ? "" : c).trim());
+      // The name is every cell before the first number or contact, so a
+      // "Tanenbaum, Rob" split in two by a comma list goes back together.
+      const nameCells = [];
+      let i = 0;
+      for (; i < cells.length; i++) {
+        if (cells[i] === "" || contactCell(cells[i]) || /^-?\d/.test(cells[i])) break;
+        nameCells.push(cells[i]);
+      }
+      const name = nameCells.join(", ").trim();
+      let mobile = "", email = "", why = null;
+      cells.forEach((c) => {
+        const kind = contactCell(c);
+        if (kind === "email") {
+          if (email && email !== c) why = "two e-mails on one line";
+          email = c;
+        } else if (kind === "phone") {
+          const d = c.replace(/\D/g, "");
+          if (!(d.length === 10 || (d.length === 11 && d.charAt(0) === "1"))) {
+            why = why || "mobile “" + c + "” is not a ten-digit number";
+          } else if (mobile && mobile !== c) {
+            why = why || "two mobiles on one line";
+          } else {
+            mobile = c;
+          }
+        }
+      });
+      // A title, a heading row, or a man with nothing to fill in.
+      if (name === "" || (!mobile && !email && !why)) { ignored++; return; }
+      rows.push({ name, mobile, email, at: -1, round: -1, why });
+    });
+
+    // The same man twice in one paste: neither line can win over the other.
+    const count = {};
+    rows.forEach((r) => { count[keyOf(r.name)] = (count[keyOf(r.name)] || 0) + 1; });
+    rows.forEach((r) => {
+      if (count[keyOf(r.name)] > 1) r.why = r.why || "is in the paste twice";
+    });
+
+    rows.forEach((r) => {
+      if (r.why) return;
+      const hits = [];
+      roster.forEach((n, j) => { if (keyOf(n) === keyOf(r.name)) hits.push(j); });
+      if (hits.length > 1) { r.why = "matches more than one man in the roster"; return; }
+      if (hits.length === 1) { r.at = hits[0]; return; }
+      const inRound = [];
+      round.forEach((n, j) => { if (keyOf(n) === keyOf(r.name)) inRound.push(j); });
+      if (inRound.length > 1) { r.why = "matches more than one man in the round"; return; }
+      if (inRound.length === 1) r.round = inRound[0];
+    });
+
+    // A new name close to a man nobody in the paste accounted for is a
+    // spelling of him, not a second man.
+    const claimedRoster = {}, claimedRound = {};
+    rows.forEach((r) => {
+      if (r.at !== -1) claimedRoster[keyOf(roster[r.at])] = true;
+      if (r.round !== -1) claimedRound[keyOf(round[r.round])] = true;
+    });
+    const open = roster.filter((n) => !claimedRoster[keyOf(n)])
+      .concat(round.filter((n) => !claimedRound[keyOf(n)] && !claimedRoster[keyOf(n)]));
+    rows.forEach((r) => {
+      if (r.why || r.at !== -1 || r.round !== -1) return;
+      const near = nearestName(r.name, open);
+      if (near.index !== -1) r.why = "could be " + open[near.index] + " — spell it the same in both";
+    });
+
+    return { rows, ignored };
+  }
+
   globalThis.ClubhouseImporter = {
     parseRoster, splitCsvLine, parseBirdiePicks,
     parseScores, splitName, grossCardToPlayer,
     normalizeName, unreverseName, stripHandicap, canonicalName, initialKey, matchName,
-    nearestName, editDistance, readIndexFeed, INDEX_FEED_HEADER,
+    nearestName, editDistance, readIndexFeed, INDEX_FEED_HEADER, readContacts,
     PICKED_UP,
   };
 })();
