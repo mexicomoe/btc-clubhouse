@@ -7,6 +7,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import "../engine.js";
 import "../importer.js";
@@ -137,4 +138,15 @@ test("a wrong header reads nothing at all", () => {
 test("the header is read whatever its case, and a byte-order mark is ignored", () => {
   const r = I.readIndexFeed("﻿Name,Index,Tee,Playing\n\"Smith, Alan\",12.4,IV,TRUE", ROUND, OPTS);
   assert.equal(r.ok, true);
+});
+
+test("the page reads the Index feed tab, published as CSV", () => {
+  // A published-to-web page address, or a sheet's edit link, looks right and
+  // reads as HTML: every row would fail the header check and nothing would say
+  // why until Invites was opened on the day.
+  const html = readFileSync(new URL("../leaderboard.html", import.meta.url), "utf8");
+  const m = html.match(/^const INDEX_CSV = "([^"]*)";$/m);
+  assert.ok(m, "INDEX_CSV is in leaderboard.html");
+  assert.match(m![1],
+    /^https:\/\/docs\.google\.com\/spreadsheets\/d\/e\/[\w-]+\/pub\?gid=1116052183&single=true&output=csv$/);
 });

@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="theme-color" content="#0b2e13">
 <title>Beat the Crowd · Clubhouse</title>
-<link rel="stylesheet" href="clubhouse.css?v=0ec656c">
+<link rel="stylesheet" href="clubhouse.css?v=79f0f43">
 </head>
 <body>
 
@@ -234,14 +234,14 @@
   <div id="editBody"></div>
 </section>
 
-<script src="engine.js?v=0ec656c"></script>
-<script src="importer.js?v=0ec656c"></script>
-<script src="exporter.js?v=0ec656c"></script>
-<script src="results.js?v=0ec656c"></script>
-<script src="fieldlink.js?v=0ec656c"></script>
-<script src="boardimage.js?v=0ec656c"></script>
-<script src="version.js?v=0ec656c"></script>
-<script src="display.js?v=0ec656c"></script>
+<script src="engine.js?v=79f0f43"></script>
+<script src="importer.js?v=79f0f43"></script>
+<script src="exporter.js?v=79f0f43"></script>
+<script src="results.js?v=79f0f43"></script>
+<script src="fieldlink.js?v=79f0f43"></script>
+<script src="boardimage.js?v=79f0f43"></script>
+<script src="version.js?v=79f0f43"></script>
+<script src="display.js?v=79f0f43"></script>
 <script>
 "use strict";
 /* Rendering and setup only — every number comes from engine.js
@@ -3601,8 +3601,9 @@ function renderInvites(){
    published as CSV, is read each time Invites opens, so an edit to the sheet
    is all it takes for a man's six to move and his row to say "send again".
    The rules for reading it are in importer.js, readIndexFeed; this applies
-   them. Blank, and nothing is read: Invites works exactly as it did. */
-const INDEX_CSV = "";
+   them. Blank, and nothing is read: Invites works exactly as it did.
+   The "Index feed" tab of Clubhouse_Master_Sheet, published as CSV. */
+const INDEX_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQg-44HCczcIAcyn9_osr4HvnniZba5IV9wKlf-uNFjz_CaGDcYRnqYVz_n4L7dsPdcUJkynwk7lx4d/pub?gid=1116052183&single=true&output=csv";
 
 let indexSheetBusy = false;
 let indexSheetFailed = false;
