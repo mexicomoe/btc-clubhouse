@@ -14,3 +14,9 @@ jay_rounds_*.csv
 
 # A diagnostic ladder of test links — regenerated, never shipped.
 linktest.txt
+
+# Screenshots test/browser/scoringPage.smoke.mjs writes on every run.
+board.png
+card.png
+score.png
+teams.png
