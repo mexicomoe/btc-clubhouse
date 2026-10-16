@@ -90,10 +90,26 @@
     background:var(--felt);color:#fff;border-radius:10px;padding:14px;margin:0 0 4px;
     font-size:20px;font-weight:600;
   }
+  .mine{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+  /* "not you?" — small and quiet, top right. It is the way out of a remembered
+     name, not something a man should feel invited to tap. Still 44px tall. */
   .mine button{
-    display:block;margin-top:8px;min-height:44px;padding:8px 12px;font:inherit;font-size:16px;
-    background:transparent;color:#fff;border:1px solid rgba(255,255,255,.6);border-radius:8px;cursor:pointer;
+    flex:none;min-height:44px;margin:-10px -8px 0 0;padding:8px 10px;font:inherit;font-size:15px;
+    font-weight:400;background:transparent;color:#cfe0d4;border:0;text-decoration:underline;cursor:pointer;
   }
+  .mine button:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+  /* Is this you? — his name large, and two whole-width answers. */
+  .confirm{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 16px;margin:0 0 16px}
+  .confirm .q{font-size:16px;color:var(--quiet);margin:0 0 4px}
+  .confirm .big{font-size:28px;font-weight:700;line-height:1.2;margin:0 0 16px}
+  .confirm button{
+    display:block;width:100%;padding:16px;margin:0 0 10px;font:inherit;font-size:19px;font-weight:600;
+    border-radius:10px;cursor:pointer;
+  }
+  .confirm .yes{background:var(--felt);color:#fff;border:1px solid var(--felt)}
+  .confirm .no{background:transparent;color:var(--ink);border:1px solid var(--line);margin:0}
+  .confirm button:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+  .heads{background:#fff7e0;border:1px solid #e6cf8f;border-radius:10px;padding:12px 14px;margin:0 0 14px;font-size:16px;line-height:1.45}
   @media (prefers-reduced-motion:no-preference){.hole{transition:background .12s}}
 </style>
 </head>
@@ -105,6 +121,7 @@
 </header>
 
 <main>
+  <div id="feedNote"></div>
   <div id="whoBox">
     <label class="namelab" for="who">Your name</label>
     <input id="who" type="text" autocomplete="name" placeholder="Rob Tanenbaum">
@@ -123,8 +140,9 @@
   <p id="copied"></p>
 </div></div>
 
-<script src="engine.js?v=6263077"></script>
-<script src="fieldlink.js?v=6263077"></script>
+<script src="engine.js?v=7cd232b"></script>
+<script src="importer.js?v=7cd232b"></script>
+<script src="fieldlink.js?v=7cd232b"></script>
 <script>
 /**
  * Where a completed card is filed, on top of the text message.
@@ -248,37 +266,83 @@ function picksInOrder(){
   return out;
 }
 
-/* ---------- what the link brought, if anything ----------
+/* ---------- who is playing, and where the page learns it ----------
 
    THREE WAYS THIS PAGE CAN BE OPENED, and it has to be right in all of them.
 
    · HIS OWN INVITATION (?p=) — his name and his six opponents, worked out
-     before the link was built. The one Rob texts. It carries NO handicap
-     index: the bands were decided against his own index, which stayed behind
-     on the phone that made it.
+     before the link was built. It carries NO handicap index: the bands were
+     decided against his own index, which stayed behind on the phone that made
+     it. Kept because men have these saved, and because it is the escape hatch
+     for a man who keeps tapping the wrong name — there is no list on it.
    · THE WHOLE FIELD (?f=) — every player and his index, from which the page
-     works out anybody's opponents. Longer, and it grows with the field.
-   · PLAINLY, with neither. Type your name, pick your holes, no opponent box.
-     Not every round has a field ready when the sheet goes out, and this is
-     what the page has always done.
+     works out anybody's opponents. Kept for the links already in old texts.
+   · PLAINLY, with neither — THE PERMANENT LINK. The page reads the field from
+     the Index feed, the same published tab Invites reads, and then behaves
+     exactly as a ?f= link does. One address, forever: nothing rides in it, so
+     it never changes, never needs a shortener, and Rob sends nothing weekly.
+     If the feed cannot be read, it falls back to the typed name it always had.
 
    ONE LINK SERVES BOTH CONTESTS. The holes need nothing but the course, which
    this page already knows, so a man taps once for Watch the Birdie and the Hit
    List together. */
 const FL = window.ClubhouseFieldLink;
+const IMP = window.ClubhouseImporter;
+
+/** The "Index feed" tab of Clubhouse_Master_Sheet, published as CSV. */
+const INDEX_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQg-44HCczcIAcyn9_osr4HvnniZba5IV9wKlf-uNFjz_CaGDcYRnqYVz_n4L7dsPdcUJkynwk7lx4d/pub?gid=1116052183&single=true&output=csv";
+/** Long enough for a weak signal on the first tee; short enough that he is not left staring. */
+const FEED_WAIT = 8000;
+
+/** "Tanenbaum, Rob" and "Rob Tanenbaum" are the same man. */
+const sameMan = (a, b) =>
+  IMP.normalizeName(IMP.canonicalName(a)) === IMP.normalizeName(IMP.canonicalName(b));
+
+/**
+ * SORTED BY SURNAME. In Players-tab order Rob is team 1, seat 1, so his was the
+ * first big button — and three times in one week a man tapped it, reading it as
+ * "tap the man who sent this". Alphabetical puts nobody there by seating.
+ */
+function bySurname(players){
+  const key = (p) => {
+    const parts = IMP.normalizeName(IMP.canonicalName(p.name)).split(" ");
+    return parts[parts.length - 1] + " " + parts.slice(0, -1).join(" ");
+  };
+  return players.slice().sort((a, b) => key(a).localeCompare(key(b)));
+}
+
 const INVITE = (() => {
   const where = location.search || location.href;
   const man = FL.manFromUrl(where);
   if (man.ok) return { kind: "man", name: man.man.name, six: man.man.six };
   const field = FL.fieldFromUrl(where);
-  if (field.ok) return { kind: "field", made: field.field.made, players: field.field.players };
-  return null;
+  if (field.ok) return { kind: "field", made: field.field.made, players: bySurname(field.field.players) };
+  // The bare page. Filled in when the feed answers; until then, nobody.
+  return { kind: "feed", state: "reading", players: [], readAt: null };
 })();
+/** A list of names to tap, from either a ?f= link or the feed. */
+const hasList = () => INVITE.kind === "field" || (INVITE.kind === "feed" && INVITE.state === "ok");
+/** The feed failed: the typed-name page, as it always was. */
+const typed = () => INVITE.kind === "feed" && INVITE.state === "failed";
 
-let me = INVITE && INVITE.kind === "man" ? { name: INVITE.name, index: null } : null;
+/* ---- remembering him ----
+   Once a man has tapped his name and said yes, he is never asked again. Kept
+   on the phone, and GUARDED: storage throws in a private window and comes back
+   empty after a history clear, and the page must work either way. */
+const MINE_KEY = "clubhouse.picks.me";
+function recall(){ try { return localStorage.getItem(MINE_KEY) || null; } catch (e) { return null; } }
+function remember(name){ try { localStorage.setItem(MINE_KEY, name); } catch (e) {} }
+function forget(){ try { localStorage.removeItem(MINE_KEY); } catch (e) {} }
+
+let me = INVITE.kind === "man" ? { name: INVITE.name, index: null } : null;
 let opponent = null;
+/** Tapped but not yet confirmed: "Is this you?" is on screen. */
+let pending = null;
+/** He had a name stored that is not on this week's list. */
+let strayName = null;
 
 const whoBox = document.getElementById("whoBox");
+const feedNote = document.getElementById("feedNote");
 const pickWho = document.getElementById("pickWho");
 const oppBox = document.getElementById("oppBox");
 const fieldNote = document.getElementById("fieldNote");
@@ -287,9 +351,35 @@ const esc = (t) => String(t == null ? "" : t)
   .replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
 const idx = (v) => v == null ? "" : E.formatHandicapIndex(v);
 
+/** Put the remembered man back, if he is on the list in front of us. */
+function restore(){
+  if (!hasList() || me) return;
+  const kept = recall();
+  if (!kept) return;
+  const found = INVITE.players.find(p => sameMan(p.name, kept));
+  if (found) me = found;
+  else strayName = kept;   // not playing this week, or renamed: ask, never guess
+}
+
+function ago(at){
+  const s = Math.max(0, Math.round((Date.now() - at) / 1000));
+  if (s < 45) return "just now";
+  const m = Math.round(s / 60);
+  if (m <= 1) return "a minute ago";
+  if (m < 60) return m + " minutes ago";
+  const h = Math.round(m / 60);
+  return h <= 1 ? "an hour ago" : h + " hours ago";
+}
+
 function drawField(){
-  if(!INVITE){ pickWho.innerHTML = ""; fieldNote.innerHTML = ""; return; }
-  whoBox.style.display = "none";
+  whoBox.style.display = typed() ? "" : "none";
+  // No holes until he is somebody: picking under the wrong name is the very
+  // mistake the confirm step is there to stop.
+  slotsEl.style.display = INVITE.kind === "man" || typed() || me ? "" : "none";
+  feedNote.innerHTML = typed()
+    ? `<div class="heads">Couldn't reach the player list. Type your name and pick your ` +
+      `holes — I'll sort the Hit List out.</div>`
+    : "";
 
   if(INVITE.kind === "man"){
     // His name came with the link. There is nothing to choose and nothing to
@@ -300,31 +390,102 @@ function drawField(){
     return;
   }
 
+  if(INVITE.kind === "feed" && INVITE.state === "reading"){
+    pickWho.innerHTML = `<div class="heads">Reading this week's player list…</div>`;
+    fieldNote.innerHTML = "";
+    return;
+  }
+  if(typed()){ pickWho.innerHTML = ""; fieldNote.innerHTML = ""; return; }
+
   if(me){
     pickWho.innerHTML =
-      `<div class="mine">${esc(me.name)}${me.index == null ? "" : " \u00b7 " + idx(me.index)}` +
-      `<button type="button" id="notMe">Not you? Tap to change</button></div>`;
+      `<div class="mine"><span>${esc(me.name)}${me.index == null ? "" : " · " + idx(me.index)}</span>` +
+      `<button type="button" id="notMe">not you?</button></div>`;
     document.getElementById("notMe").addEventListener("click", () => {
-      me = null; opponent = null; drawField(); drawOpponent(); refresh();
+      forget();
+      me = null; opponent = null; pending = null; strayName = null;
+      drawAll();
+    });
+  } else if(pending){
+    // ONE CHECK, THE FIRST TIME ONLY. A mis-tap used to be silent: the card
+    // went off under another man's name and nobody knew until scoring.
+    pickWho.innerHTML =
+      `<div class="confirm"><p class="q">Is this you?</p>` +
+      `<p class="big">${esc(pending.name)}</p>` +
+      `<button type="button" class="yes" id="yesMe">Yes, that's me</button>` +
+      `<button type="button" class="no" id="noBack">No, go back</button></div>`;
+    document.getElementById("yesMe").addEventListener("click", () => {
+      me = pending; pending = null; strayName = null; opponent = null;
+      remember(me.name);
+      drawAll();
+      scrollTo(0, 0);
+    });
+    document.getElementById("noBack").addEventListener("click", () => {
+      pending = null; drawAll();
     });
   } else {
     pickWho.innerHTML =
+      (strayName ? `<div class="heads">You're not in this week's list. Tap your name if you're playing.</div>` : "") +
       `<label class="namelab">Tap your name</label>` +
       INVITE.players.map((p, i) =>
         `<button type="button" class="who" data-i="${i}">${esc(p.name)}` +
         `<span class="idx">${idx(p.index) || "no handicap index"}</span></button>`).join("");
     pickWho.querySelectorAll("button[data-i]").forEach(b =>
       b.addEventListener("click", () => {
-        me = INVITE.players[Number(b.dataset.i)];
-        opponent = null;
-        drawField(); drawOpponent(); refresh();
+        pending = INVITE.players[Number(b.dataset.i)];
+        drawAll();
+        scrollTo(0, 0);
       }));
   }
 
-  fieldNote.innerHTML =
-    `This list was made <b>${esc(INVITE.made || "at some point")}</b> and has ` +
-    `<b>${INVITE.players.length}</b> players in it. If somebody is missing, ask ` +
-    `for a newer link — naming a man who does not play pays nothing.`;
+  fieldNote.innerHTML = INVITE.kind === "feed"
+    // READ LIVE, so a man picking on a Sunday before Rob has set the Players
+    // tab sees last week's men. Say what was read and when.
+    ? `This list was read <b>${ago(INVITE.readAt)}</b> and has ` +
+      `<b>${INVITE.players.length}</b> players in it. If somebody is missing, pick ` +
+      `again later — naming a man who does not play pays nothing.`
+    : `This list was made <b>${esc(INVITE.made || "at some point")}</b> and has ` +
+      `<b>${INVITE.players.length}</b> players in it. If somebody is missing, ask ` +
+      `for a newer link — naming a man who does not play pays nothing.`;
+}
+
+function drawAll(){ drawField(); drawOpponent(); refresh(); }
+
+/**
+ * Read the field from the Index feed. Parsed by importer.js's readIndexFeed —
+ * the same rules Invites applies, so a man who would be refused from the round
+ * is not offered here either, and a name with a comma in it stays one name.
+ * Against an empty round every playing man comes back as an add.
+ *
+ * Cache-busted and no-store, as score.html reads its feed, or a phone serves
+ * yesterday's field out of its own cache.
+ */
+async function readFeed(){
+  let players = null;
+  try {
+    const ctl = window.AbortController ? new AbortController() : null;
+    const stop = ctl ? setTimeout(() => ctl.abort(), FEED_WAIT) : null;
+    const url = INDEX_CSV + (INDEX_CSV.indexOf("?") < 0 ? "?" : "&") + "cachebust=" + Date.now();
+    const res = await fetch(url, { cache: "no-store", signal: ctl ? ctl.signal : undefined });
+    if (stop) clearTimeout(stop);
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const read = IMP.readIndexFeed(await res.text(), [],
+      { tees: E.TEE_IDS, parseIndex: E.parseHandicapIndex });
+    if (read.ok) players = read.adds.map(a => ({ name: a.name, index: a.index }));
+  } catch (e) {
+    players = null;
+  }
+  // FEWER THAN TWO is not a field. An empty list to tap is worse than a box
+  // to type in, so it is treated exactly as no answer at all.
+  if (players && players.length >= 2) {
+    INVITE.state = "ok";
+    INVITE.players = bySurname(players);
+    INVITE.readAt = Date.now();
+    restore();
+  } else {
+    INVITE.state = "failed";
+  }
+  drawAll();
 }
 
 /**
@@ -333,14 +494,13 @@ function drawField(){
  * From HIS OWN LINK they arrive already decided, bands and all, and the page
  * does no arithmetic — it cannot, because no index traveled.
  *
- * From a field link the page works them out with the ENGINE's own rule. Never a
- * second copy of it: a page that recommends a man the app then refuses is the
- * worst outcome available here.
+ * From a field link or the feed the page works them out with the ENGINE's own
+ * rule. Never a second copy of it: a page that recommends a man the app then
+ * refuses is the worst outcome available here.
  */
 function opponentsFor(){
-  if(!INVITE) return [];
   if(INVITE.kind === "man") return INVITE.six.map(o => ({ name: o.name, said: FL.bandWords(o.band) }));
-  if(!me) return [];
+  if(!hasList() || !me) return [];
   const others = INVITE.players.filter(p => p !== me && p.index != null);
   const band = E.DEFAULT_CONTESTS.hitList.equalBand;
   const howMany = E.DEFAULT_CONTESTS.hitList.offer;
@@ -354,7 +514,7 @@ function opponentsFor(){
 }
 
 function drawOpponent(){
-  if(!INVITE || !me){ oppBox.innerHTML = ""; return; }
+  if(!me || (INVITE.kind !== "man" && !hasList())){ oppBox.innerHTML = ""; return; }
   const list = opponentsFor();
   oppBox.innerHTML =
     `<section class="pick"><h2>Hit List \u00b7 pick one</h2>` +
@@ -418,10 +578,12 @@ function refresh(){
   const n = picksInOrder().filter(h => h != null).length;
   const named = me ? true : who.value.trim().length > 0;
   // An opponent is only ASKED FOR when the link brought somebody to name.
-  const wantsOpponent = !!(INVITE && me && opponentsFor().length > 0);
+  const wantsOpponent = !!(me && opponentsFor().length > 0);
   let ready = false;
-  if (INVITE && INVITE.kind === "field" && !me) {
-    summary.textContent = "Tap your name in the list first.";
+  if (INVITE.kind === "feed" && INVITE.state === "reading") {
+    summary.textContent = "Reading the player list\u2026";
+  } else if (hasList() && !me) {
+    summary.textContent = pending ? "Is that you? Tap yes to start." : "Tap your name in the list first.";
   } else if (n === 0) {
     // The instruction, before he has tapped anything — and derived, so it can
     // never come to say something the boxes above it do not.
@@ -478,9 +640,13 @@ addEventListener("orientationchange", fitTray);
 if (window.ResizeObserver) new ResizeObserver(fitTray).observe(tray);
 
 who.addEventListener("input", refresh);
-drawField();
-drawOpponent();
-refresh();
+restore();
+drawAll();
+if (INVITE.kind === "feed") readFeed();
+// "read just now" should not still say so an hour later on an open phone.
+setInterval(() => { if (INVITE.kind === "feed" && INVITE.state === "ok" && !pending) {
+  const note = fieldNote.querySelector("b"); if (note) note.textContent = ago(INVITE.readAt);
+} }, 30000);
 
 /**
  * THE SAME CARD, ON ONE LINE, for the Google Sheet.
