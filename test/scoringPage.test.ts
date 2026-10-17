@@ -46,13 +46,14 @@ function varSource(name: string): string {
 }
 
 const LIFTED = [
-  "FORM_TEAM", "FORM_HOLE", "FORM_SEAT", "PAR",
+  "FORM_TEAM", "FORM_HOLE", "FORM_SEAT", "PAR", "PODIUM_BOARDS",
 ].map(varSource).join("\n") + "\n" + [
   "parseCsv", "parseFeed", "isEmptySeat", "displayName", "firstName", "parOf",
   "scoreButtons", "nextHole", "prevHole", "playIndex", "feedSentHoles",
   "feedHoleLine", "isOut", "playingSeats", "missingMan", "sendBody",
   "sendId", "outboxNext", "parseBoards", "prettyCell",
   "cardCell", "mineForTeam", "ackedForTeam", "queueWords",
+  "boardDone", "podiumClass", "grossTotal",
 ].map(fnSource).join("\n");
 
 const P = new Function(LIFTED + "\nreturn {" + [
@@ -61,6 +62,7 @@ const P = new Function(LIFTED + "\nreturn {" + [
   "feedHoleLine", "isOut", "playingSeats", "missingMan", "sendBody",
   "sendId", "outboxNext", "parseBoards", "prettyCell",
   "cardCell", "mineForTeam", "ackedForTeam", "queueWords",
+  "boardDone", "podiumClass", "grossTotal",
 ].join(",") + "};")() as any;
 
 /* ---------- a feed to work from ---------- */
@@ -422,6 +424,64 @@ test("a board with an extra column needs no code change", () => {
   const x = P.parseBoards(withSkins);
   assert.deepEqual(x[0].header, ["", "Player", "Thru", "Net", "Skins", "Clubhouse"]);
   assert.equal(x[0].rows[0][4], "-1.2");
+});
+
+/* ---------- the top two, once the round is in ---------- */
+
+const ALL_IN = BOARDS.replace(
+  '2,1,"Tanenbaum, Rob & Schwartz, Harvey & Horvitz, Stu",12,,-2.0',
+  '2,1,"Tanenbaum, Rob & Schwartz, Harvey & Horvitz, Stu",18*,,-2.0');
+
+test("nothing on the team board is shaded while a team is still out", () => {
+  // Mid-round the top row is mostly the team that teed off first.
+  const b = P.parseBoards(BOARDS)[1];
+  assert.equal(P.boardDone(b), false);
+  assert.deepEqual([0, 1].map(i => P.podiumClass(b, i)), ["", ""]);
+});
+
+test("once every team is in, first is green and second is yellow", () => {
+  // 18* is a team that went off the 10th, and is just as finished as 18.
+  const b = P.parseBoards(ALL_IN)[1];
+  assert.equal(P.boardDone(b), true);
+  assert.deepEqual([0, 1, 2].map(i => P.podiumClass(b, i)), ["first", "second", ""]);
+});
+
+test("a team on nought or on a blank Thru keeps the board unshaded", () => {
+  for (const thru of ["0", "", "17"]) {
+    const b = P.parseBoards(ALL_IN.replace(",18*,,-2.0", "," + thru + ",,-2.0"))[1];
+    assert.equal(P.podiumClass(b, 0), "", "Thru of '" + thru + "'");
+  }
+});
+
+test("only the boards named for it shade, and only by position", () => {
+  // CLUBHOUSE is all in here and still gets nothing: it was not asked for.
+  const club = P.parseBoards(BOARDS.replace(",12,48,", ",18,70,"))[0];
+  assert.equal(P.boardDone(club), true);
+  assert.equal(P.podiumClass(club, 0), "");
+  // A board with no Thru column can never be known to be finished.
+  assert.equal(P.boardDone({ title: "THE TEAM GAME", header: ["", "Team", "Total"],
+                             rows: [["1", "2", "-6"]] }), false);
+});
+
+test("the shades are tints behind black text", () => {
+  assert.match(CSS, /\.board tr\.first td\{background:var\(--firstfill\);\}/);
+  assert.match(CSS, /\.board tr\.second td\{background:var\(--secondfill\);\}/);
+});
+
+/* ---------- out, in and the round ---------- */
+
+test("a nine is added up only once all nine holes are in", () => {
+  const front = [4, 5, 3, 4, 4, 5, 4, 3, 4];
+  const seat = { seat: 1, name: "Tanenbaum, Rob", holes: [...front, 5, 4, 4, null, null, null, null, null, null] };
+  assert.deepEqual(P.grossTotal(seat, 1, 9, {}), { v: "36", mine: false });
+  assert.deepEqual(P.grossTotal(seat, 10, 18, {}), { v: "", mine: false });
+  assert.deepEqual(P.grossTotal(seat, 1, 18, {}), { v: "", mine: false });
+});
+
+test("a total that leans on this phone's scores is marked as this phone's", () => {
+  const seat = { seat: 2, name: "Levy, Rich", holes: [4, 5, 3, 4, 4, 5, 4, 3, null, ...Array(9).fill(null)] };
+  const mine = { 9: { 2: 6 } };
+  assert.deepEqual(P.grossTotal(seat, 1, 9, mine), { v: "38", mine: true });
 });
 
 test("a tab that has not come through gives nothing rather than half a board", () => {
