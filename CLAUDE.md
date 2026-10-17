@@ -32,3 +32,11 @@ rows in the sheet. Four of the sheet's boards count their own rows with
 hard-coded numbers (`ROW()-49`, `ROW()-61`, `ROW()-91`, `ROW()-121`), so
 inserting or moving rows silently fills boards with the wrong players.
 Reorder in the page. An earlier brief said the opposite; it was wrong.
+
+## leaderboard.html is not retired yet
+
+PR #1 made the permanent picks link live on Fri Oct 16 at 7:14 PM Florida
+time - AFTER that morning's round. So no round has yet been played on the new
+picks page. The first is Friday Oct 23. Leave `leaderboard.html` in the repo
+until after that round has run and Rob confirms it worked. Its cached roster
+is stale and must never be trusted for anything.
