@@ -685,6 +685,35 @@ function prettyCell(v){
  */
 var PODIUM_BOARDS = {"THE TEAM GAME":{}, "HIT LIST":{doneBy:"CLUBHOUSE", tiesOn:"score"}};
 
+/**
+ * THE ORDER THE BOARDS ARE DRAWN IN. The named boards first, in this order;
+ * then EVERY OTHER BOARD, in the order the sheet gives them. Not a whitelist:
+ * a contest switched on next month still appears with no change here.
+ *
+ * WHY THE PAGE AND NOT THE SHEET. Several boards on the Leaderboard tab count
+ * their own rows with fixed offsets (ROW()-49, ROW()-61 ...). Inserting rows
+ * there to move a board fills every board below it with the wrong men, and
+ * nothing says so. Reordering here moves nothing in the sheet.
+ *
+ * A name with no board on the tab is skipped: no error, no empty heading.
+ */
+var BOARD_ORDER = ["THE TEAM GAME", "CLUBHOUSE"];
+
+/** A board title as it is matched: case and surrounding spaces ignored. */
+function titleKey(t){ return String(t==null?"":t).trim().toUpperCase(); }
+
+/** The boards in drawing order. Every board comes back exactly once. */
+function orderBoards(boards){
+  var out=[],used=[],i,j;
+  for(i=0;i<BOARD_ORDER.length;i++){
+    var want=titleKey(BOARD_ORDER[i]);
+    for(j=0;j<boards.length;j++)
+      if(!used[j]&&titleKey(boards[j].title)===want){ out.push(boards[j]); used[j]=true; }
+  }
+  for(j=0;j<boards.length;j++) if(!used[j]) out.push(boards[j]);
+  return out;
+}
+
 /** Where a column sits on a board, by its heading, or -1. */
 function colAt(b,name){
   var i;
@@ -946,7 +975,7 @@ function fetchBoards(){
 
 function drawBoards(){
   var box=$("boardBody");box.textContent="";
-  S.boards.forEach(function(b){
+  orderBoards(S.boards).forEach(function(b){
     var wrap=document.createElement("div");wrap.className="board";
     var h=document.createElement("h2");h.textContent=b.title;wrap.appendChild(h);
     var t=document.createElement("table");

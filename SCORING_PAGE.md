@@ -124,7 +124,7 @@ Honestly, because it matters:
 
 On the bottom of **both** the scoring screen and the card — the two screens a
 man actually sits on. Tapping it opens a fourth screen inside the page: the
-CLUBHOUSE board and THE TEAM GAME, one under the other, in the page's own
+boards on the Leaderboard tab, one under the other, in the page's own
 type. No new tab, no Google, no pinch-zoom, and it keeps working off the
 phone's last copy when the signal goes.
 
@@ -161,6 +161,22 @@ nobody can put a face to is what gets asked about on the 4th tee. His effect is
 untouched: the team's total is still partly his doing and stands as the sheet
 computed it. **A man who has not teed off is not a BLIND** — he stands on the
 board with a `Thru` of `0`, which is the true thing to say about him.
+
+### The order they are drawn in
+
+`BOARD_ORDER` in `score.html` names the boards drawn first, in order: today
+**THE TEAM GAME**, then **CLUBHOUSE**. Every other board follows in the
+sheet's order — HIT LIST, then GROSS — and a new board appears with no code
+change. A name with no board on the tab is skipped. Case and surrounding
+spaces in a title don't matter.
+
+**Reorder here, never in the sheet.** Several boards on the Leaderboard tab
+count their own rows with fixed offsets (`ROW()-49`, `ROW()-61`, `ROW()-91`,
+`ROW()-121`). Inserting rows to move a board silently fills every board with
+the wrong men.
+
+A board whose rows are all blank — GROSS before the first card is in — is
+not drawn at all, heading included.
 
 ### The top two, once the round is in
 

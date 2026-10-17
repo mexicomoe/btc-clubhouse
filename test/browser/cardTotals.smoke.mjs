@@ -28,7 +28,10 @@ const FEED = [H,
   r(1,1,4,"BLIND",[]),
 ].join("\n");
 
-const board = (thru2, clubThru = "18*") => [
+// GROSS as on the tab: 24 slots, blank until the first card is in.
+const gross = (rows) => [",,,,", "GROSS,,,,", "Gross strokes so far, lowest first,,,,", ",,,,",
+  ",Player,Thru,Gross", ...rows, ...Array(24 - rows.length).fill(",,,")];
+const board = (thru2, clubThru = "18*", grossRows = []) => [
   "CLUBHOUSE,,,,", ",,,,",
   ",Player,Thru,Net,Clubhouse",
   '1,"Tanenbaum, Rob",18,71,-3.5',
@@ -46,6 +49,7 @@ const board = (thru2, clubThru = "18*") => [
   ',"Granville, Loren","Schwartz, Harvey",74,-1.1',
   ',"Wallach, Mike","Horvitz, Stu",76,-0.6',
   ...Array(22).fill(",,,,"),
+  ...gross(grossRows),
 ].join("\n");
 let BOARDS = board("12");
 
@@ -90,12 +94,15 @@ for (const width of [400, 360]) {
 
   // 2 · the team board, mid-round: nothing shaded
   await p.click("#lbCard"); await p.waitForTimeout(300);
+  let order = await p.$$eval(".board h2", e => e.map(x => x.textContent));
+  ok(JSON.stringify(order) === '["THE TEAM GAME","CLUBHOUSE","HIT LIST"]',
+     "the team game first, and an empty GROSS draws no heading: "+order);
   let shaded = await p.$$eval(".board tr.first, .board tr.second", e => e.length);
   ok(shaded === 0, "nothing shaded while a team is out, Hit List included: "+shaded);
   ok(await noScroll(), "no sideways scroll on the board");
 
   // 3 · every team in, one of them off the 10th: green then yellow
-  BOARDS = board("18*");
+  BOARDS = board("18*", "18*", ['1,"Tanenbaum, Rob",18,74', '2,"Granville, Loren",18*,79']);
   await p.click("#boardBack"); await p.waitForTimeout(150);
   await p.click("#lbCard"); await p.waitForTimeout(400);
   const rows = await p.$$eval(".board", bs => bs.map(b => ({
@@ -116,6 +123,11 @@ for (const width of [400, 360]) {
   ok(hit && hit.rows.map(x => x.cls).join("|") === "first|first|", "both men level at -1.1 are green, the third plain: "+(hit&&hit.rows.map(x=>x.cls)));
   ok(hit && hit.rows[0].bg === team.rows[0].bg, "the same green as the team board");
   ok(hit && hit.rows.every(x => x.cls !== "second"), "no yellow on the Hit List");
+  order = await p.$$eval(".board h2", e => e.map(x => x.textContent));
+  ok(JSON.stringify(order) === '["THE TEAM GAME","CLUBHOUSE","HIT LIST","GROSS"]',
+     "GROSS appears once it has men, and draws last: "+order);
+  const g = rows.find(x => x.title === "GROSS");
+  ok(g && g.rows.length === 2 && g.rows.every(x => x.cls === ""), "GROSS has its two men and no shading");
   ok(await noScroll(), "no sideways scroll on the finished board");
   await p.screenshot({path:`${OUT}/board-${width}.png`, fullPage:true});
   await ctx.close();

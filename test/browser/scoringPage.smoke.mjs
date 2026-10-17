@@ -318,7 +318,7 @@ await p.click("#lbScore"); await p.waitForTimeout(400);
 ok(await p.isVisible("#screenBoard"), "the leaderboard opens IN the page");
 ok(ctx.pages().length === tabsBefore, "and does not hand him to Google: "+ctx.pages().length);
 const boards = await p.$$eval(".board h2", e => e.map(x => x.textContent));
-ok(JSON.stringify(boards) === '["CLUBHOUSE","THE TEAM GAME"]', "both boards are there: "+boards);
+ok(JSON.stringify(boards) === '["THE TEAM GAME","CLUBHOUSE"]', "both boards are there, the team game first: "+boards);
 const txt = await p.innerText("#boardBody");
 ok(txt.includes("18*"), "the star on a Thru survived");
 ok(txt.includes("Rob Tanenbaum"), "names are turned round");
