@@ -9,12 +9,15 @@ The pages the men tap (`picks.html`, `score.html`) are served straight off
   UTC, which is 4–5 hours ahead: Friday night in Florida is already Saturday
   there. Check with `TZ=America/New_York date` before naming a day.
 - **The round is FRIDAY MORNING.** There is no Saturday round.
-- **The men make picks from Monday through Thursday night**, on `picks.html`.
+- **The men make picks Tuesday through Thursday night**, on `picks.html`.
+  Not Monday: Rob sets the Players tab on Monday after booking tee times,
+  and `picks.html` reads that tab, so a man picking on Monday would see last
+  week's field.
 - **SAFE TO MERGE: Friday afternoon through Monday.**
 - **NEVER MERGE: Tuesday through Friday morning.**
 
-This is the rule. Earlier briefs said "not Thursday or Friday" and then
-"Friday through Tuesday"; both were wrong.
+This is the rule. Earlier briefs said "not Thursday or Friday", then
+"Friday through Tuesday", then "picks from Monday"; all were wrong.
 
 When a PR has to wait, put the hold in its title as a plain date range in
 Florida time, e.g. `[HOLD — merge Fri 23 Oct afternoon – Mon 26 Oct]`.
