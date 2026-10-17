@@ -42,12 +42,12 @@ const board = (thru2, clubThru = "18*", grossRows = []) => [
   '1,2,"Granville, Loren & Levy, Rich & Wallach, Mike",18,,-6.0',
   `2,1,"Tanenbaum, Rob & Schwartz, Harvey & Horvitz, Stu",${thru2},,-2.0`,
   '3,3,"Marks, Dick & Lohrman, Gary",18,,+1.0',
-  // The Hit List as on the tab: 25 slots, the unused ones blank.
+  // The Hit List as on the tab: A rank, B-E Player/Named/Net/Score; 25 slots, the unused ones blank.
   ",,,,", "HIT LIST,,,,", "The one man each player named, and how it went,,,,", ",,,,",
   ",Player,Named,Net,Score",
-  ',"Tanenbaum, Rob","Levy, Rich",71,-1.1',
-  ',"Granville, Loren","Schwartz, Harvey",74,-1.1',
-  ',"Wallach, Mike","Horvitz, Stu",76,-0.6',
+  '1,"Tanenbaum, Rob","Levy, Rich",71,-1.1',
+  '2,"Granville, Loren","Schwartz, Harvey",74,-1.1',
+  '3,"Wallach, Mike","Horvitz, Stu",76,-0.6',
   ...Array(22).fill(",,,,"),
   ...gross(grossRows),
 ].join("\n");
