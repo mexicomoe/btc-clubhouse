@@ -24,3 +24,11 @@ This is the rule. Earlier briefs said "not Thursday or Friday", then
 
 When a PR has to wait, put the hold in its title as a plain date range in
 Florida time, e.g. `[HOLD — merge Fri 23 Oct afternoon – Mon 26 Oct]`.
+
+## Board order on the Leaderboard
+
+Board display order is set in `score.html` by `BOARD_ORDER`, never by moving
+rows in the sheet. Four of the sheet's boards count their own rows with
+hard-coded numbers (`ROW()-49`, `ROW()-61`, `ROW()-91`, `ROW()-121`), so
+inserting or moving rows silently fills boards with the wrong players.
+Reorder in the page. An earlier brief said the opposite; it was wrong.
