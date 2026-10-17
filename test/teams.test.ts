@@ -92,7 +92,9 @@ test("a feed with no name heading is not read as a field", () => {
 test("the page reads the roll call, never the Index feed", () => {
   // The Index feed follows Players, which this page fills: it would hand Rob
   // last week's men every Monday.
-  assert.equal(/gid=1116052183/.test(PAGE), false, "the Index feed's address is in teams.html");
+  assert.equal(/gid=1116052183&/.test(PAGE), false, "the Index feed's address is in teams.html");
+  // The Playing feed tab, from Roll call, in the same published document as the others.
+  assert.match(P.ROLL_CSV, /^https:\/\/docs\.google\.com\/spreadsheets\/d\/e\/2PACX-1vQg-44HCczcIAcyn9_osr4HvnniZba5IV9wKlf-uNFjz_CaGDcYRnqYVz_n4L7dsPdcUJkynwk7lx4d\/pub\?gid=1365054493&single=true&output=csv$/);
   assert.match(PAGE, /cache:"no-store"/);
   assert.match(PAGE, /cachebust="\+Date\.now\(\)/);
 });

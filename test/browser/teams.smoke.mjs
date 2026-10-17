@@ -143,7 +143,8 @@ console.log("nobody yet");
 
 console.log("no address set");
 {
-  const { ctx, p } = await open("", { page: SRC });
+  const blank = SRC.replace(/^var ROLL_CSV = "[^"]*";$/m, 'var ROLL_CSV = "";');
+  const { ctx, p } = await open("", { page: blank });
   ok((await p.innerText("#status")).includes("address isn't set yet"), "says so, rather than an empty screen");
   await ctx.close();
 }

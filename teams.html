@@ -89,11 +89,12 @@ button.big.plain{background:var(--paper);color:var(--ink);}
 "use strict";
 
 /**
- * WHO SAID YES — the roll-call feed, published as CSV: name,index,tee.
- * NOT the Index feed: that one follows Players, which is what this page fills.
- * Left blank until Rob publishes the tab; the page says so rather than guess.
+ * WHO SAID YES — the "Playing feed" tab (gid 1365054493), drawn from Roll call:
+ * name,index,tee for each man who answered YES. NOT the Index feed (gid
+ * 1116052183): that one follows Players, which is what this page fills, so on
+ * a Monday it still holds last week's men.
  */
-var ROLL_CSV = "";
+var ROLL_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQg-44HCczcIAcyn9_osr4HvnniZba5IV9wKlf-uNFjz_CaGDcYRnqYVz_n4L7dsPdcUJkynwk7lx4d/pub?gid=1365054493&single=true&output=csv";
 
 /** Six blocks of four: Seats rows 35-58, six team-board rows, 24 Players slots. */
 var MAX_TEAMS = 6;
