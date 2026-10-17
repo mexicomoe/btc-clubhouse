@@ -46,14 +46,14 @@ function varSource(name: string): string {
 }
 
 const LIFTED = [
-  "FORM_TEAM", "FORM_HOLE", "FORM_SEAT", "PAR", "PODIUM_BOARDS",
+  "FORM_TEAM", "FORM_HOLE", "FORM_SEAT", "PAR", "PODIUM_BOARDS", "BOARD_ORDER",
 ].map(varSource).join("\n") + "\n" + [
   "parseCsv", "parseFeed", "isEmptySeat", "displayName", "firstName", "parOf",
   "scoreButtons", "nextHole", "prevHole", "playIndex", "feedSentHoles",
   "feedHoleLine", "isOut", "playingSeats", "missingMan", "sendBody",
   "sendId", "outboxNext", "parseBoards", "prettyCell",
   "cardCell", "mineForTeam", "ackedForTeam", "queueWords",
-  "colAt", "boardDone", "podiumClasses", "grossTotal",
+  "colAt", "boardDone", "podiumClasses", "grossTotal", "titleKey", "orderBoards",
 ].map(fnSource).join("\n");
 
 const P = new Function(LIFTED + "\nreturn {" + [
@@ -62,7 +62,7 @@ const P = new Function(LIFTED + "\nreturn {" + [
   "feedHoleLine", "isOut", "playingSeats", "missingMan", "sendBody",
   "sendId", "outboxNext", "parseBoards", "prettyCell",
   "cardCell", "mineForTeam", "ackedForTeam", "queueWords",
-  "colAt", "boardDone", "podiumClasses", "grossTotal",
+  "colAt", "boardDone", "podiumClasses", "grossTotal", "titleKey", "orderBoards",
 ].join(",") + "};")() as any;
 
 /* ---------- a feed to work from ---------- */
@@ -528,6 +528,61 @@ test("a total that leans on this phone's scores is marked as this phone's", () =
   const seat = { seat: 2, name: "Levy, Rich", holes: [4, 5, 3, 4, 4, 5, 4, 3, null, ...Array(9).fill(null)] };
   const mine = { 9: { 2: 6 } };
   assert.deepEqual(P.grossTotal(seat, 1, 9, mine), { v: "38", mine: true });
+});
+
+/* ---------- the order the boards are drawn in ---------- */
+
+/** As on the Leaderboard tab: A150 the title, B-D the columns, 24 slots. */
+const GROSS = (rows: string[]) => [
+  ",,,,", "GROSS,,,,", "Gross strokes so far, lowest first,,,,", ",,,,",
+  ",Player,Thru,Gross",
+  ...rows, ...Array(24 - rows.length).fill(",,,"),
+].join("\n");
+const titles = (bs: any[]) => P.orderBoards(bs).map((b: any) => b.title);
+
+test("THE TEAM GAME is drawn above CLUBHOUSE, whatever order the sheet has them in", () => {
+  assert.deepEqual(titles(P.parseBoards(BOARDS)), ["THE TEAM GAME", "CLUBHOUSE"]);
+});
+
+test("every board not named still draws, after the named ones, in sheet order", () => {
+  // Not a whitelist: a contest switched on next month must appear untouched.
+  const tab = BOARDS + "\n" + HIT + "\n" + GROSS(['1,"Tanenbaum, Rob",9*,41']) +
+              "\n,,,,\nNEXT MONTH,,,,\n,,,,\n,Player,Thru,Points\n1,\"Levy, Rich\",18,3";
+  assert.deepEqual(titles(P.parseBoards(tab)),
+    ["THE TEAM GAME", "CLUBHOUSE", "HIT LIST", "GROSS", "NEXT MONTH"]);
+  // And parseBoards itself still gives the sheet's order.
+  assert.deepEqual(P.parseBoards(tab).map((b: any) => b.title),
+    ["CLUBHOUSE", "THE TEAM GAME", "HIT LIST", "GROSS", "NEXT MONTH"]);
+});
+
+test("a named board missing from the tab is skipped, and nothing is lost or doubled", () => {
+  const only = P.parseBoards(HIT);
+  assert.deepEqual(titles(only), ["HIT LIST"]);
+  assert.deepEqual(P.orderBoards([]), []);
+});
+
+test("matching a title ignores case and surrounding spaces", () => {
+  assert.equal(P.titleKey("  The Team Game "), "THE TEAM GAME");
+  const bs = [{ title: "CLUBHOUSE" }, { title: "the team game " }];
+  assert.deepEqual(P.orderBoards(bs).map((b: any) => b.title), ["the team game ", "CLUBHOUSE"]);
+});
+
+test("GROSS is left out of the order, so it draws after the named boards", () => {
+  // Even if the sheet put it first, it is not named, so it goes after them.
+  const tab = GROSS(['1,"Tanenbaum, Rob",9*,41']) + "\n" + BOARDS;
+  assert.deepEqual(titles(P.parseBoards(tab)), ["THE TEAM GAME", "CLUBHOUSE", "GROSS"]);
+});
+
+test("a GROSS board with no scores in yet is no board at all, not an empty heading", () => {
+  // Every data row is blank before the first card is in: the board ends at
+  // the first of them, has no rows, and is dropped.
+  const empty = P.parseBoards(BOARDS + "\n" + GROSS([]));
+  assert.deepEqual(empty.map((b: any) => b.title), ["CLUBHOUSE", "THE TEAM GAME"]);
+  // With two men in, they are its rows, star and all; the blank slots are not.
+  const two = P.parseBoards(BOARDS + "\n" + GROSS(['1,"Tanenbaum, Rob",9*,41', '2,"Levy, Rich",9,44']))
+    .find((b: any) => b.title === "GROSS");
+  assert.deepEqual(two.header, ["", "Player", "Thru", "Gross"]);
+  assert.deepEqual(two.rows.map((r: string[]) => r[2]), ["9*", "9"]);
 });
 
 test("a tab that has not come through gives nothing rather than half a board", () => {
