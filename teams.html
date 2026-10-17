@@ -1,0 +1,534 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>TGIF · Team maker</title>
+<!--
+  THE TEAM MAKER. Rob opens it on Monday, taps one button, and pastes the
+  names into the Players tab at A4.
+
+  It reads the ROLL CALL feed — who said yes this week — and never the Index
+  feed. The Index feed is built FROM Players, and Players is what this page
+  fills in: on Monday it still holds last week's men.
+
+  It never writes to the sheet. It reads a feed and hands Rob text.
+-->
+<style>
+:root{
+  --ink:#000;
+  --paper:#fff;
+  --quiet:#444;
+  --sel:#ffe9d6;
+  --selink:#8a3b00;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;overflow-x:hidden;background:var(--paper);color:var(--ink);}
+body{
+  font:600 19px/1.35 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+  -webkit-text-size-adjust:100%;
+  padding:0 16px env(safe-area-inset-bottom) 16px;
+  max-width:560px;margin:0 auto;
+}
+h1{font-size:26px;margin:14px 0 4px;}
+p{margin:.6em 0;font-size:19px;}
+.hide{display:none !important;}
+#status{font-size:19px;}
+#status.bad{font-weight:800;}
+#who{font-size:18px;font-weight:600;color:var(--quiet);margin:4px 0 12px;}
+button{font:inherit;cursor:pointer;}
+button.big{
+  display:block;width:100%;min-height:56px;margin:12px 0;
+  font-size:21px;font-weight:800;border:3px solid var(--ink);border-radius:8px;
+  background:var(--ink);color:var(--paper);
+}
+button.big.plain{background:var(--paper);color:var(--ink);}
+.team{margin:16px 0;border:3px solid var(--ink);border-radius:8px;overflow:hidden;}
+.team h2{margin:0;padding:8px 10px;font-size:21px;background:var(--ink);color:var(--paper);
+  display:flex;justify-content:space-between;align-items:baseline;gap:8px;}
+.team h2 span{font-size:18px;font-weight:700;white-space:nowrap;}
+.seat{display:flex;align-items:stretch;border-top:2px solid var(--ink);}
+.seat:first-of-type{border-top:0;}
+.seat .lab{width:34px;flex:none;display:flex;align-items:center;justify-content:center;
+  font-size:19px;font-weight:800;border-right:2px solid var(--ink);}
+.seat button.man{flex:1;min-width:0;min-height:48px;text-align:left;padding:6px 8px;
+  border:0;background:var(--paper);color:var(--ink);font-size:19px;font-weight:700;
+  display:flex;justify-content:space-between;align-items:center;gap:8px;}
+.seat button.man .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.seat button.man .ix{flex:none;font-size:18px;font-weight:600;}
+.seat button.man.sel{background:var(--sel);color:var(--selink);}
+.seat button.man.blind{font-style:italic;color:var(--quiet);}
+.seat button.lock{width:76px;padding:0 4px;flex:none;min-height:48px;border:0;border-left:2px solid var(--ink);
+  background:var(--paper);color:var(--ink);font-size:18px;font-weight:800;}
+.seat button.lock[aria-pressed="true"]{background:var(--ink);color:var(--paper);}
+#notes p{font-size:18px;}
+#copied{font-size:19px;font-weight:800;}
+</style>
+</head>
+<body>
+
+<h1>Make the teams</h1>
+<p id="status">Reading who said yes…</p>
+<div id="who"></div>
+
+<button id="make" class="big hide">Make the teams</button>
+
+<div id="teamsBox"></div>
+<div id="notes"></div>
+
+<div id="after" class="hide">
+  <button id="again" class="big plain">Make the teams again</button>
+  <p style="font-size:18px">Tap two names to swap them. Tap <b>Lock</b> to keep a man on his team when you make them again.</p>
+  <p id="clearFirst"><b>Select A4:A27 in Players, press Delete, then click in A4 and paste.</b></p>
+  <button id="copy" class="big">Copy for the Players tab</button>
+  <p id="copied"></p>
+</div>
+
+<script>
+"use strict";
+
+/**
+ * WHO SAID YES — the "Playing feed" tab (gid 1365054493), drawn from Roll call:
+ * name,index,tee for each man who answered YES. NOT the Index feed (gid
+ * 1116052183): that one follows Players, which is what this page fills, so on
+ * a Monday it still holds last week's men.
+ */
+var ROLL_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQg-44HCczcIAcyn9_osr4HvnniZba5IV9wKlf-uNFjz_CaGDcYRnqYVz_n4L7dsPdcUJkynwk7lx4d/pub?gid=1365054493&single=true&output=csv";
+
+/** Six blocks of four: Seats rows 35-58, six team-board rows, 24 Players slots. */
+var MAX_TEAMS = 6;
+/** How far a reshuffle may drift from the snake's evenness, in index strokes. */
+var EVEN_SLACK = 1.0;
+/** Random arrangements tried per tap. 3,000 because with BLINDs in the field a few hundred often missed the even ones; it takes well under a second on a phone. */
+var TRIES = 3000;
+var HISTORY_KEY = "clubhouse.teams.history";
+
+/* ---------- reading the feed ---------- */
+
+/** RFC 4180-ish: quoted fields, doubled quotes, a comma inside "Surname, First". */
+function parseCsv(text){
+  var rows=[],row=[],field="",quoted=false,i;
+  text = String(text||"").replace(/\r\n/g,"\n").replace(/\r/g,"\n");
+  for(i=0;i<text.length;i++){
+    var c=text[i];
+    if(quoted){
+      if(c==='"'){ if(text[i+1]==='"'){field+='"';i++;} else quoted=false; }
+      else field+=c;
+    } else if(c==='"'){ quoted=true; }
+    else if(c===","){ row.push(field);field=""; }
+    else if(c==="\n"){ row.push(field);field="";rows.push(row);row=[]; }
+    else field+=c;
+  }
+  row.push(field);
+  if(row.length>1||row[0]!=="") rows.push(row);
+  return rows;
+}
+
+/** A golf index as written: "23.5", or "+1.2" for a plus man, who is BETTER than scratch. */
+function parseIndex(v){
+  var s=String(v==null?"":v).trim();
+  if(s==="") return null;
+  var plus=s.charAt(0)==="+";
+  var n=parseFloat(plus?s.slice(1):s);
+  if(isNaN(n)) return null;
+  return plus?-n:n;
+}
+
+/**
+ * THE ROLL CALL, AS MEN. Columns are found by heading, not position. Blank
+ * names and BLINDs are skipped — BLIND is this page's to place, not the
+ * feed's. A name twice is kept once and reported, never silently.
+ */
+function parseRoll(text){
+  var rows=parseCsv(text),head=-1,i,cn=-1,ci=-1,ct=-1;
+  for(i=0;i<rows.length&&head<0;i++){
+    var low=rows[i].map(function(x){ return String(x).trim().toLowerCase(); });
+    if(low.indexOf("name")>-1){ head=i; cn=low.indexOf("name"); ci=low.indexOf("index"); ct=low.indexOf("tee"); }
+  }
+  if(head<0) return {ok:false,men:[],twice:[],noIndex:[]};
+  var men=[],seen={},twice=[],noIndex=[];
+  for(i=head+1;i<rows.length;i++){
+    var r=rows[i],name=String(r[cn]==null?"":r[cn]).trim();
+    if(name===""||name.toUpperCase()==="BLIND") continue;
+    if(seen[name]){ twice.push(name); continue; }
+    seen[name]=true;
+    var ix=ci<0?null:parseIndex(r[ci]);
+    if(ix===null) noIndex.push(name);
+    men.push({name:name,index:ix,tee:ct<0?"":String(r[ct]==null?"":r[ct]).trim()});
+  }
+  return {ok:true,men:men,twice:twice,noIndex:noIndex};
+}
+
+/* ---------- making the teams ---------- */
+
+/** Men divided by four, rounded up. Zero when there is nobody. */
+function teamCount(n){ return Math.ceil(n/4); }
+
+/**
+ * LOWEST INDEX FIRST, then the BLINDs to fill the last seats. A man with no
+ * index goes after every man with one: he is dealt, never dropped. Ties are
+ * broken by name so the same field always deals the same way.
+ */
+function dealOrder(men){
+  var t=teamCount(men.length),out=men.slice().sort(function(a,b){
+    var ai=a.index==null?Infinity:a.index,bi=b.index==null?Infinity:b.index;
+    return ai!==bi?ai-bi:(a.name<b.name?-1:a.name>b.name?1:0);
+  }),k;
+  for(k=men.length;k<t*4;k++) out.push({name:"BLIND",index:null,tee:"",blind:true});
+  return out;
+}
+
+/** One man's team total: the men's indexes, BLINDs and missing indexes as nothing. */
+function teamTotal(team){
+  var s=0,i;
+  for(i=0;i<team.length;i++) if(!team[i].blind&&team[i].index!=null) s+=team[i].index;
+  return Math.round(s*10)/10;
+}
+
+/**
+ * A TEAM'S WEIGHT, MAN FOR MAN: its men's average index, times four. For a
+ * team of four men it is simply the total. For a team with a BLIND it is what
+ * the total would be with a fourth man like the other three — so a team is
+ * not counted "light" just for having a BLIND, and the evening-out does not
+ * pile the strong men onto the one full team to make up for it.
+ *
+ * MEASURED, NOT ASSUMED: over 160 real player-rounds on Rob's course at index
+ * 19+, best 2 net balls of four men averaged 135.4 and of three men plus a
+ * BLIND on net par 135.5; head to head a BLIND team won 43, tied 15, lost 43
+ * per 100. A BLIND is worth an average man. Do not weaken BLIND teams.
+ */
+function teamWeight(team){
+  var s=0,n=0,i;
+  for(i=0;i<team.length;i++) if(!team[i].blind&&team[i].index!=null){ s+=team[i].index; n++; }
+  return n?s/n*4:0;
+}
+
+/** The gap between the heaviest and lightest team, man for man. */
+function spread(teams){
+  var t=teams.map(teamWeight);
+  return Math.round((Math.max.apply(null,t)-Math.min.apply(null,t))*10)/10;
+}
+
+/** A, B, C, D: lowest index first, BLINDs last. This is the order Copy uses. */
+function seatOrder(team){
+  return team.slice().sort(function(a,b){
+    if(!!a.blind!==!!b.blind) return a.blind?1:-1;
+    var ai=a.index==null?Infinity:a.index,bi=b.index==null?Infinity:b.index;
+    return ai!==bi?ai-bi:(a.name<b.name?-1:a.name>b.name?1:0);
+  });
+}
+
+/**
+ * ONE ARRANGEMENT. The deal is cut into four rows of T men — one row per
+ * quarter of the field. Each team takes one man from each row, so every team
+ * has one man from each quarter whatever the shuffle. `orderFor(row)` gives
+ * the order the teams take that row's men: the snake is 1..T, T..1, 1..T,
+ * T..1; a reshuffle is any other order.
+ *
+ * A LOCKED man stays on his team. He uses up that team's place in his own
+ * row, and the rest of the row goes to the other teams.
+ */
+function arrange(deal,T,locks,orderFor){
+  var teams=[],took=[],k,i,j;
+  for(i=0;i<T;i++){ teams.push([]); took.push({}); }
+  var rowOf={};
+  for(i=0;i<deal.length;i++) rowOf[i]=Math.floor(i/T);
+  for(i=0;i<deal.length;i++){
+    var m=deal[i],lt=m.blind?undefined:locks[m.name];
+    if(lt!=null&&lt<T&&teams[lt].length<4){ teams[lt].push(m); took[lt][rowOf[i]]=true; }
+  }
+  for(k=0;k<4;k++){
+    var order=orderFor(k),free=[];
+    for(i=k*T;i<Math.min((k+1)*T,deal.length);i++){
+      var d=deal[i],l=d.blind?undefined:locks[d.name];
+      if(!(l!=null&&l<T&&teams[l].indexOf(d)>-1)) free.push(d);
+    }
+    for(i=0;i<free.length;i++){
+      var put=-1;
+      for(j=0;j<order.length&&put<0;j++){ var t=order[j]; if(!took[t][k]&&teams[t].length<4) put=t; }
+      for(j=0;j<order.length&&put<0;j++){ var t2=order[j]; if(teams[t2].length<4) put=t2; }
+      teams[put].push(free[i]); took[put][k]=true;
+    }
+  }
+  return teams.map(seatOrder);
+}
+
+/** The snake: 1-2-3-4, then 4-3-2-1, and again. */
+function snakeOrder(T){
+  return function(k){
+    var o=[],i; for(i=0;i<T;i++) o.push(i);
+    return k%2?o.reverse():o;
+  };
+}
+
+/** A shuffled order for every row, from the random source given. */
+function shuffledOrder(T,rand){
+  return function(){
+    var o=[],i; for(i=0;i<T;i++) o.push(i);
+    for(i=T-1;i>0;i--){ var j=Math.floor(rand()*(i+1)),x=o[i]; o[i]=o[j]; o[j]=x; }
+    return o;
+  };
+}
+
+/** Every pair of real men on one team, as "name|name" in name order. */
+function pairKeys(teams){
+  var out=[],t,i,j;
+  for(t=0;t<teams.length;t++){
+    var real=teams[t].filter(function(m){ return !m.blind; }).map(function(m){ return m.name; }).sort();
+    for(i=0;i<real.length;i++) for(j=i+1;j<real.length;j++) out.push(real[i]+"|"+real[j]);
+  }
+  return out;
+}
+
+/**
+ * THE RECENT PAIRINGS THAT STILL MATTER: from the last three weeks stored,
+ * not counting this week's own (a second Copy on Monday is not "last week"),
+ * and only between two men both playing this week.
+ */
+function recentPairs(history,week,men){
+  var here={},set={},i,j;
+  for(i=0;i<men.length;i++) here[men[i].name]=true;
+  for(i=0;i<(history||[]).length;i++){
+    var h=history[i]; if(!h||h.week===week) continue;
+    for(j=0;j<(h.pairs||[]).length;j++){
+      var p=h.pairs[j].split("|");
+      if(here[p[0]]&&here[p[1]]) set[h.pairs[j]]=true;
+    }
+  }
+  return set;
+}
+
+function repeatsIn(teams,recent){
+  return pairKeys(teams).filter(function(p){ return recent[p]; }).length;
+}
+
+/**
+ * MAKE THE TEAMS. The snake first, for evenness. Then a few hundred other
+ * row orders; any that stays within EVEN_SLACK strokes of the snake's spread
+ * may replace it if it repeats fewer recent pairings. A preference, never a
+ * rule: it always returns teams.
+ *
+ * `again` picks at random among the best, so a second tap gives a different
+ * answer even with no history to steer by.
+ */
+function makeTeams(men,opts){
+  opts=opts||{};
+  var T=teamCount(men.length);
+  if(T===0) return {teams:[],repeats:0,recent:0};
+  var deal=dealOrder(men),locks=opts.locks||{},rand=opts.rand||Math.random;
+  var recent=recentPairs(opts.history,opts.week,men),nRecent=Object.keys(recent).length;
+  var base=arrange(deal,T,locks,snakeOrder(T));
+  var all=[{teams:base,r:repeatsIn(base,recent),s:spread(base)}],i;
+  for(i=0;i<(opts.tries==null?TRIES:opts.tries);i++){
+    var c=arrange(deal,T,locks,shuffledOrder(T,rand));
+    all.push({teams:c,r:repeatsIn(c,recent),s:spread(c)});
+  }
+  // EVEN FIRST. The allowance is measured from the most even arrangement
+  // found, not from the plain snake, which is often three strokes out.
+  var limit=Math.min.apply(null,all.map(function(c){ return c.s; }))+EVEN_SLACK;
+  var cands=all.filter(function(c){ return c.s<=limit+1e-9; });
+  var bestR=Math.min.apply(null,cands.map(function(c){ return c.r; }));
+  var best=cands.filter(function(c){ return c.r===bestR; });
+  var pick;
+  if(opts.again){
+    var key=function(ts){ return pairKeys(ts).sort().join(","); };
+    var fresh=best.filter(function(c){ return !opts.current||key(c.teams)!==key(opts.current); });
+    var pool=fresh.length?fresh:best;
+    pick=pool[Math.floor(rand()*pool.length)];
+  } else {
+    pick=best.slice().sort(function(a,b){ return a.s-b.s; })[0];
+  }
+  return {teams:pick.teams,repeats:pick.r,recent:nRecent};
+}
+
+/** Swap two men between (or within) teams, then re-letter both teams. */
+function swapMen(teams,a,b){
+  var out=teams.map(function(t){ return t.slice(); });
+  var x=out[a.team][a.seat],y=out[b.team][b.seat];
+  out[a.team][a.seat]=y; out[b.team][b.seat]=x;
+  out[a.team]=seatOrder(out[a.team]);
+  if(b.team!==a.team) out[b.team]=seatOrder(out[b.team]);
+  return out;
+}
+
+/* ---------- the paste ---------- */
+
+/**
+ * WHAT GOES IN COLUMN A. Team then seat, A to D, one per line, exactly as the
+ * feed spelled each man — the sheet matches names against the Roster. ALWAYS
+ * 24 lines: a blank line for every unused seat. That is a backstop only —
+ * whether a pasted blank clears a cell is not relied on. The screen tells Rob
+ * to clear A4:A27 first, which is what guarantees last week's men are gone.
+ */
+function copyText(teams){
+  var lines=[],t,i;
+  for(t=0;t<MAX_TEAMS;t++) for(i=0;i<4;i++){
+    var m=teams[t]&&teams[t][i];
+    lines.push(m?m.name:"");
+  }
+  return lines.join("\n");
+}
+
+/** The Friday these teams are for, in Florida: the next one, and a week on if today is Friday. */
+function weekKey(now){
+  var parts=new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit",weekday:"short"})
+    .formatToParts(now||new Date()),p={},i;
+  for(i=0;i<parts.length;i++) p[parts[i].type]=parts[i].value;
+  var dow=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].indexOf(p.weekday);
+  var ahead=(5-dow+7)%7||7;
+  var d=new Date(Date.UTC(+p.year,+p.month-1,+p.day+ahead));
+  return d.toISOString().slice(0,10);
+}
+
+/** This week's pairings in, the same week's older copy out, the newest three kept. */
+function rememberWeek(history,week,teams){
+  var h=(history||[]).filter(function(x){ return x&&x.week!==week; });
+  h.push({week:week,pairs:pairKeys(teams)});
+  h.sort(function(a,b){ return a.week<b.week?-1:a.week>b.week?1:0; });
+  return h.slice(-3);
+}
+
+/* ---------- the phone's memory, guarded ----------
+   Storage throws in a private window and comes back empty after a history
+   clear. Without it the page still makes even teams. */
+function loadHistory(){
+  try { var v=JSON.parse(localStorage.getItem(HISTORY_KEY)||"[]"); return Array.isArray(v)?v:[]; }
+  catch(e){ return []; }
+}
+function saveHistory(h){ try { localStorage.setItem(HISTORY_KEY,JSON.stringify(h)); } catch(e){} }
+
+/* ---------- the screen ---------- */
+
+var S={men:[],teams:[],locks:{},sel:null,result:null};
+var $=function(id){ return document.getElementById(id); };
+var fmt=function(v){ return v==null?"no index":(v<0?"+"+(-v).toFixed(1):v.toFixed(1)); };
+
+function say(text,bad){ $("status").textContent=text; $("status").classList.toggle("bad",!!bad); }
+
+function drawTeams(){
+  var box=$("teamsBox"); box.textContent="";
+  S.teams.forEach(function(team,ti){
+    var wrap=document.createElement("div"); wrap.className="team";
+    var h=document.createElement("h2");
+    var real=team.filter(function(m){ return !m.blind; }).length;
+    h.innerHTML="Team "+(ti+1)+" <span>total "+teamTotal(team).toFixed(1)+
+      " · avg "+(teamWeight(team)/4).toFixed(1)+(real<4?" · "+real+" men":"")+"</span>";
+    wrap.appendChild(h);
+    team.forEach(function(m,si){
+      var row=document.createElement("div"); row.className="seat";
+      var lab=document.createElement("div"); lab.className="lab"; lab.textContent="ABCD".charAt(si); row.appendChild(lab);
+      var b=document.createElement("button"); b.type="button"; b.className="man"+(m.blind?" blind":"");
+      if(S.sel&&S.sel.team===ti&&S.sel.seat===si) b.className+=" sel";
+      var nm=document.createElement("span"); nm.className="nm"; nm.textContent=m.name; b.appendChild(nm);
+      var ix=document.createElement("span"); ix.className="ix"; ix.textContent=m.blind?"":fmt(m.index); b.appendChild(ix);
+      b.addEventListener("click",function(){
+        if(!S.sel){ S.sel={team:ti,seat:si}; }
+        else if(S.sel.team===ti&&S.sel.seat===si){ S.sel=null; }
+        else { S.teams=swapMen(S.teams,S.sel,{team:ti,seat:si}); S.sel=null; S.locks=relock(); }
+        $("copied").textContent=""; drawTeams();
+      });
+      row.appendChild(b);
+      var lk=document.createElement("button"); lk.type="button"; lk.className="lock";
+      if(m.blind){ lk.disabled=true; lk.textContent=""; }
+      else {
+        var on=S.locks[m.name]!=null; lk.setAttribute("aria-pressed",String(on)); lk.textContent=on?"Locked":"Lock";
+        lk.addEventListener("click",function(){
+          if(S.locks[m.name]!=null) delete S.locks[m.name]; else S.locks[m.name]=ti;
+          drawTeams();
+        });
+      }
+      row.appendChild(lk);
+      wrap.appendChild(row);
+    });
+    box.appendChild(wrap);
+  });
+  drawNotes();
+}
+
+/** A locked man who was swapped is locked where he now stands. */
+function relock(){
+  var out={},t,i;
+  for(t=0;t<S.teams.length;t++) for(i=0;i<S.teams[t].length;i++){
+    var m=S.teams[t][i]; if(!m.blind&&S.locks[m.name]!=null) out[m.name]=t;
+  }
+  return out;
+}
+
+function drawNotes(){
+  var n=$("notes"); n.textContent="";
+  var add=function(t){ var p=document.createElement("p"); p.textContent=t; n.appendChild(p); };
+  if(!S.teams.length) return;
+  var blinds=0; S.teams.forEach(function(t){ t.forEach(function(m){ if(m.blind) blinds++; }); });
+  if(blinds) add(blinds===1?"1 BLIND fills an empty seat.":blinds+" BLINDs fill the empty seats, one per team.");
+  var r=S.result;
+  if(r&&r.recent) add("Avoided "+(r.recent-repeatsIn(S.teams,recentPairs(loadHistory(),weekKey(),S.men)))+" of "+r.recent+" recent pairings.");
+  add(blinds
+    ? "Evened man for man, so a team with a BLIND isn't counted light: within "+spread(S.teams).toFixed(1)+" strokes."
+    : "Totals are within "+spread(S.teams).toFixed(1)+" of each other.");
+}
+
+function make(again){
+  var res=makeTeams(S.men,{locks:S.locks,history:loadHistory(),week:weekKey(),again:again,current:S.teams});
+  S.teams=res.teams; S.result=res; S.sel=null; S.locks=relock();
+  $("make").classList.add("hide"); $("after").classList.remove("hide"); $("copied").textContent="";
+  drawTeams();
+}
+
+$("make").addEventListener("click",function(){ make(false); });
+$("again").addEventListener("click",function(){ make(true); });
+
+$("copy").addEventListener("click",function(){
+  var text=copyText(S.teams);
+  saveHistory(rememberWeek(loadHistory(),weekKey(),S.teams));
+  var done=function(){ $("copied").textContent="Copied. Select A4:A27 in Players, press Delete, then click in A4 and paste."; };
+  var fallback=function(){
+    try {
+      var ta=document.createElement("textarea"); ta.value=text; document.body.appendChild(ta);
+      ta.select(); document.execCommand("copy"); ta.remove(); done();
+    } catch(e){ $("copied").textContent="Couldn't copy on this phone. Try again on a computer."; }
+  };
+  if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done,fallback);
+  else fallback();
+});
+
+/**
+ * READ WHO SAID YES. Cache-busted and no-store, as score.html reads its feed:
+ * a stale read here puts the wrong men on teams. Every way it can go wrong is
+ * said in words, and none of them shows the button.
+ */
+function readRoll(){
+  if(!/^https?:\/\/\S+$/.test(ROLL_CSV)){ say("The roll-call feed address isn't set yet, so there's nobody to read.",true); return Promise.resolve(); }
+  var url=ROLL_CSV+(ROLL_CSV.indexOf("?")<0?"?":"&")+"cachebust="+Date.now();
+  var ctl=window.AbortController?new AbortController():null;
+  var stop=ctl?setTimeout(function(){ ctl.abort(); },8000):null;
+  return fetch(url,{cache:"no-store",signal:ctl?ctl.signal:undefined}).then(function(r){
+    if(stop) clearTimeout(stop);
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    return r.text();
+  }).then(function(text){
+    var got=parseRoll(text);
+    if(!got.ok){ say("Couldn't read the roll call: the feed came back without a name column.",true); return; }
+    var n=got.men.length;
+    if(n===0){ say("Nobody has said yes yet.",true); return; }
+    if(n>MAX_TEAMS*4){
+      say(n+" men said yes. The sheet holds 24 — six teams of four. Take "+(n-24)+" off the roll call, then reload.",true);
+      $("who").textContent=got.men.map(function(m){ return m.name; }).join(" · ");
+      return;
+    }
+    S.men=got.men;
+    var T=teamCount(n),extra=[];
+    if(got.twice.length) extra.push("Listed twice, counted once: "+got.twice.join("; ")+".");
+    if(got.noIndex.length) extra.push("No index, dealt last: "+got.noIndex.join("; ")+".");
+    say(n+" men said yes — "+T+(T===1?" team":" teams")+"."+(extra.length?" "+extra.join(" "):""));
+    $("who").textContent=got.men.map(function(m){ return m.name; }).join(" · ");
+    $("make").classList.remove("hide");
+  }).catch(function(){
+    if(stop) clearTimeout(stop);
+    say("Couldn't reach the roll call. Check the signal, then reload this page.",true);
+  });
+}
+readRoll();
+</script>
+</body>
+</html>
