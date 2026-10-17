@@ -80,8 +80,8 @@ button.big.plain{background:var(--paper);color:var(--ink);}
 <div id="after" class="hide">
   <button id="again" class="big plain">Make the teams again</button>
   <p style="font-size:18px">Tap two names to swap them. Tap <b>Lock</b> to keep a man on his team when you make them again.</p>
+  <p id="clearFirst"><b>Select A4:A27 in Players, press Delete, then click in A4 and paste.</b></p>
   <button id="copy" class="big">Copy for the Players tab</button>
-  <p><b>Paste into Players, cell A4.</b> It fills all 24 rows, so last week's names are cleared too.</p>
   <p id="copied"></p>
 </div>
 
@@ -191,6 +191,11 @@ function teamTotal(team){
  * the total would be with a fourth man like the other three — so a team is
  * not counted "light" just for having a BLIND, and the evening-out does not
  * pile the strong men onto the one full team to make up for it.
+ *
+ * MEASURED, NOT ASSUMED: over 160 real player-rounds on Rob's course at index
+ * 19+, best 2 net balls of four men averaged 135.4 and of three men plus a
+ * BLIND on net par 135.5; head to head a BLIND team won 43, tied 15, lost 43
+ * per 100. A BLIND is worth an average man. Do not weaken BLIND teams.
  */
 function teamWeight(team){
   var s=0,n=0,i;
@@ -351,8 +356,9 @@ function swapMen(teams,a,b){
 /**
  * WHAT GOES IN COLUMN A. Team then seat, A to D, one per line, exactly as the
  * feed spelled each man — the sheet matches names against the Roster. ALWAYS
- * 24 lines: a blank line for every unused seat, so a week with fewer teams
- * clears last week's names from the rows below.
+ * 24 lines: a blank line for every unused seat. That is a backstop only —
+ * whether a pasted blank clears a cell is not relied on. The screen tells Rob
+ * to clear A4:A27 first, which is what guarantees last week's men are gone.
  */
 function copyText(teams){
   var lines=[],t,i;
@@ -474,7 +480,7 @@ $("again").addEventListener("click",function(){ make(true); });
 $("copy").addEventListener("click",function(){
   var text=copyText(S.teams);
   saveHistory(rememberWeek(loadHistory(),weekKey(),S.teams));
-  var done=function(){ $("copied").textContent="Copied. Paste into Players, cell A4."; };
+  var done=function(){ $("copied").textContent="Copied. Select A4:A27 in Players, press Delete, then click in A4 and paste."; };
   var fallback=function(){
     try {
       var ta=document.createElement("textarea"); ta.value=text; document.body.appendChild(ta);

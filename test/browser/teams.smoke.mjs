@@ -91,7 +91,9 @@ for (const [n, T, blinds] of [[12, 3, 0], [13, 4, 3], [17, 5, 3], [21, 6, 3], [2
     ok(lines.length === 24 && lines.every(l => /^Surname\w+, First$/.test(l)), "Copy: 24 names, spelled as the feed spelled them");
     const shown = (await p.$$eval(".team", ts => ts.map(t => [...t.querySelectorAll(".man .nm")].map(x => x.textContent)))).flat();
     ok(JSON.stringify(lines) === JSON.stringify(shown), "Copy is team then seat, as shown");
-    ok((await p.innerText("#copied")).includes("Paste into Players, cell A4"), "says where it goes");
+    ok((await p.innerText("#copied")).includes("Select A4:A27 in Players, press Delete, then click in A4 and paste."), "says where it goes, clear first");
+    const order = await p.evaluate(() => !!(document.getElementById("clearFirst").compareDocumentPosition(document.getElementById("copy")) & Node.DOCUMENT_POSITION_FOLLOWING));
+    ok(order && (await p.innerText("#clearFirst")) === "Select A4:A27 in Players, press Delete, then click in A4 and paste.", "the clear-first instruction sits above Copy");
     // memory: next make reports avoided pairings
     await p.click("#again"); await p.waitForTimeout(100);
     ok(!(await p.innerText("#notes")).includes("recent pairings"), "this week's own copy is not 'recent'");

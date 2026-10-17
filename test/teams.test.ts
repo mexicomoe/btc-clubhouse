@@ -170,6 +170,12 @@ test("25 men is more than the sheet holds", () => {
 
 /* ---------- the paste ---------- */
 
+test("Rob is told to clear A4:A27 before pasting", () => {
+  // A pasted blank line is not relied on to clear a cell; the Delete is.
+  assert.match(PAGE, /<p id="clearFirst"><b>Select A4:A27 in Players, press Delete, then click in A4 and paste\.<\/b><\/p>\s*<button id="copy"/);
+  assert.equal(/last week's names are cleared too/.test(PAGE), false, "the page no longer promises the paste clears them");
+});
+
 test("Copy is 24 lines, team then seat, spelled as the feed spelled them", () => {
   const men = [
     { name: "Tanenbaum, Rob", index: 23.5, tee: "IV" }, { name: "Wolberg, Larry", index: 30.1, tee: "IV" },
