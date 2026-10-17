@@ -17,7 +17,7 @@
 
 Everything below is Clubhouse. The Tournament product is parked.
 
-**The app is live** at `https://mexicomoe.github.io/btc-clubhouse/leaderboard.html`, built with Claude Code from `~/Desktop/BtC_Clubhouse`, 236 tests passing.
+**The app is live** at `https://mexicomoe.github.io/btc-clubhouse/leaderboard.html`, built with Claude Code from `~/Desktop/BtC_Clubhouse`, 788 tests passing.
 
 ---
 
@@ -161,7 +161,7 @@ Rob's group already plays **Best 2-ball**, **Cha-Cha** (1 best ball on holes 1-4
 
 ## 8. What exists
 
-**Code** — `~/Desktop/BtC_Clubhouse`, on GitHub at `mexicomoe/btc-clubhouse`, live on GitHub Pages. Single HTML file plus plain-JS engine, no build step, works offline, 236 tests. One engine shared by the app and the tests, with a parity suite that fails if they ever diverge.
+**Code** — `~/Desktop/BtC_Clubhouse`, on GitHub at `mexicomoe/btc-clubhouse`, live on GitHub Pages. Single HTML file plus plain-JS engine, no build step, works offline, 788 tests. One engine shared by the app and the tests, with a parity suite that fails if they ever diverge.
 
 **Documents** — this handoff, `BUILD_BRIEF.md` in the repo, the team-formats design, the player-mode and backend design.
 
