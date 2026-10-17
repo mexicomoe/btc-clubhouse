@@ -98,10 +98,10 @@ var ROLL_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQg-44HCczcIAcyn
 
 /** Six blocks of four: Seats rows 35-58, six team-board rows, 24 Players slots. */
 var MAX_TEAMS = 6;
-/** How far a reshuffle may drift from the snake's evenness, in index strokes. */
-var EVEN_SLACK = 1.0;
-/** Random arrangements tried per tap. 3,000 because with BLINDs in the field a few hundred often missed the even ones; it takes well under a second on a phone. */
-var TRIES = 3000;
+/** How far the repeat preference may trade away evenness, in index strokes. Evenness comes first. */
+var EVEN_SLACK = 0.5;
+/** Fresh random starts per tap, each improved by swaps until no swap helps. */
+var TRIES = 300;
 var HISTORY_KEY = "clubhouse.teams.history";
 
 /* ---------- reading the feed ---------- */
@@ -166,9 +166,8 @@ function parseRoll(text){
 function teamCount(n){ return Math.ceil(n/4); }
 
 /**
- * LOWEST INDEX FIRST, then the BLINDs to fill the last seats. A man with no
- * index goes after every man with one: he is dealt, never dropped. Ties are
- * broken by name so the same field always deals the same way.
+ * THE FIELD, LOWEST INDEX FIRST, then a BLIND for each empty seat. A man with
+ * no index goes after every man with one: he is placed, never dropped.
  */
 function dealOrder(men){
   var t=teamCount(men.length),out=men.slice().sort(function(a,b){
@@ -220,55 +219,74 @@ function seatOrder(team){
 }
 
 /**
- * ONE ARRANGEMENT. The deal is cut into four rows of T men — one row per
- * quarter of the field. Each team takes one man from each row, so every team
- * has one man from each quarter whatever the shuffle. `orderFor(row)` gives
- * the order the teams take that row's men: the snake is 1..T, T..1, 1..T,
- * T..1; a reshuffle is any other order.
- *
- * A LOCKED man stays on his team. He uses up that team's place in his own
- * row, and the rest of the row goes to the other teams.
+ * WHY THERE IS NO "ONE MAN FROM EACH QUARTER" RULE. The first version dealt a
+ * snake — 1-2-3-4, 4-3-2-1 — so every team had one man from each quarter of
+ * the field. That balances the SHAPE of a team, not its strength, and it comes
+ * apart the moment one man sits far out at either end. Rob has had a man at
+ * 38.9 for three years, eleven strokes above the next: on the real field of 23
+ * October the quarter rule could do no better than 6.5 strokes between teams,
+ * where 0.6 was available by putting him with the three lowest men. So the
+ * only rule is the most even team totals. Do not put the quarter rule back.
  */
-function arrange(deal,T,locks,orderFor){
-  var teams=[],took=[],k,i,j;
-  for(i=0;i<T;i++){ teams.push([]); took.push({}); }
-  var rowOf={};
-  for(i=0;i<deal.length;i++) rowOf[i]=Math.floor(i/T);
+
+/**
+ * WHAT DOES NOT MOVE: locked men on their teams, then the BLINDs, one per team
+ * (to the team with fewest BLINDs, then fewest seats taken). Everything else
+ * is `free`, to be seated by the search.
+ */
+function seatFixed(deal,T,locks){
+  var teams=[],free=[],fixed=[],blind=[],i;
+  for(i=0;i<T;i++){ teams.push([]); blind.push(0); fixed.push([]); }
   for(i=0;i<deal.length;i++){
     var m=deal[i],lt=m.blind?undefined:locks[m.name];
-    if(lt!=null&&lt<T&&teams[lt].length<4){ teams[lt].push(m); took[lt][rowOf[i]]=true; }
+    if(lt!=null&&lt<T&&teams[lt].length<4){ teams[lt].push(m); fixed[lt].push(m); }
+    else if(!m.blind) free.push(m);
   }
-  for(k=0;k<4;k++){
-    var order=orderFor(k),free=[];
-    for(i=k*T;i<Math.min((k+1)*T,deal.length);i++){
-      var d=deal[i],l=d.blind?undefined:locks[d.name];
-      if(!(l!=null&&l<T&&teams[l].indexOf(d)>-1)) free.push(d);
-    }
-    for(i=0;i<free.length;i++){
-      var put=-1;
-      for(j=0;j<order.length&&put<0;j++){ var t=order[j]; if(!took[t][k]&&teams[t].length<4) put=t; }
-      for(j=0;j<order.length&&put<0;j++){ var t2=order[j]; if(teams[t2].length<4) put=t2; }
-      teams[put].push(free[i]); took[put][k]=true;
-    }
+  for(i=0;i<deal.length;i++){
+    if(!deal[i].blind) continue;
+    var best=-1,t;
+    for(t=0;t<T;t++) if(teams[t].length<4&&(best<0||blind[t]<blind[best]||(blind[t]===blind[best]&&teams[t].length<teams[best].length))) best=t;
+    teams[best].push(deal[i]); fixed[best].push(deal[i]); blind[best]++;
   }
-  return teams.map(seatOrder);
+  return {teams:teams,free:free};
 }
 
-/** The snake: 1-2-3-4, then 4-3-2-1, and again. */
-function snakeOrder(T){
-  return function(k){
-    var o=[],i; for(i=0;i<T;i++) o.push(i);
-    return k%2?o.reverse():o;
-  };
+/** The free men, shuffled, into the empty seats. */
+function fillSeats(fixed,free,rand){
+  var teams=fixed.map(function(t){ return t.slice(); }),men=free.slice(),i,t=0;
+  for(i=men.length-1;i>0;i--){ var j=Math.floor(rand()*(i+1)),x=men[i]; men[i]=men[j]; men[j]=x; }
+  for(i=0;i<men.length;i++){ while(teams[t].length>=4) t++; teams[t].push(men[i]); }
+  return teams;
 }
 
-/** A shuffled order for every row, from the random source given. */
-function shuffledOrder(T,rand){
-  return function(){
-    var o=[],i; for(i=0;i<T;i++) o.push(i);
-    for(i=T-1;i>0;i--){ var j=Math.floor(rand()*(i+1)),x=o[i]; o[i]=o[j]; o[j]=x; }
-    return o;
-  };
+/** How uneven, as a pair: the gap first, then the spread of all teams to break ties. */
+function unevenness(teams){
+  var w=teams.map(teamWeight),mean=0,v=0,i;
+  for(i=0;i<w.length;i++) mean+=w[i]/w.length;
+  for(i=0;i<w.length;i++) v+=(w[i]-mean)*(w[i]-mean);
+  return [Math.max.apply(null,w)-Math.min.apply(null,w),v];
+}
+function lessUneven(a,b){ return a[0]<b[0]-1e-9||(Math.abs(a[0]-b[0])<=1e-9&&a[1]<b[1]-1e-9); }
+
+/**
+ * IMPROVE BY SWAPS. Trade any two men on different teams whenever it makes
+ * the teams more even, until no trade does. Locked men and BLINDs never move.
+ */
+function climb(teams,fixedSet){
+  var cur=unevenness(teams),better=true,a,b,i,j,pass=0;
+  while(better&&pass++<60){
+    better=false;
+    for(a=0;a<teams.length;a++) for(b=a+1;b<teams.length;b++)
+      for(i=0;i<teams[a].length;i++) for(j=0;j<teams[b].length;j++){
+        var x=teams[a][i],y=teams[b][j];
+        if(fixedSet.indexOf(x)>-1||fixedSet.indexOf(y)>-1) continue;
+        teams[a][i]=y; teams[b][j]=x;
+        var u=unevenness(teams);
+        if(lessUneven(u,cur)){ cur=u; better=true; }
+        else { teams[a][i]=x; teams[b][j]=y; }
+      }
+  }
+  return teams;
 }
 
 /** Every pair of real men on one team, as "name|name" in name order. */
@@ -304,13 +322,14 @@ function repeatsIn(teams,recent){
 }
 
 /**
- * MAKE THE TEAMS. The snake first, for evenness. Then a few hundred other
- * row orders; any that stays within EVEN_SLACK strokes of the snake's spread
- * may replace it if it repeats fewer recent pairings. A preference, never a
- * rule: it always returns teams.
+ * MAKE THE TEAMS. TRIES fresh random starts, each improved by swaps until no
+ * swap helps, and the most even kept. Among those within EVEN_SLACK strokes
+ * of the most even, the one repeating fewest of the last three weeks'
+ * pairings wins: a preference, never a rule — it always returns teams.
  *
  * `again` picks at random among the best, so a second tap gives a different
- * answer even with no history to steer by.
+ * answer even with no history to steer by. Any man may move anywhere except
+ * a locked one.
  */
 function makeTeams(men,opts){
   opts=opts||{};
@@ -318,14 +337,13 @@ function makeTeams(men,opts){
   if(T===0) return {teams:[],repeats:0,recent:0};
   var deal=dealOrder(men),locks=opts.locks||{},rand=opts.rand||Math.random;
   var recent=recentPairs(opts.history,opts.week,men),nRecent=Object.keys(recent).length;
-  var base=arrange(deal,T,locks,snakeOrder(T));
-  var all=[{teams:base,r:repeatsIn(base,recent),s:spread(base)}],i;
-  for(i=0;i<(opts.tries==null?TRIES:opts.tries);i++){
-    var c=arrange(deal,T,locks,shuffledOrder(T,rand));
+  var seated=seatFixed(deal,T,locks),fixedSet=[],i,t;
+  for(t=0;t<T;t++) for(i=0;i<seated.teams[t].length;i++) fixedSet.push(seated.teams[t][i]);
+  var all=[],tries=Math.max(1,opts.tries==null?TRIES:opts.tries);
+  for(i=0;i<tries;i++){
+    var c=climb(fillSeats(seated.teams,seated.free,rand),fixedSet).map(seatOrder);
     all.push({teams:c,r:repeatsIn(c,recent),s:spread(c)});
   }
-  // EVEN FIRST. The allowance is measured from the most even arrangement
-  // found, not from the plain snake, which is often three strokes out.
   var limit=Math.min.apply(null,all.map(function(c){ return c.s; }))+EVEN_SLACK;
   var cands=all.filter(function(c){ return c.s<=limit+1e-9; });
   var bestR=Math.min.apply(null,cands.map(function(c){ return c.r; }));
@@ -463,9 +481,8 @@ function drawNotes(){
   if(blinds) add(blinds===1?"1 BLIND fills an empty seat.":blinds+" BLINDs fill the empty seats, one per team.");
   var r=S.result;
   if(r&&r.recent) add("Avoided "+(r.recent-repeatsIn(S.teams,recentPairs(loadHistory(),weekKey(),S.men)))+" of "+r.recent+" recent pairings.");
-  add(blinds
-    ? "Evened man for man, so a team with a BLIND isn't counted light: within "+spread(S.teams).toFixed(1)+" strokes."
-    : "Totals are within "+spread(S.teams).toFixed(1)+" of each other.");
+  add("Gap between the heaviest and lightest team: "+spread(S.teams).toFixed(1)+" strokes"+
+    (blinds?", counted man for man so a team with a BLIND isn't counted light.":"."));
 }
 
 function make(again){

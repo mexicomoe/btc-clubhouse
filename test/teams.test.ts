@@ -6,9 +6,9 @@
  *
  * What is checked is everything that can put the wrong men on a team:
  *  · the feed, with a comma in every name, a BLIND, a blank and a repeat
- *  · the snake, exactly as the brief draws it for sixteen men
+ *  · Rob's real field of 23 October, 0.6 strokes apart and not 6.5
  *  · the awkward counts: 12, 13, 17, 21, 24, and 25, which must refuse
- *  · BLINDs spread one per team by the snake, never three on one team
+ *  · BLINDs spread one per team, never three on one team
  *  · locks kept through a reshuffle, swaps re-lettered
  *  · Copy: 24 lines, team then seat, names exactly as the feed spelled them
  *  · recent partners leaned away from, and never a refusal over it
@@ -36,7 +36,7 @@ function varSource(name: string): string {
 }
 
 const FNS = ["parseCsv", "parseIndex", "parseRoll", "teamCount", "dealOrder", "teamTotal",
-  "teamWeight", "spread", "seatOrder", "arrange", "snakeOrder", "shuffledOrder", "pairKeys",
+  "teamWeight", "spread", "seatOrder", "seatFixed", "fillSeats", "unevenness", "lessUneven", "climb", "pairKeys",
   "recentPairs", "repeatsIn", "makeTeams", "swapMen", "copyText", "weekKey", "rememberWeek"];
 const P = new Function(
   ["ROLL_CSV", "MAX_TEAMS", "EVEN_SLACK", "TRIES"].map(varSource).join("\n") + "\n" +
@@ -99,26 +99,51 @@ test("the page reads the roll call, never the Index feed", () => {
   assert.match(PAGE, /cachebust="\+Date\.now\(\)/);
 });
 
-/* ---------- the snake ---------- */
+/* ---------- the most even totals, and nothing else ---------- */
 
-test("sixteen men deal exactly as the brief draws it", () => {
-  // sorted A..P; team 1 A H I P, team 2 B G J O, team 3 C F K N, team 4 D E L M
-  const r = P.makeTeams(field(16), { tries: 0 });
-  assert.deepEqual(names(r.teams), ["AHIP", "BGJO", "CFKN", "DELM"]);
+/** Rob's 12 men for Friday 23 October, from the Playing feed. */
+const OCT23 = [
+  ["Tanenbaum, Rob", 23.5], ["Buyer, Chuck", 23.6], ["Cooper, Ian", 28], ["Finkelstein, Dave", 24.8],
+  ["Gidaly, Mitch", 22], ["Goodman, Bob", 22.1], ["Granville, Loren", 25], ["Haskin, Bruce", 19.3],
+  ["Rothman, Bob", 25.6], ["Smith, Alan", 26.8], ["Weissman, Marty", 38.9], ["Wolberg, Larry", 27.7],
+].map(([name, index]) => ({ name, index, tee: "IV" }));
+
+test("Rob's real field of 23 October comes out 0.6 strokes apart, every tap", () => {
+  // The quarter rule could do no better than 6.5 here: Marty Weissman at 38.9
+  // is eleven strokes above the next man. 0.6 is the best possible split of
+  // these twelve, found by trying every one.
+  for (let seed = 1; seed <= 10; seed++) {
+    const r = P.makeTeams(OCT23, { rand: seeded(seed) });
+    assert.equal(P.spread(r.teams), 0.6, "seed " + seed);
+    const marty = r.teams.find((t: any[]) => t.some(m => m.name === "Weissman, Marty"));
+    assert.deepEqual(marty.map((m: any) => m.name),
+      ["Haskin, Bruce", "Gidaly, Mitch", "Goodman, Bob", "Weissman, Marty"]);
+  }
 });
 
-test("every team has one man from each quarter of the field, whatever the shuffle", () => {
-  const men = field(24), T = 6;
-  const deal = P.dealOrder(men);
-  const quarter = (m: any) => Math.floor(deal.indexOf(m) / T);
-  for (let seed = 1; seed <= 20; seed++) {
-    const teams = P.arrange(deal, T, {}, P.shuffledOrder(T, seeded(seed)));
-    for (const t of teams) assert.deepEqual(t.map(quarter).sort(), [0, 1, 2, 3]);
+test("there is no one-man-per-quarter rule, and the reason is written down", () => {
+  // A later session must not put it back: it balanced a team's shape, not its strength.
+  assert.match(PAGE, /Do not put the quarter rule back\./);
+  assert.equal(/function (arrange|snakeOrder|shuffledOrder)\(/.test(PAGE), false);
+  // On Rob's field the even answer puts three first-quarter men on one team.
+  const r = P.makeTeams(OCT23, { rand: seeded(1) });
+  const q1 = ["Haskin, Bruce", "Gidaly, Mitch", "Goodman, Bob"];
+  assert.ok(r.teams.some((t: any[]) => q1.every(n => t.some(m => m.name === n))));
+});
+
+test("the gap is shown on screen", () => {
+  assert.match(PAGE, /"Gap between the heaviest and lightest team: "\+spread\(S\.teams\)\.toFixed\(1\)\+" strokes"/);
+});
+
+test("evenly spread fields come out within a stroke", () => {
+  for (const n of [12, 16, 20, 24]) {
+    const r = P.makeTeams(field(n), { rand: seeded(n) });
+    assert.ok(P.spread(r.teams) <= 1.0, n + " men: gap " + P.spread(r.teams));
   }
 });
 
 test("A is the lowest index on the team, then B, C, D", () => {
-  const r = P.makeTeams(field(16), { tries: 0 });
+  const r = P.makeTeams(field(16), { tries: 1 });
   for (const t of r.teams) {
     const ix = t.map((m: any) => m.index);
     assert.deepEqual(ix, [...ix].sort((a, b) => a - b));
@@ -142,8 +167,8 @@ for (const [n, teams, blinds] of [[12, 3, 0], [13, 4, 3], [16, 4, 0], [17, 5, 3]
   });
 }
 
-test("13 men: the snake puts the BLINDs on teams 1-3, and team 4 is four men", () => {
-  const r = P.makeTeams(field(13), { tries: 0 });
+test("13 men: the BLINDs go on teams 1-3, and team 4 is four men", () => {
+  const r = P.makeTeams(field(13), { rand: seeded(13) });
   assert.deepEqual(blindsPer(r.teams), [1, 1, 1, 0]);
   assert.equal(r.teams[0][3].name, "BLIND");
   assert.equal(P.copyText(r.teams).split("\n")[3], "BLIND", "spelled exactly that way");
@@ -154,9 +179,7 @@ test("a team with a BLIND is weighed man for man, not counted light", () => {
   // so the evening-out piled the strong men onto the one full team.
   for (const n of [13, 17, 21]) {
     const r = P.makeTeams(field(n), { rand: seeded(n) });
-    const full = P.makeTeams(field(n), { tries: 0 });
-    assert.ok(P.spread(r.teams) <= 5, n + " men: spread " + P.spread(r.teams) + " (raw totals gave about 26)");
-    assert.ok(P.spread(r.teams) <= P.spread(full.teams) + 1e-9, "never worse than the plain snake");
+    assert.ok(P.spread(r.teams) <= 2, n + " men: gap " + P.spread(r.teams) + " (raw totals gave about 26)");
   }
   const t = [{ name: "a", index: 20 }, { name: "b", index: 30 }, { name: "c", index: 25 }, { name: "BLIND", index: null, blind: true }];
   assert.equal(P.teamWeight(t), 100);
@@ -184,7 +207,7 @@ test("Copy is 24 lines, team then seat, spelled as the feed spelled them", () =>
     { name: "Cooper, Ian", index: 19.4, tee: "III" }, { name: "Goodman, Bob", index: 33.0, tee: "IV" },
     { name: "Buyer, Chuck", index: 23.6, tee: "IV" },
   ];
-  const r = P.makeTeams(men, { tries: 0 });
+  const r = P.makeTeams(men, { rand: seeded(5) });
   const lines = P.copyText(r.teams).split("\n");
   assert.equal(lines.length, 24);
   // Two teams of four: 5 men and 3 BLINDs. Rows 4-7 then 8-11, A to D each.
@@ -196,10 +219,13 @@ test("Copy is 24 lines, team then seat, spelled as the feed spelled them", () =>
 /* ---------- moving men by hand ---------- */
 
 test("a swap trades two men and re-letters both teams", () => {
-  const r = P.makeTeams(field(16), { tries: 0 });
-  const out = P.swapMen(r.teams, { team: 0, seat: 0 }, { team: 3, seat: 0 }); // A <-> D
-  assert.deepEqual(names(out), ["DHIP", "BGJO", "CFKN", "AELM"]);
-  assert.deepEqual(names(r.teams), ["AHIP", "BGJO", "CFKN", "DELM"], "the old teams are not touched");
+  const r = P.makeTeams(field(16), { rand: seeded(2) });
+  const before = names(r.teams);
+  const x = r.teams[0][0].name, y = r.teams[3][3].name;
+  const out = P.swapMen(r.teams, { team: 0, seat: 0 }, { team: 3, seat: 3 });
+  assert.ok(out[0].some((m: any) => m.name === y) && out[3].some((m: any) => m.name === x));
+  for (const t of out) { const ix = t.map((m: any) => m.index); assert.deepEqual(ix, [...ix].sort((a, b) => a - b)); }
+  assert.deepEqual(names(r.teams), before, "the old teams are not touched");
 });
 
 test("a locked man stays on his team through every reshuffle", () => {
@@ -215,7 +241,7 @@ test("a locked man stays on his team through every reshuffle", () => {
 
 test("making them again gives a different set of teams", () => {
   const men = field(16);
-  const first = P.makeTeams(men, { tries: 0 }).teams;
+  const first = P.makeTeams(men, { rand: seeded(1) }).teams;
   const again = P.makeTeams(men, { again: true, current: first, rand: seeded(7) }).teams;
   assert.notDeepEqual(names(again).sort(), names(first).sort());
 });
@@ -224,18 +250,18 @@ test("making them again gives a different set of teams", () => {
 
 test("recent partners are leaned away from", () => {
   const men = field(16);
-  const lastWeek = P.makeTeams(men, { tries: 0 }).teams;
+  const lastWeek = P.makeTeams(men, { rand: seeded(1) }).teams;
   const history = P.rememberWeek([], "2026-10-16", lastWeek);
   const r = P.makeTeams(men, { history, week: "2026-10-23", rand: seeded(3) });
   assert.equal(r.recent, 24, "16 men in 4 teams make 24 pairings");
-  assert.ok(r.repeats < 24, "repeats: " + r.repeats);
-  // Still even: within the slack of the snake's spread.
-  assert.ok(P.spread(r.teams) <= P.spread(lastWeek) + 1.0 + 1e-9);
+  assert.ok(r.repeats <= 6, "repeats: " + r.repeats);
+  // Evenness first: within EVEN_SLACK of the most even found without history.
+  assert.ok(P.spread(r.teams) <= P.spread(lastWeek) + 0.5 + 1e-9);
 });
 
 test("this week's own copy is not counted as last week", () => {
   const men = field(16);
-  const teams = P.makeTeams(men, { tries: 0 }).teams;
+  const teams = P.makeTeams(men, { tries: 1 }).teams;
   const history = P.rememberWeek([], "2026-10-23", teams);
   assert.equal(P.makeTeams(men, { history, week: "2026-10-23", tries: 0 }).recent, 0);
 });
@@ -247,7 +273,7 @@ test("only pairings between two men playing this week count", () => {
 });
 
 test("three weeks are kept, and a second Copy in a week replaces the first", () => {
-  const t = P.makeTeams(field(8), { tries: 0 }).teams;
+  const t = P.makeTeams(field(8), { tries: 1 }).teams;
   let h: any[] = [];
   for (const w of ["2026-10-02", "2026-10-09", "2026-10-16", "2026-10-23", "2026-10-23"]) h = P.rememberWeek(h, w, t);
   assert.deepEqual(h.map(x => x.week), ["2026-10-09", "2026-10-16", "2026-10-23"]);
