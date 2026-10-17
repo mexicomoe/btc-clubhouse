@@ -53,7 +53,7 @@ const LIFTED = [
   "feedHoleLine", "isOut", "playingSeats", "missingMan", "sendBody",
   "sendId", "outboxNext", "parseBoards", "prettyCell",
   "cardCell", "mineForTeam", "ackedForTeam", "queueWords",
-  "boardDone", "podiumClass", "grossTotal",
+  "colAt", "boardDone", "podiumClasses", "grossTotal",
 ].map(fnSource).join("\n");
 
 const P = new Function(LIFTED + "\nreturn {" + [
@@ -62,7 +62,7 @@ const P = new Function(LIFTED + "\nreturn {" + [
   "feedHoleLine", "isOut", "playingSeats", "missingMan", "sendBody",
   "sendId", "outboxNext", "parseBoards", "prettyCell",
   "cardCell", "mineForTeam", "ackedForTeam", "queueWords",
-  "boardDone", "podiumClass", "grossTotal",
+  "colAt", "boardDone", "podiumClasses", "grossTotal",
 ].join(",") + "};")() as any;
 
 /* ---------- a feed to work from ---------- */
@@ -432,35 +432,81 @@ const ALL_IN = BOARDS.replace(
   '2,1,"Tanenbaum, Rob & Schwartz, Harvey & Horvitz, Stu",12,,-2.0',
   '2,1,"Tanenbaum, Rob & Schwartz, Harvey & Horvitz, Stu",18*,,-2.0');
 
+const pods = (bs: any[], i: number) => P.podiumClasses(bs[i], bs);
+
 test("nothing on the team board is shaded while a team is still out", () => {
   // Mid-round the top row is mostly the team that teed off first.
-  const b = P.parseBoards(BOARDS)[1];
-  assert.equal(P.boardDone(b), false);
-  assert.deepEqual([0, 1].map(i => P.podiumClass(b, i)), ["", ""]);
+  const bs = P.parseBoards(BOARDS);
+  assert.equal(P.boardDone(bs[1]), false);
+  assert.deepEqual(pods(bs, 1), ["", ""]);
 });
 
 test("once every team is in, first is green and second is yellow", () => {
   // 18* is a team that went off the 10th, and is just as finished as 18.
-  const b = P.parseBoards(ALL_IN)[1];
-  assert.equal(P.boardDone(b), true);
-  assert.deepEqual([0, 1, 2].map(i => P.podiumClass(b, i)), ["first", "second", ""]);
+  const bs = P.parseBoards(ALL_IN.replace(
+    '2,1,"Tanenbaum, Rob & Schwartz, Harvey & Horvitz, Stu",18*,,-2.0',
+    '2,1,"Tanenbaum, Rob & Schwartz, Harvey & Horvitz, Stu",18*,,-2.0\n3,3,"Marks, Dick",18,,+1.0'));
+  assert.equal(P.boardDone(bs[1]), true);
+  assert.deepEqual(pods(bs, 1), ["first", "second", ""]);
 });
 
 test("a team on nought or on a blank Thru keeps the board unshaded", () => {
   for (const thru of ["0", "", "17"]) {
-    const b = P.parseBoards(ALL_IN.replace(",18*,,-2.0", "," + thru + ",,-2.0"))[1];
-    assert.equal(P.podiumClass(b, 0), "", "Thru of '" + thru + "'");
+    const bs = P.parseBoards(ALL_IN.replace(",18*,,-2.0", "," + thru + ",,-2.0"));
+    assert.deepEqual(pods(bs, 1), ["", ""], "Thru of '" + thru + "'");
   }
 });
 
 test("only the boards named for it shade, and only by position", () => {
   // CLUBHOUSE is all in here and still gets nothing: it was not asked for.
-  const club = P.parseBoards(BOARDS.replace(",12,48,", ",18,70,"))[0];
-  assert.equal(P.boardDone(club), true);
-  assert.equal(P.podiumClass(club, 0), "");
+  const bs = P.parseBoards(BOARDS.replace(",12,48,", ",18,70,"));
+  assert.equal(P.boardDone(bs[0]), true);
+  assert.deepEqual(pods(bs, 0), ["", "", ""]);
   // A board with no Thru column can never be known to be finished.
   assert.equal(P.boardDone({ title: "THE TEAM GAME", header: ["", "Team", "Total"],
                              rows: [["1", "2", "-6"]] }), false);
+});
+
+/* ---------- the Hit List: green for every man level at the top ---------- */
+
+/** As on the Leaderboard tab: A88 the title, B-E the columns, best first. */
+const HIT = [
+  ",,,,", "HIT LIST,,,,", "The one man each player named, and how it went,,,,", ",,,,",
+  ",Player,Named,Net,Score",
+  ',"Tanenbaum, Rob","Levy, Rich",71,-1.1',
+  ',"Granville, Loren","Schwartz, Harvey",74,-1.1',
+  ',"Wallach, Mike","Horvitz, Stu",76,-0.6',
+  ',"Levy, Rich","Tanenbaum, Rob",75,+0.4',
+].join("\n");
+const CLUB_IN = BOARDS.replace(",12,48,", ",18,70,");
+
+test("the Hit List board comes out of the tab", () => {
+  const bs = P.parseBoards(CLUB_IN + "\n" + HIT);
+  assert.deepEqual(bs.map((b: any) => b.title), ["CLUBHOUSE", "THE TEAM GAME", "HIT LIST"]);
+  assert.deepEqual(bs[2].header, ["Player", "Named", "Net", "Score"]);
+  assert.equal(bs[2].rows.length, 4);
+});
+
+test("the Hit List waits on CLUBHOUSE, since it has no Thru of its own", () => {
+  // Harvey is through 12 on CLUBHOUSE: the round is not in, nothing shades.
+  const bs = P.parseBoards(BOARDS + "\n" + HIT);
+  assert.deepEqual(pods(bs, 2), ["", "", "", ""]);
+  // And with no CLUBHOUSE board on the tab at all, it never shades.
+  const alone = P.parseBoards(HIT);
+  assert.deepEqual(pods(alone, 0), ["", "", "", ""]);
+});
+
+test("once CLUBHOUSE is in, every man level at the top is green, and nobody yellow", () => {
+  const bs = P.parseBoards(CLUB_IN + "\n" + HIT);
+  assert.deepEqual(pods(bs, 2), ["first", "first", "", ""]);
+  // One man alone at the top: one green row, still no yellow.
+  const one = P.parseBoards(CLUB_IN + "\n" + HIT.replace('"Schwartz, Harvey",74,-1.1', '"Schwartz, Harvey",74,-0.9'));
+  assert.deepEqual(pods(one, 2), ["first", "", "", ""]);
+});
+
+test("a blank top Score shades nothing on the Hit List", () => {
+  const bs = P.parseBoards(CLUB_IN + "\n" + HIT.replace(/,-1\.1/g, ",").replace(",-0.6", ",").replace(",+0.4", ","));
+  assert.deepEqual(pods(bs, 2).filter((x: string) => x), []);
 });
 
 test("the shades are tints behind black text", () => {

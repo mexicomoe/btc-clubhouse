@@ -673,11 +673,24 @@ function prettyCell(v){
 }
 
 /**
- * THE BOARDS THAT SHADE THEIR TOP TWO once the round is in, by the title the
- * sheet gives them. That is the whole of what the page knows about them: which
- * board, not what its columns mean.
+ * THE BOARDS THAT SHADE THEIR WINNERS once the round is in, by the title the
+ * sheet gives them. That is the whole of what the page knows about them.
+ *
+ *  · THE TEAM GAME: first row green, second yellow, gated on its own Thru.
+ *  · HIT LIST: no Thru of its own, so it waits on CLUBHOUSE — the same field
+ *    of men. Green only, and EVERY row level with the first on Score: ties at
+ *    the top are the normal case there, and one green row would look broken.
+ *    The sheet already sorts it best-first, so "level with the first" needs
+ *    no idea of whether lower or higher is better.
  */
-var PODIUM_BOARDS = {"THE TEAM GAME":true};
+var PODIUM_BOARDS = {"THE TEAM GAME":{}, "HIT LIST":{doneBy:"CLUBHOUSE", tiesOn:"score"}};
+
+/** Where a column sits on a board, by its heading, or -1. */
+function colAt(b,name){
+  var i;
+  for(i=0;i<b.header.length;i++) if(b.header[i].toLowerCase()===name) return i;
+  return -1;
+}
 
 /**
  * IS EVERY ROW ON THIS BOARD IN? Every Thru reads 18 — or 18*, which is a team
@@ -688,17 +701,33 @@ var PODIUM_BOARDS = {"THE TEAM GAME":true};
  * that teed off first. Colouring it green would crown them for being early.
  */
 function boardDone(b){
-  var at=-1,i;
-  for(i=0;i<b.header.length;i++) if(b.header[i].toLowerCase()==="thru"){ at=i; break; }
+  var at=colAt(b,"thru"),i;
   if(at<0||!b.rows.length) return false;
   for(i=0;i<b.rows.length;i++) if(!/^18\*?$/.test(b.rows[i][at])) return false;
   return true;
 }
 
-/** "first", "second" or "" for one row: by position on the board, nothing else. */
-function podiumClass(b,row){
-  if(!PODIUM_BOARDS[b.title]||!boardDone(b)) return "";
-  return row===0?"first":row===1?"second":"";
+/**
+ * "first", "second" or "" for every row of one board. By position and by
+ * matching text, never by reading what a score means. `boards` is the whole
+ * tab, for a board that waits on another.
+ */
+function podiumClasses(b,boards){
+  var rule=PODIUM_BOARDS[b.title],out=b.rows.map(function(){ return ""; }),gate=b,i;
+  if(!rule) return out;
+  if(rule.doneBy){
+    gate=null;
+    for(i=0;i<(boards||[]).length;i++) if(boards[i].title===rule.doneBy){ gate=boards[i]; break; }
+  }
+  if(!gate||!boardDone(gate)||!b.rows.length) return out;
+  if(rule.tiesOn){
+    var at=colAt(b,rule.tiesOn),top=at<0?"":b.rows[0][at];
+    if(top==="") return out;
+    for(i=0;i<b.rows.length;i++) if(b.rows[i][at]===top) out[i]="first";
+    return out;
+  }
+  out[0]="first"; if(out.length>1) out[1]="second";
+  return out;
 }
 
 /**
@@ -927,9 +956,10 @@ function drawBoards(){
     });
     thead.appendChild(hr);t.appendChild(thead);
     var body=document.createElement("tbody");
+    var pods=podiumClasses(b,S.boards);
     b.rows.forEach(function(row,ri){
       var tr=document.createElement("tr");
-      var pod=podiumClass(b,ri); if(pod) tr.className=pod;
+      if(pods[ri]) tr.className=pods[ri];
       row.forEach(function(cell){
         var td=document.createElement("td");td.textContent=prettyCell(cell);tr.appendChild(td);
       });

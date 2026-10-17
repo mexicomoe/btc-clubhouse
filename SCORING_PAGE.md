@@ -171,6 +171,13 @@ off first. It goes by position on the board and by the title the sheet gives
 it (`PODIUM_BOARDS` in `score.html`), never by reading a score. **Retitle that
 board and the shading stops.**
 
+On **HIT LIST**, every row level with the first on `Score` is tinted the same
+green, and nobody yellow: ties at the top are the normal case there. It has no
+`Thru` of its own, so it waits on **CLUBHOUSE** — the same field of men — and
+shades only once every CLUBHOUSE row reads `18` or `18*`. The sheet sorts it
+best-first, so the page never has to know whether lower is better. Rename the
+board, its `Score` heading, or CLUBHOUSE, and it stops shading.
+
 ### Out, in and the round on the card
 
 Under the two nines, a small table gives each man's gross out, in and total,
