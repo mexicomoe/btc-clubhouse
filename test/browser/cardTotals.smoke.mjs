@@ -28,17 +28,24 @@ const FEED = [H,
   r(1,1,4,"BLIND",[]),
 ].join("\n");
 
-const board = thru2 => [
+const board = (thru2, clubThru = "18*") => [
   "CLUBHOUSE,,,,", ",,,,",
   ",Player,Thru,Net,Clubhouse",
   '1,"Tanenbaum, Rob",18,71,-3.5',
-  '2,"Granville, Loren",18*,74,-1.0',
+  `2,"Granville, Loren",${clubThru},74,-1.0`,
   ",,,,",
   "THE TEAM GAME,,,,", "Best 2 balls,,,,", ",,,,",
   ",Team,Players,Thru,,Total",
   '1,2,"Granville, Loren & Levy, Rich & Wallach, Mike",18,,-6.0',
   `2,1,"Tanenbaum, Rob & Schwartz, Harvey & Horvitz, Stu",${thru2},,-2.0`,
   '3,3,"Marks, Dick & Lohrman, Gary",18,,+1.0',
+  // The Hit List as on the tab: 25 slots, the unused ones blank.
+  ",,,,", "HIT LIST,,,,", "The one man each player named, and how it went,,,,", ",,,,",
+  ",Player,Named,Net,Score",
+  ',"Tanenbaum, Rob","Levy, Rich",71,-1.1',
+  ',"Granville, Loren","Schwartz, Harvey",74,-1.1',
+  ',"Wallach, Mike","Horvitz, Stu",76,-0.6',
+  ...Array(22).fill(",,,,"),
 ].join("\n");
 let BOARDS = board("12");
 
@@ -62,7 +69,7 @@ for (const width of [400, 360]) {
   });
   const p = await ctx.newPage();
   const noScroll = () => p.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth);
-  BOARDS = board("12");
+  BOARDS = board("12", "12");
   await p.goto("http://x/index.html"); await p.waitForTimeout(400);
   await p.click(".teamBtn:nth-of-type(1)"); await p.click("#roleNo"); await p.waitForTimeout(200);
 
@@ -84,7 +91,7 @@ for (const width of [400, 360]) {
   // 2 · the team board, mid-round: nothing shaded
   await p.click("#lbCard"); await p.waitForTimeout(300);
   let shaded = await p.$$eval(".board tr.first, .board tr.second", e => e.length);
-  ok(shaded === 0, "nothing shaded while a team is out: "+shaded);
+  ok(shaded === 0, "nothing shaded while a team is out, Hit List included: "+shaded);
   ok(await noScroll(), "no sideways scroll on the board");
 
   // 3 · every team in, one of them off the 10th: green then yellow
@@ -104,6 +111,11 @@ for (const width of [400, 360]) {
   ok(team.rows.every(x => x.ink === "rgb(0, 0, 0)"), "the text on them stays black");
   const club = rows.find(x => x.title === "CLUBHOUSE");
   ok(club.rows.every(x => x.cls === ""), "the CLUBHOUSE board is not shaded");
+  const hit = rows.find(x => x.title === "HIT LIST");
+  ok(hit && hit.rows.length === 3, "the Hit List is drawn, and its blank slots are not rows: "+(hit&&hit.rows.length));
+  ok(hit && hit.rows.map(x => x.cls).join("|") === "first|first|", "both men level at -1.1 are green, the third plain: "+(hit&&hit.rows.map(x=>x.cls)));
+  ok(hit && hit.rows[0].bg === team.rows[0].bg, "the same green as the team board");
+  ok(hit && hit.rows.every(x => x.cls !== "second"), "no yellow on the Hit List");
   ok(await noScroll(), "no sideways scroll on the finished board");
   await p.screenshot({path:`${OUT}/board-${width}.png`, fullPage:true});
   await ctx.close();
