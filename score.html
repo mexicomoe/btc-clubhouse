@@ -39,6 +39,10 @@
   --paper:#fff;
   --wait:#8a3b00;
   --waitfill:#ffe9d6;
+  /* THE ONLY OTHER COLOURS, and only behind a finished board's top two rows.
+     Tints, not blocks: the text on them stays pure black. */
+  --firstfill:#cdeed6;
+  --secondfill:#fff1a6;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html,body{margin:0;padding:0;overflow-x:hidden;background:var(--paper);color:var(--ink);}
@@ -159,6 +163,9 @@ th.nm,td.nm{text-align:left;width:86px;padding-left:4px;font-size:18px;
 thead th{background:var(--ink);color:var(--paper);}
 tr.par td,tr.par th{font-weight:600;}
 td.mine{background:var(--waitfill);color:var(--wait);}
+/* The out / in / total table under the card. Four columns, so it never needs
+   the width the eighteen holes are already using. */
+table.sums th:not(.nm),table.sums td:not(.nm){width:22%;}
 #cardLegend{font-size:18px;font-weight:700;color:var(--wait);margin:10px 0 0;}
 #cardStamp{font-size:18px;font-weight:600;margin:10px 0 0;}
 footer{margin:22px 0 10px;border-top:3px solid var(--ink);padding-top:12px;}
@@ -182,6 +189,8 @@ footer{margin:22px 0 10px;border-top:3px solid var(--ink);padding-top:12px;}
   overflow-wrap:break-word;}
 .board th:first-child,.board td:first-child{text-align:center;width:30px;}
 .board th:nth-child(2),.board td:nth-child(2){text-align:left;}
+.board tr.first td{background:var(--firstfill);}
+.board tr.second td{background:var(--secondfill);}
 </style>
 </head>
 <body>
@@ -664,6 +673,51 @@ function prettyCell(v){
 }
 
 /**
+ * THE BOARDS THAT SHADE THEIR TOP TWO once the round is in, by the title the
+ * sheet gives them. That is the whole of what the page knows about them: which
+ * board, not what its columns mean.
+ */
+var PODIUM_BOARDS = {"THE TEAM GAME":true};
+
+/**
+ * IS EVERY ROW ON THIS BOARD IN? Every Thru reads 18 — or 18*, which is a team
+ * that went off the 10th and is just as finished. A board with no Thru column
+ * is never in, so it never shades.
+ *
+ * WHY NOTHING SHADES BEFORE THEN. Mid-round, the top row is mostly the team
+ * that teed off first. Colouring it green would crown them for being early.
+ */
+function boardDone(b){
+  var at=-1,i;
+  for(i=0;i<b.header.length;i++) if(b.header[i].toLowerCase()==="thru"){ at=i; break; }
+  if(at<0||!b.rows.length) return false;
+  for(i=0;i<b.rows.length;i++) if(!/^18\*?$/.test(b.rows[i][at])) return false;
+  return true;
+}
+
+/** "first", "second" or "" for one row: by position on the board, nothing else. */
+function podiumClass(b,row){
+  if(!PODIUM_BOARDS[b.title]||!boardDone(b)) return "";
+  return row===0?"first":row===1?"second":"";
+}
+
+/**
+ * ONE MAN'S GROSS FOR A RUN OF HOLES, as he would add it up on a paper card.
+ * Nothing until every hole in the run has a score: a "38" after seven holes
+ * reads as a nine, and a man checking his card against his partners' would
+ * find it wrong. Marked as this phone's if any hole in it is.
+ */
+function grossTotal(seat,from,to,mine){
+  var sum=0,anyMine=false,h;
+  for(h=from;h<=to;h++){
+    var c=cardCell(seat,h,mine),n=parseInt(c.v,10);
+    if(isNaN(n)) return {v:"",mine:false};
+    sum+=n; if(c.mine) anyMine=true;
+  }
+  return {v:String(sum),mine:anyMine};
+}
+
+/**
  * ONE CELL OF THE TEAM CARD — THE FEED FIRST, THIS PHONE SECOND.
  *
  * The feed runs about five minutes behind Google's publish cache. For
@@ -873,8 +927,9 @@ function drawBoards(){
     });
     thead.appendChild(hr);t.appendChild(thead);
     var body=document.createElement("tbody");
-    b.rows.forEach(function(row){
+    b.rows.forEach(function(row,ri){
       var tr=document.createElement("tr");
+      var pod=podiumClass(b,ri); if(pod) tr.className=pod;
       row.forEach(function(cell){
         var td=document.createElement("td");td.textContent=prettyCell(cell);tr.appendChild(td);
       });
@@ -1202,6 +1257,38 @@ function drawCard(){
     });
     tb.appendChild(body);wrap.appendChild(tb);box.appendChild(wrap);
   });
+  /* OUT, IN AND THE ROUND, GROSS — the three figures a paper card has, and
+     the ones a man checks against his partners. A table of their own under
+     the nines, because a tenth and eleventh column on the nines would not
+     fit a phone without scrolling sideways. */
+  var sw=document.createElement("div");sw.className="card";
+  var st=document.createElement("table");st.className="sums";
+  var sh=document.createElement("thead"),shr=document.createElement("tr");
+  ["Gross","Out","In","Total"].forEach(function(label,i){
+    var x=document.createElement("th");if(i===0)x.className="nm";x.textContent=label;shr.appendChild(x);
+  });
+  sh.appendChild(shr);st.appendChild(sh);
+  var sb=document.createElement("tbody");
+  var parRow=document.createElement("tr");parRow.className="par";
+  var parOut=0,parIn=0,ph;
+  for(ph=1;ph<=9;ph++) parOut+=parOf(ph);
+  for(ph=10;ph<=18;ph++) parIn+=parOf(ph);
+  ["Par",parOut,parIn,parOut+parIn].forEach(function(v,i){
+    var x=document.createElement("td");if(i===0)x.className="nm";x.textContent=String(v);parRow.appendChild(x);
+  });
+  sb.appendChild(parRow);
+  t.seats.forEach(function(seat){
+    if(!seat||isEmptySeat(seat)) return;
+    var tr=document.createElement("tr");
+    var nd=document.createElement("td");nd.className="nm";nd.textContent=firstName(seat.name);tr.appendChild(nd);
+    [grossTotal(seat,1,9,mine),grossTotal(seat,10,18,mine),grossTotal(seat,1,18,mine)].forEach(function(cell){
+      var td=document.createElement("td");td.textContent=cell.v;
+      if(cell.mine){ td.className="mine"; anyMine=true; }
+      tr.appendChild(td);
+    });
+    sb.appendChild(tr);
+  });
+  st.appendChild(sb);sw.appendChild(st);box.appendChild(sw);
   /* Said in words as well as in colour. A man who cannot tell the shading from
      the paper in the sun can still read the line under the card. */
   $("cardLegend").textContent=anyMine

@@ -162,6 +162,23 @@ untouched: the team's total is still partly his doing and stands as the sheet
 computed it. **A man who has not teed off is not a BLIND** — he stands on the
 board with a `Thru` of `0`, which is the true thing to say about him.
 
+### The top two, once the round is in
+
+On **THE TEAM GAME** board, the first row is tinted green and the second
+yellow — but only when every row's `Thru` reads `18` or `18*`. Until then
+nothing is shaded, because mid-round the top row is mostly the team that teed
+off first. It goes by position on the board and by the title the sheet gives
+it (`PODIUM_BOARDS` in `score.html`), never by reading a score. **Retitle that
+board and the shading stops.**
+
+### Out, in and the round on the card
+
+Under the two nines, a small table gives each man's gross out, in and total,
+and par's. A nine is added up only once all nine holes are in — a "38" after
+seven holes reads as a nine. It has its own table because an eleventh column
+on the nines would not fit a 360px phone. There is no net here: the feed
+carries no handicaps, and net is on the board.
+
 ## 7 · Also needed
 
 Both in the repo. Two crops of the one file you supplied:
