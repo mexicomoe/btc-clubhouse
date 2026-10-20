@@ -132,7 +132,7 @@
 
 <header>
   <h1>CLUBHOUSE</h1>
-  <p>You get eight holes. Pick any four. Every birdie counts.</p>
+  <p>You've drawn eight holes. Pick any four.<br>Every net birdie counts.</p>
 </header>
 
 <main>
@@ -146,7 +146,6 @@
   <div class="rules">
     <p>Watch the Birdie</p>
     <ul>
-      <li>You get eight holes. Pick any four. Every birdie counts.</li>
       <li>Net birdie on a hole you picked — 1.0 off</li>
       <li>Net eagle — 3.0 off</li>
       <li>Agony Alley (4 or 5) if you take it — net par 1.0 off, net birdie 4.0 off</li>
@@ -166,9 +165,9 @@
   <p id="copied"></p>
 </div></div>
 
-<script src="engine.js?v=b5d0165"></script>
-<script src="importer.js?v=b5d0165"></script>
-<script src="fieldlink.js?v=b5d0165"></script>
+<script src="engine.js?v=e6111bf"></script>
+<script src="importer.js?v=e6111bf"></script>
+<script src="fieldlink.js?v=e6111bf"></script>
 <script>
 /**
  * Where a completed card is filed, on top of the text message.
@@ -285,8 +284,12 @@ function drawHoles(){
   lead.className = "lead";
   lead.innerHTML =
     `<p>${now.dealt ? "Pick 4 of your 8." : "Pick any 4."}</p>` +
-    `<p><b>AGONY ALLEY (4, 5)</b> \u2014 a net PAR pays. About 4 times in 10.</p>` +
-    `<p><b>EASY STREET (11, 12)</b> \u2014 a birdie pays, a bogey costs you.</p>`;
+    // Only the streets he can pick: draw B holds neither 4 nor 5, draw F
+    // neither 11 nor 12, and a rule about a hole he cannot take is noise.
+    (now.holes.some(h => AGONY.indexOf(h) !== -1)
+      ? `<p><b>AGONY ALLEY (4, 5)</b> \u2014 a net PAR pays. About 4 times in 10.</p>` : "") +
+    (now.holes.some(h => EASY.indexOf(h) !== -1)
+      ? `<p><b>EASY STREET (11, 12)</b> \u2014 a birdie pays, a bogey costs you.</p>` : "");
   sec.appendChild(lead);
   const row = document.createElement("div"); row.className = "holes";
 
