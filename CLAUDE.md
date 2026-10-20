@@ -40,3 +40,11 @@ time - AFTER that morning's round. So no round has yet been played on the new
 picks page. The first is Friday Oct 23. Leave `leaderboard.html` in the repo
 until after that round has run and Rob confirms it worked. Its cached roster
 is stale and must never be trusted for anything.
+
+## Parked until after Friday 23 Oct
+
+- **Make the green tray line conditional.** The line at the bottom of
+  `picks.html` ("Tap your name in the list first.", set in `refresh()`)
+  should change with what the man is looking at. That is a change in what the
+  page does, not just its wording, so it waits until after Friday's round.
+  Parked by Rob on Tue 20 Oct.
