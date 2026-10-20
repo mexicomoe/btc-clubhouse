@@ -71,9 +71,14 @@ for (const [letter, holes] of Object.entries(DRAWS)) {
   const tags = (await p.$$eval("#slots .hole .tag", ts => ts.map(t => t.textContent))).join(" ");
   ok(holes.some(h => h === 4 || h === 5) === /AGONY ALLEY/.test(tags), `${letter}: Agony Alley tag on a hole exactly when he holds 4 or 5`);
   ok(holes.some(h => h === 11 || h === 12) === /EASY STREET/.test(tags), `${letter}: Easy Street tag on a hole exactly when he holds 11 or 12`);
-  ok(await p.innerText("#slots .lead") === "Pick 4 of your 8.\nAGONY ALLEY (4, 5) — a net PAR pays. About 4 times in 10.\nEASY STREET (11, 12) — a birdie pays, a bogey costs you."
-     || /^Pick 4 of your 8\.\n+AGONY ALLEY \(4, 5\) — a net PAR pays\. About 4 times in 10\.\n+EASY STREET \(11, 12\) — a birdie pays, a bogey costs you\.$/.test(await p.innerText("#slots .lead")),
-     `${letter}: the three-line headline`);
+  const lead = await p.innerText("#slots .lead");
+  ok(/^Pick 4 of your 8\./.test(lead), `${letter}: headline starts Pick 4 of your 8`);
+  ok(holes.some(h => h === 4 || h === 5) === /AGONY ALLEY \(4, 5\) — a net PAR pays\. About 4 times in 10\./.test(lead),
+     `${letter}: Agony Alley line exactly when he holds 4 or 5`);
+  ok(holes.some(h => h === 11 || h === 12) === /EASY STREET \(11, 12\) — a birdie pays, a bogey costs you\./.test(lead),
+     `${letter}: Easy Street line exactly when he holds 11 or 12`);
+  ok(/You've drawn eight holes\. Pick any four\.\s+Every net birdie counts\./.test(await p.innerText("header")), `${letter}: the subhead`);
+  ok(!/Every birdie counts/.test(await p.innerText("body")), `${letter}: the old line is gone`);
   ok(await p.$eval("#slots .lead", l => l.compareDocumentPosition(document.querySelector("#slots .hole")) & 4) > 0, `${letter}: headline above the first hole`);
   if (holes.includes(4)) ok(/pays 36 times in 100/.test(txt), `${letter}: hole 4 pays 36 in 100`);
   if (holes.includes(5)) ok(/pays 42 times in 100/.test(txt), `${letter}: hole 5 pays 42 in 100`);
