@@ -34,18 +34,30 @@
   input#who:focus{outline:3px solid var(--felt);outline-offset:1px}
   section.pick{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin:16px 0}
   section.pick h2{margin:0 0 12px;font-size:19px;font-weight:600}
-  /* A GRID RATHER THAN A FLEX ROW, since the par 4 box holds eight holes.
-     Flex gave the last row's two buttons half the width of the six above them,
-     which reads as a different kind of button rather than the same one wrapped.
-     Every cell is one column wide whatever falls in it. */
-  .holes{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:10px}
+  /* ONE HOLE TO A ROW, WHOLE WIDTH. Each carries what it pays in words, and
+     "but bogey costs you" does not fit in a third of a 400px phone. */
+  .holes{display:grid;grid-template-columns:1fr;gap:10px}
   .hole{
-    padding:20px 8px;font-size:22px;font-weight:600;
+    display:grid;grid-template-columns:92px 1fr;align-items:center;gap:4px 12px;
+    width:100%;text-align:left;padding:14px 14px;
     background:var(--paper);color:var(--ink);border:1px solid var(--line);
-    border-radius:10px;cursor:pointer;font-family:inherit;
+    border-radius:10px;cursor:pointer;font-family:inherit;font-size:17px;line-height:1.35;
   }
+  .hole .hn{grid-row:1 / span 3;font-size:22px;font-weight:700}
+  .hole .tag{font-size:15px;font-weight:700;letter-spacing:.06em}
+  .hole .tag span{display:inline-block;border:2px solid currentColor;border-radius:6px;padding:1px 7px}
+  .hole .tag.aa{color:#8a1c1c}
+  .hole .tag.es{color:#1d4f91}
+  .hole .odds{font-size:17px}
+  .hole .yes{font-size:15px;font-weight:700;display:none}
   .hole[aria-pressed="true"]{background:var(--felt);color:#fff;border-color:var(--felt)}
+  .hole[aria-pressed="true"] .tag{color:#fff}
+  .hole[aria-pressed="true"] .yes{display:block}
   .hole:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+  .rules{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:16px 0;font-size:16px}
+  .rules p{margin:0 0 8px;font-weight:600;font-size:17px}
+  .rules ul{margin:0;padding:0 0 0 20px}
+  .rules li{margin:0 0 4px}
   #tray{
     position:fixed;left:0;right:0;bottom:0;background:var(--green);color:#fff;
     padding:14px 16px calc(14px + env(safe-area-inset-bottom));
@@ -117,7 +129,7 @@
 
 <header>
   <h1>CLUBHOUSE</h1>
-  <p>Pick nine holes before you tee off. A net birdie on one takes half a stroke off, a net eagle a stroke and a half. Nothing on any of the nine costs you half.</p>
+  <p>You get eight holes. Pick any four. Every birdie counts.</p>
 </header>
 
 <main>
@@ -128,6 +140,17 @@
   </div>
   <div id="pickWho"></div>
   <div id="slots"></div>
+  <div class="rules">
+    <p>Watch the Birdie</p>
+    <ul>
+      <li>You get eight holes. Pick any four. Every birdie counts.</li>
+      <li>Net birdie on a hole you picked — 1.0 off</li>
+      <li>Net eagle — 3.0 off</li>
+      <li>Agony Alley (4 or 5) if you take it — net par 1.0 off, net birdie 4.0 off</li>
+      <li>Easy Street (11 or 12) if you take it — net bogey or worse, 1.0 on</li>
+      <li>Nothing at all from your four — 0.5 on</li>
+    </ul>
+  </div>
   <div id="oppBox"></div>
   <div id="fieldNote"></div>
   <p id="elsewhere"><a href="index.html">Clubhouse home</a> &middot; <a href="leaderboard.html">Leaderboard</a></p>
@@ -140,9 +163,9 @@
   <p id="copied"></p>
 </div></div>
 
-<script src="engine.js?v=7cd232b"></script>
-<script src="importer.js?v=7cd232b"></script>
-<script src="fieldlink.js?v=7cd232b"></script>
+<script src="engine.js?v=19e1d95"></script>
+<script src="importer.js?v=19e1d95"></script>
+<script src="fieldlink.js?v=19e1d95"></script>
 <script>
 /**
  * Where a completed card is filed, on top of the text message.
@@ -168,81 +191,117 @@ const FORM_POST = "https://docs.google.com/forms/d/e/1FAIpQLSdbtFLO94Gq1RYC2-YJm
 const FORM_FIELD = "entry.1094711796";
 
 /**
- * The three boxes, and what each one asks for — BUILT FROM THE ENGINE, not
- * typed out here.
+ * WATCH THE BIRDIE, FROM 23 OCTOBER 2026: each man is DEALT EIGHT HOLES and
+ * picks FOUR. Which draw a man holds comes from the Index feed's "draw" column,
+ * A to I; the nine draws themselves do not change week to week, so they live
+ * here.
  *
- * THIS PAGE USED TO KEEP ITS OWN COPY of the hole lists, and it was the only
- * place in the app that did. It survived the last two changes by being edited
- * twice; it would not have survived a third, and the failure would have been
- * silent — a man offered hole 13 on a sheet that the parser then refused, or
- * worse, not offered a hole he was entitled to. The engine says which holes are
- * legal for which slot and this asks it.
- *
- * TWO PAR 5s OF THREE, THREE PAR 3s OF FOUR, FOUR PAR 4s OF EIGHT. Front and
- * back no longer matter to any box: the par 4s were split when six of them were
- * left, and with Easy Street off there are eight.
- *
- * `keys` is the slot the engine files each pick under, and their ORDER is the
- * order the nine numbers are written in the message. That order is the only
- * thing the parser at the other end has to go on, which is why it is taken
- * straight from PICK_SLOTS rather than restated.
+ * The page no longer asks the engine which holes are legal. The engine's
+ * PICK_SLOTS are the old nine-pick game, which leaderboard.html still scores;
+ * this game is scored on the sheet's Picks tab, which splits the card on commas.
  */
-const LEGAL = E.birdiePickHoles(E.ABERDEEN_TEE_IV);
-const PAR_SAID = { 3: "Par 3s", 4: "Par 4s", 5: "Par 5s" };
-const COUNT_SAID = ["", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
+const DRAWS = {
+  A: [1, 5, 7, 12, 13, 14, 16, 17],
+  B: [2, 6, 7, 10, 11, 15, 16, 17],
+  C: [2, 3, 4, 9, 10, 11, 13, 18],
+  D: [1, 3, 5, 6, 8, 9, 11, 16],
+  E: [2, 4, 6, 7, 8, 9, 12, 13],
+  F: [1, 5, 9, 14, 15, 16, 17, 18],
+  G: [3, 4, 8, 10, 12, 14, 15, 18],
+  H: [2, 3, 5, 6, 7, 8, 12, 15],
+  I: [1, 4, 10, 11, 13, 14, 17, 18],
+};
+const ALL_HOLES = Array.from({ length: 18 }, (_, i) => i + 1);
+const PICKS = 4;
 
-const SLOTS = [];
-E.PICK_SLOTS.forEach((sl) => {
-  // Slots of one par run together in PICK_SLOTS and share a list, so they are
-  // one box. Written this way rather than grouped by par so the box order
-  // follows the slot order and cannot drift from it.
-  const box = SLOTS[SLOTS.length - 1];
-  if (box && box.par === sl.par) { box.keys.push(sl.key); box.pick++; return; }
-  SLOTS.push({ par: sl.par, holes: LEGAL[sl.key], pick: 1, keys: [sl.key] });
-});
-SLOTS.forEach((s) => {
-  // "pick two of three" — the count AND the field it comes from, because the
-  // whole point of this shape is that every box is a real choice. Both in
-  // words: "two of 3" is a jarring thing to read on a card.
-  s.label = PAR_SAID[s.par] + " \u00b7 pick " + COUNT_SAID[s.pick] +
-            " of " + (COUNT_SAID[s.holes.length] || s.holes.length);
-});
-const TOTAL_PICKS = SLOTS.reduce((n, s) => n + s.pick, 0);
+/**
+ * WHAT EACH HOLE PAYS, per 100 rounds — measured on 233 rounds of Rob's group.
+ * Printed next to every hole because the men fear 4 and 5, which are the two
+ * best picks on the board: the number turns the fear into arithmetic.
+ * Agony Alley pays on a net PAR; every other hole on a net birdie or better.
+ */
+const PAYS = {
+  1: 8, 2: 11, 3: 13, 4: 36, 5: 42, 6: 10, 7: 10, 8: 21, 9: 11,
+  10: 15, 11: 24, 12: 28, 13: 17, 14: 19, 15: 13, 16: 12, 17: 13, 18: 16,
+};
+/** Easy Street's other side: a net bogey or worse, per 100, costs 1.0. */
+const COSTS = { 11: 30, 12: 21 };
+const AGONY = [4, 5], EASY = [11, 12];
 
-/** Holes chosen in each box, oldest first, so a third tap knows what to drop. */
-const chosen = SLOTS.map(() => []);
+function oddsSaid(n){
+  if (COSTS[n] != null) return "birdie " + PAYS[n] + " in 100, but bogey costs you — " + COSTS[n] + " in 100";
+  return "pays " + PAYS[n] + " times in 100";
+}
+
+/** His draw letter, A to I, or null when the feed did not give a readable one. */
+function drawOf(man){
+  const d = String(man && man.draw != null ? man.draw : "").trim().toUpperCase();
+  return DRAWS[d] ? d : null;
+}
+
+/**
+ * THE HOLES HE MAY PICK FROM. His eight when his draw is known. When it is not
+ * — no letter, a letter that is not A to I, or a link that carries no draw —
+ * ALL EIGHTEEN, and he is told. A man who cannot file a card is worse than a
+ * man with the wrong eight.
+ */
+function holesNow(){
+  const d = drawOf(me);
+  return d ? { holes: DRAWS[d], dealt: true } : { holes: ALL_HOLES, dealt: false };
+}
+
+/** Holes chosen, oldest first, so a fifth tap knows what to drop. */
+let chosen = [];
+let shownKey = "";
 
 const slotsEl = document.getElementById("slots");
-SLOTS.forEach((s, si) => {
+
+function drawHoles(){
+  const now = holesNow();
+  const key = now.holes.join(",");
+  if (key === shownKey) return;
+  shownKey = key;
+  // A pick that is not among his holes any more (his name changed) goes.
+  chosen = chosen.filter(h => now.holes.indexOf(h) !== -1);
+
+  slotsEl.innerHTML = "";
   const sec = document.createElement("section");
   sec.className = "pick";
-  const h = document.createElement("h2"); h.textContent = s.label; sec.appendChild(h);
+  const h = document.createElement("h2");
+  h.textContent = now.dealt ? "Your eight holes · pick four" : "All 18 holes · pick four";
+  sec.appendChild(h);
+  if (!now.dealt) {
+    const note = document.createElement("div");
+    note.className = "heads";
+    note.textContent = "Couldn't find your eight holes — pick any four and I'll sort it out.";
+    sec.appendChild(note);
+  }
   const row = document.createElement("div"); row.className = "holes";
 
   const paint = () => {
     row.querySelectorAll(".hole").forEach((b) => {
-      b.setAttribute("aria-pressed", String(chosen[si].indexOf(Number(b.dataset.hole)) !== -1));
+      b.setAttribute("aria-pressed", String(chosen.indexOf(Number(b.dataset.hole)) !== -1));
     });
   };
 
-  s.holes.forEach((n) => {
+  now.holes.forEach((n) => {
     const b = document.createElement("button");
     b.type = "button"; b.className = "hole"; b.dataset.hole = String(n);
     b.setAttribute("aria-pressed", "false");
-    b.textContent = "Hole " + n;
+    // IN WORDS, NOT ONLY COLOR: some of these men are 80.
+    const tag = AGONY.indexOf(n) !== -1 ? `<span class="tag aa"><span>AGONY ALLEY</span></span>`
+              : EASY.indexOf(n) !== -1 ? `<span class="tag es"><span>EASY STREET</span></span>` : "";
+    b.innerHTML = `<span class="hn">Hole ${n}</span>${tag}` +
+      `<span class="odds">${oddsSaid(n)}</span><span class="yes">✓ Picked</span>`;
     b.addEventListener("click", () => {
-      const at = chosen[si].indexOf(n);
-      if (at !== -1) {
-        // Tapping a chosen hole again lets it go. In a pick-one box that would
-        // leave the box empty, which is worse than useless — there he can only
-        // ever change his mind TO another hole, never to nothing.
-        if (s.pick > 1) chosen[si].splice(at, 1);
-      } else {
-        chosen[si].push(n);
-        // One too many: the OLDEST goes, so a man who taps a third hole gets
-        // the third one he asked for rather than being refused. Refusing would
-        // be read as a broken button.
-        while (chosen[si].length > s.pick) chosen[si].shift();
+      const at = chosen.indexOf(n);
+      if (at !== -1) chosen.splice(at, 1);
+      else {
+        chosen.push(n);
+        // One too many: the OLDEST goes, so a man who taps a fifth hole gets
+        // the one he asked for rather than being refused. Refusing would be
+        // read as a broken button.
+        while (chosen.length > PICKS) chosen.shift();
       }
       paint();
       refresh();
@@ -251,19 +310,15 @@ SLOTS.forEach((s, si) => {
   });
   sec.appendChild(row);
   slotsEl.appendChild(sec);
-});
+  paint();
+}
 
-/** Every pick in slot order, lowest hole first inside a multi-pick box. */
+/**
+ * His picks, lowest hole first — so the same four holes always write the same
+ * message however they were tapped. The message is the record.
+ */
 function picksInOrder(){
-  const out = [];
-  SLOTS.forEach((s, si) => {
-    // Sorted, so the same two holes always write the same message however they
-    // were tapped — the message is the record, and it should not depend on the
-    // order a man's finger happened to move.
-    const holes = chosen[si].slice().sort((a, b) => a - b);
-    for (let k = 0; k < s.pick; k++) out.push(holes[k] == null ? null : holes[k]);
-  });
-  return out;
+  return chosen.slice().sort((a, b) => a - b);
 }
 
 /* ---------- who is playing, and where the page learns it ----------
@@ -404,6 +459,7 @@ function drawField(){
     document.getElementById("notMe").addEventListener("click", () => {
       forget();
       me = null; opponent = null; pending = null; strayName = null;
+      chosen = []; shownKey = "";
       drawAll();
     });
   } else if(pending){
@@ -416,6 +472,7 @@ function drawField(){
       `<button type="button" class="no" id="noBack">No, go back</button></div>`;
     document.getElementById("yesMe").addEventListener("click", () => {
       me = pending; pending = null; strayName = null; opponent = null;
+      chosen = []; shownKey = "";
       remember(me.name);
       drawAll();
       scrollTo(0, 0);
@@ -449,7 +506,7 @@ function drawField(){
       `for a newer link — naming a man who does not play pays nothing.`;
 }
 
-function drawAll(){ drawField(); drawOpponent(); refresh(); }
+function drawAll(){ drawField(); drawHoles(); drawOpponent(); refresh(); }
 
 /**
  * Read the field from the Index feed. Parsed by importer.js's readIndexFeed —
@@ -471,7 +528,7 @@ async function readFeed(){
     if (!res.ok) throw new Error("HTTP " + res.status);
     const read = IMP.readIndexFeed(await res.text(), [],
       { tees: E.TEE_IDS, parseIndex: E.parseHandicapIndex });
-    if (read.ok) players = read.adds.map(a => ({ name: a.name, index: a.index }));
+    if (read.ok) players = read.adds.map(a => ({ name: a.name, index: a.index, draw: a.draw }));
   } catch (e) {
     players = null;
   }
@@ -585,16 +642,13 @@ function refresh(){
   } else if (hasList() && !me) {
     summary.textContent = pending ? "Is that you? Tap yes to start." : "Tap your name in the list first.";
   } else if (n === 0) {
-    // The instruction, before he has tapped anything — and derived, so it can
-    // never come to say something the boxes above it do not.
-    summary.textContent = "Pick " +
-      SLOTS.map(s => COUNT_SAID[s.pick] + " " + PAR_SAID[s.par].toLowerCase()).join(", ") + ".";
-  } else if (n < TOTAL_PICKS) {
-    summary.textContent = n + " of " + TOTAL_PICKS + " picked.";
+    summary.textContent = holesNow().dealt ? "Pick four of your eight holes." : "Pick any four holes.";
+  } else if (n < PICKS) {
+    summary.textContent = n + " of " + PICKS + " picked.";
   } else if (!named) {
-    summary.textContent = "All " + TOTAL_PICKS + " picked. Add your name above.";
+    summary.textContent = "All 4 picked. Add your name above.";
   } else if (wantsOpponent && !opponent) {
-    summary.textContent = "All " + TOTAL_PICKS + " picked. Now pick your Hit List man.";
+    summary.textContent = "All 4 picked. Now pick your Hit List man.";
   } else {
     summary.textContent = line();
     ready = true;
