@@ -54,6 +54,9 @@
   .hole[aria-pressed="true"] .tag{color:#fff}
   .hole[aria-pressed="true"] .yes{display:block}
   .hole:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+  .lead{margin:-4px 0 14px;font-size:17px;line-height:1.4}
+  .lead p{margin:0 0 4px}
+  .lead p:first-child{font-weight:700}
   .rules{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:16px 0;font-size:16px}
   .rules p{margin:0 0 8px;font-weight:600;font-size:17px}
   .rules ul{margin:0;padding:0 0 0 20px}
@@ -163,9 +166,9 @@
   <p id="copied"></p>
 </div></div>
 
-<script src="engine.js?v=19e1d95"></script>
-<script src="importer.js?v=19e1d95"></script>
-<script src="fieldlink.js?v=19e1d95"></script>
+<script src="engine.js?v=b5d0165"></script>
+<script src="importer.js?v=b5d0165"></script>
+<script src="fieldlink.js?v=b5d0165"></script>
 <script>
 /**
  * Where a completed card is filed, on top of the text message.
@@ -276,6 +279,15 @@ function drawHoles(){
     note.textContent = "Couldn't find your eight holes — pick any four and I'll sort it out.";
     sec.appendChild(note);
   }
+  // THE HEADLINE, ABOVE THE HOLES: three plain lines for a man picking for the
+  // first time. The full six rules stay below the holes for whoever wants them.
+  const lead = document.createElement("div");
+  lead.className = "lead";
+  lead.innerHTML =
+    `<p>${now.dealt ? "Pick 4 of your 8." : "Pick any 4."}</p>` +
+    `<p><b>AGONY ALLEY (4, 5)</b> \u2014 a net PAR pays. About 4 times in 10.</p>` +
+    `<p><b>EASY STREET (11, 12)</b> \u2014 a birdie pays, a bogey costs you.</p>`;
+  sec.appendChild(lead);
   const row = document.createElement("div"); row.className = "holes";
 
   const paint = () => {
