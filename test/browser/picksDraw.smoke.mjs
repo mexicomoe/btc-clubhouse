@@ -65,17 +65,16 @@ for (const [letter, holes] of Object.entries(DRAWS)) {
   const { ctx, p, filed } = await phone(man);
   const got = await shown(p);
   ok(JSON.stringify(got) === JSON.stringify(holes), `${letter}: ${man} sees his eight: ${got.join(",")}`);
-  ok(/Your eight holes · pick four/.test(await p.innerText("#slots")), `${letter}: titled as his eight`);
+  ok(!/pick four|Pick 4 of your 8/i.test(await p.innerText("#slots")), `${letter}: the holes box does not restate the rule`);
   ok(!(await p.isVisible("text=Couldn't find your eight holes")), `${letter}: no fallback note`);
   const txt = await p.innerText("#slots");
   const tags = (await p.$$eval("#slots .hole .tag", ts => ts.map(t => t.textContent))).join(" ");
   ok(holes.some(h => h === 4 || h === 5) === /AGONY ALLEY/.test(tags), `${letter}: Agony Alley tag on a hole exactly when he holds 4 or 5`);
   ok(holes.some(h => h === 11 || h === 12) === /ECSTASY STREET/.test(tags), `${letter}: Ecstasy Street tag on a hole exactly when he holds 11 or 12`);
   const lead = await p.innerText("#slots .lead");
-  ok(/^Pick 4 of your 8\./.test(lead), `${letter}: headline starts Pick 4 of your 8`);
-  ok(holes.some(h => h === 4 || h === 5) === /AGONY ALLEY \(4, 5\) — a net PAR pays\. About 4 times in 10\./.test(lead),
+  ok(holes.some(h => h === 4 || h === 5) === /AGONY ALLEY \(4, 5\) — even a net par is a stroke off, and you make one 4 times in\s10\./.test(lead),
      `${letter}: Agony Alley line exactly when he holds 4 or 5`);
-  ok(holes.some(h => h === 11 || h === 12) === /ECSTASY STREET \(11, 12\) — a birdie pays, a bogey costs you\./.test(lead),
+  ok(holes.some(h => h === 11 || h === 12) === /ECSTASY STREET \(11, 12\) — a net birdie is a stroke off, a net bogey or worse a stroke on\./.test(lead),
      `${letter}: Ecstasy Street line exactly when he holds 11 or 12`);
   ok(/You've drawn eight holes\. Pick any four\.\s+Every net birdie counts\./.test(await p.innerText("header")), `${letter}: the subhead`);
   ok(!/Every birdie counts/.test(await p.innerText("body")), `${letter}: the old line is gone`);
@@ -85,7 +84,7 @@ for (const [letter, holes] of Object.entries(DRAWS)) {
   if (holes.includes(5)) ok(/pays 42 times in 100/.test(txt), `${letter}: hole 5 pays 42 in 100`);
   if (holes.includes(11)) ok(/birdie 24 in 100, but bogey costs you — 30 in 100/.test(txt), `${letter}: hole 11 risk and reward`);
   if (holes.includes(12)) ok(/birdie 28 in 100, but bogey costs you — 21 in 100/.test(txt), `${letter}: hole 12 risk and reward`);
-  ok(await p.innerText("#summary") === "Pick four of your eight holes.", `${letter}: says what to do`);
+  ok(await p.innerText("#summary") === "0 of 4 picked.", `${letter}: the tray counts from 0 of 4`);
 
   const btns = await p.$$("#slots .hole");
   await btns[6].click(); await btns[1].click();
@@ -112,7 +111,7 @@ for (const [letter, holes] of Object.entries(DRAWS)) {
 for (const [man, why] of [["Mallace, Bob", "blank draw"], ["Nadel, Ira", "draw Q"]]) {
   const { ctx, p, filed } = await phone(man);
   ok((await shown(p)).length === 18, `${why}: all 18 holes`);
-  ok(/^Pick any 4\./.test(await p.innerText("#slots .lead")), `${why}: headline says pick any 4`);
+  ok(/AGONY ALLEY/.test(await p.innerText("#slots .lead")) && /ECSTASY STREET/.test(await p.innerText("#slots .lead")), `${why}: both street lines, since he may pick any hole`);
   ok(await p.isVisible("text=Couldn't find your eight holes — pick any four and I'll sort it out."), `${why}: says so`);
   for (const h of [3, 9, 12, 17]) await p.click(`#slots .hole[data-hole="${h}"]`);
   await p.click("#oppBox button.who >> text=Wolberg, Larry").catch(() => p.click("#oppBox button.who >> nth=0"));

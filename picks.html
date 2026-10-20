@@ -56,7 +56,6 @@
   .hole:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
   .lead{margin:-4px 0 14px;font-size:17px;line-height:1.4}
   .lead p{margin:0 0 4px}
-  .lead p:first-child{font-weight:700}
   .rules{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:16px 0;font-size:16px}
   .rules p{margin:0 0 8px;font-weight:600;font-size:17px}
   .rules ul{margin:0;padding:0 0 0 20px}
@@ -165,9 +164,9 @@
   <p id="copied"></p>
 </div></div>
 
-<script src="engine.js?v=ad58b06"></script>
-<script src="importer.js?v=ad58b06"></script>
-<script src="fieldlink.js?v=ad58b06"></script>
+<script src="engine.js?v=2176c4e"></script>
+<script src="importer.js?v=2176c4e"></script>
+<script src="fieldlink.js?v=2176c4e"></script>
 <script>
 /**
  * Where a completed card is filed, on top of the text message.
@@ -269,9 +268,6 @@ function drawHoles(){
   slotsEl.innerHTML = "";
   const sec = document.createElement("section");
   sec.className = "pick";
-  const h = document.createElement("h2");
-  h.textContent = now.dealt ? "Your eight holes · pick four" : "All 18 holes · pick four";
-  sec.appendChild(h);
   if (!now.dealt) {
     const note = document.createElement("div");
     note.className = "heads";
@@ -283,13 +279,12 @@ function drawHoles(){
   const lead = document.createElement("div");
   lead.className = "lead";
   lead.innerHTML =
-    `<p>${now.dealt ? "Pick 4 of your 8." : "Pick any 4."}</p>` +
     // Only the streets he can pick: draw B holds neither 4 nor 5, draw F
     // neither 11 nor 12, and a rule about a hole he cannot take is noise.
     (now.holes.some(h => AGONY.indexOf(h) !== -1)
-      ? `<p><b>AGONY ALLEY (4, 5)</b> \u2014 a net PAR pays. About 4 times in 10.</p>` : "") +
+      ? `<p><b>AGONY ALLEY (4, 5)</b> \u2014 even a net par is a stroke off, and you make one 4 times in\u00a010.</p>` : "") +
     (now.holes.some(h => EASY.indexOf(h) !== -1)
-      ? `<p><b>ECSTASY STREET (11, 12)</b> \u2014 a birdie pays, a bogey costs you.</p>` : "");
+      ? `<p><b>ECSTASY STREET (11, 12)</b> \u2014 a net birdie is a stroke off, a net bogey or worse a stroke on.</p>` : "");
   sec.appendChild(lead);
   const row = document.createElement("div"); row.className = "holes";
 
@@ -656,9 +651,9 @@ function refresh(){
     summary.textContent = "Reading the player list\u2026";
   } else if (hasList() && !me) {
     summary.textContent = pending ? "Is that you? Tap yes to start." : "Tap your name in the list first.";
-  } else if (n === 0) {
-    summary.textContent = holesNow().dealt ? "Pick four of your eight holes." : "Pick any four holes.";
   } else if (n < PICKS) {
+    // A COUNT, NOT THE RULE: the subhead already says pick four, and saying it
+    // again here made four copies on one screen.
     summary.textContent = n + " of " + PICKS + " picked.";
   } else if (!named) {
     summary.textContent = "All 4 picked. Add your name above.";
