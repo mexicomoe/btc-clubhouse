@@ -31,12 +31,9 @@ async function readyPage(){
   const p = await ctx.newPage();
   await p.goto("http://x/picks.html"); await p.waitForTimeout(300);
   await p.fill("#who", "Rob Tanenbaum");
-  for (const sec of await p.$$("section.pick")) {
-    const want = Number((await sec.$eval("h2", h => h.textContent)).match(/pick (\w+)/)[1]
-      .replace(/^one$/,"1").replace(/^two$/,"2").replace(/^three$/,"3").replace(/^four$/,"4"));
-    const holes = await sec.$$(".hole");
-    for (let i = 0; i < want; i++) await holes[i].click();
-  }
+  // No feed here, so no draw: all eighteen, and any four will do.
+  const holes = await p.$$("#slots .hole");
+  for (let i = 0; i < 4; i++) await holes[i].click();
   return p;
 }
 

@@ -140,6 +140,25 @@ test("the header is read whatever its case, and a byte-order mark is ignored", (
   assert.equal(r.ok, true);
 });
 
+test("a draw column after the four is read, and does not turn the sheet away", () => {
+  const r = I.readIndexFeed("name,index,tee,playing,draw\n\"Abel, Tom\",22,IV,TRUE,c\n" +
+    "\"Smith, Alan\",12.4,IV,TRUE,", [], OPTS);
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.adds, [{ name: "Abel, Tom", index: 22, tee: "IV", draw: "c" },
+                            { name: "Smith, Alan", index: 12.4, tee: "IV", draw: "" }]);
+});
+
+test("any other column after the four is ignored, not refused", () => {
+  const r = I.readIndexFeed("name,index,tee,playing,notes\n\"Abel, Tom\",22,IV,TRUE,hi", [], OPTS);
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.adds, [{ name: "Abel, Tom", index: 22, tee: "IV" }]);
+});
+
+test("the four must still come first", () => {
+  const r = I.readIndexFeed("draw,name,index,tee,playing\nA,\"Abel, Tom\",22,IV,TRUE", [], OPTS);
+  assert.equal(r.ok, false);
+});
+
 test("the page reads the Index feed tab, published as CSV", () => {
   // A published-to-web page address, or a sheet's edit link, looks right and
   // reads as HTML: every row would fail the header check and nothing would say

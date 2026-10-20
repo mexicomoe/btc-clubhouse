@@ -860,7 +860,13 @@
                   refused: [], playing: [] };
     const lines = String(text == null ? "" : text).replace(/^﻿/, "")
       .split(/\r?\n/).filter((l) => l.trim() !== "");
-    const head = (lines.shift() || "").split(",").map((c) => c.trim().toLowerCase()).join(",");
+    // The four columns come first and in this order. ANY COLUMN AFTER THEM is
+    // allowed: Rob added "draw" in column E for Watch the Birdie, and an exact
+    // match on the whole row would have turned every man away the moment it
+    // published. A column after the four is carried only if it is "draw".
+    const cols = (lines.shift() || "").split(",").map((c) => c.trim().toLowerCase());
+    const head = cols.slice(0, 4).join(",");
+    const drawAt = cols.indexOf("draw") >= 4 ? cols.indexOf("draw") : -1;
     if (head !== INDEX_FEED_HEADER) {
       out.ok = false;
       out.problem = "The Index sheet's first row should be " + INDEX_FEED_HEADER +
@@ -874,7 +880,8 @@
       const c = splitCsvLine(line).map((x) => String(x == null ? "" : x).trim());
       const flag = (c[3] || "").toUpperCase();
       const row = { name: c[0] || "", indexText: c[1] || "", tee: c[2] || "",
-                    playing: flag === "TRUE", why: null, at: -1 };
+                    playing: flag === "TRUE", why: null, at: -1,
+                  draw: drawAt === -1 ? "" : (c[drawAt] || "") };
       if (flag !== "" && flag !== "TRUE" && flag !== "FALSE") {
         row.why = "playing says “" + c[3] + "”, not TRUE or blank";
       }
@@ -924,7 +931,11 @@
     rows.forEach((r) => {
       if (r.why) { out.refused.push({ name: r.name, why: r.why }); return; }
       if (!r.playing) return;
-      if (r.at === -1) { out.adds.push({ name: r.name, index: r.index, tee: r.tee }); return; }
+      if (r.at === -1) {
+        const add = { name: r.name, index: r.index, tee: r.tee };
+        if (drawAt !== -1) add.draw = r.draw;
+        out.adds.push(add); return;
+      }
       const p = players[r.at];
       out.playing.push(p.id);
       if (p.index !== r.index || p.tee !== r.tee) {
