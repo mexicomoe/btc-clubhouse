@@ -149,7 +149,7 @@
       <li>Net birdie on a hole you picked — 1.0 off</li>
       <li>Net eagle — 3.0 off</li>
       <li>Agony Alley (4 or 5) if you take it — net par 1.0 off, net birdie 4.0 off</li>
-      <li>Easy Street (11 or 12) if you take it — net bogey or worse, 1.0 on</li>
+      <li>Ecstasy Street (11 or 12) if you take it — net bogey or worse, 1.0 on</li>
       <li>Nothing at all from your four — 0.5 on</li>
     </ul>
   </div>
@@ -165,9 +165,9 @@
   <p id="copied"></p>
 </div></div>
 
-<script src="engine.js?v=60c6177"></script>
-<script src="importer.js?v=60c6177"></script>
-<script src="fieldlink.js?v=60c6177"></script>
+<script src="engine.js?v=ad58b06"></script>
+<script src="importer.js?v=ad58b06"></script>
+<script src="fieldlink.js?v=ad58b06"></script>
 <script>
 /**
  * Where a completed card is filed, on top of the text message.
@@ -226,7 +226,7 @@ const PAYS = {
   1: 8, 2: 11, 3: 13, 4: 36, 5: 42, 6: 10, 7: 10, 8: 21, 9: 11,
   10: 15, 11: 24, 12: 28, 13: 17, 14: 19, 15: 13, 16: 12, 17: 13, 18: 16,
 };
-/** Easy Street's other side: a net bogey or worse, per 100, costs 1.0. */
+/** Ecstasy Street's other side: a net bogey or worse, per 100, costs 1.0. */
 const COSTS = { 11: 30, 12: 21 };
 const AGONY = [4, 5], EASY = [11, 12];
 
@@ -289,7 +289,7 @@ function drawHoles(){
     (now.holes.some(h => AGONY.indexOf(h) !== -1)
       ? `<p><b>AGONY ALLEY (4, 5)</b> \u2014 a net PAR pays. About 4 times in 10.</p>` : "") +
     (now.holes.some(h => EASY.indexOf(h) !== -1)
-      ? `<p><b>EASY STREET (11, 12)</b> \u2014 a birdie pays, a bogey costs you.</p>` : "");
+      ? `<p><b>ECSTASY STREET (11, 12)</b> \u2014 a birdie pays, a bogey costs you.</p>` : "");
   sec.appendChild(lead);
   const row = document.createElement("div"); row.className = "holes";
 
@@ -305,7 +305,7 @@ function drawHoles(){
     b.setAttribute("aria-pressed", "false");
     // IN WORDS, NOT ONLY COLOR: some of these men are 80.
     const tag = AGONY.indexOf(n) !== -1 ? `<span class="tag aa"><span>AGONY ALLEY</span></span>`
-              : EASY.indexOf(n) !== -1 ? `<span class="tag es"><span>EASY STREET</span></span>` : "";
+              : EASY.indexOf(n) !== -1 ? `<span class="tag es"><span>ECSTASY STREET</span></span>` : "";
     b.innerHTML = `<span class="hn">Hole ${n}</span>${tag}` +
       `<span class="odds">${oddsSaid(n)}</span><span class="yes">✓ Picked</span>`;
     b.addEventListener("click", () => {
