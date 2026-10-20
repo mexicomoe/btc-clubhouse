@@ -3,4 +3,4 @@
    overwritten on the next commit. The build fingerprints every file the browser
    loads, with the ?v= stamps stripped first, so it moves exactly when the app
    moves and not when only a stamp does. */
-globalThis.ClubhouseVersion = { build: "e6111bf", date: "2026-10-20" };
+globalThis.ClubhouseVersion = { build: "60c6177", date: "2026-10-20" };

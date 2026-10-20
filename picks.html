@@ -165,9 +165,9 @@
   <p id="copied"></p>
 </div></div>
 
-<script src="engine.js?v=e6111bf"></script>
-<script src="importer.js?v=e6111bf"></script>
-<script src="fieldlink.js?v=e6111bf"></script>
+<script src="engine.js?v=60c6177"></script>
+<script src="importer.js?v=60c6177"></script>
+<script src="fieldlink.js?v=60c6177"></script>
 <script>
 /**
  * Where a completed card is filed, on top of the text message.
@@ -498,7 +498,7 @@ function drawField(){
   } else {
     pickWho.innerHTML =
       (strayName ? `<div class="heads">You're not in this week's list. Tap your name if you're playing.</div>` : "") +
-      `<label class="namelab">Tap your name</label>` +
+      `<label class="namelab">Tap your name first.</label>` +
       INVITE.players.map((p, i) =>
         `<button type="button" class="who" data-i="${i}">${esc(p.name)}` +
         `<span class="idx">${idx(p.index) || "no handicap index"}</span></button>`).join("");
