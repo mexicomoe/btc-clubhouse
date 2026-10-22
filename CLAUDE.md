@@ -57,16 +57,33 @@ men had already filed, so the freeze override no longer helped anyone.
 Nothing merges to `main` before Saturday. In priority order:
 
 1. Merge the branch.
-2. Two hole buttons per row (4 rows, not 8), and the six Hit List opponents
+2. Shrink the fixed tray: one "Text to Rob Tanenbaum only." line under both
+   buttons, and the Android line hidden on iPhones.
+3. "Played 18" gate on the CLUBHOUSE board, modeled on the GHIN board's
+   `Gross!$T$4>=18`. Without it a man who leaves after nine shows Thru 9 with
+   a nine-hole net and tops the board (Fri 23 Oct: Rob handled one by
+   announcement). The HIT LIST board needs the same gate: a nine-hole net
+   beats any 18-hole net, so whoever named him loses and he wins his own.
+   Gate inside the formulas; never insert rows (see Board order above).
+4. Two hole buttons per row (4 rows, not 8), and the six Hit List opponents
    three rows of two. The CSS comment above `.holes` says why holes were one
    to a row ("but bogey costs you" does not fit); the 11 and 12 buttons need
    their text stacked under the hole number to fit half width.
-3. Put the message preview back as a line under the counter, not instead of
+5. Put the message preview back as a line under the counter, not instead of
    it.
-4. Self-reload for stale pages: fetch `version.js` with `no-store` and reload
+6. Self-reload for stale pages: fetch `version.js` with `no-store` and reload
    when its build differs from the page's. GitHub Pages cannot send no-store
    on the HTML itself (it serves `max-age=600`).
 
-Note: items 2 and 3 pull against each other. Item 2 shortens the scroll but
+Known risk, `score.html` "Left the round": it is saved on the one phone that
+pressed it, for that day only (`keep()`). If the team changes scoring phones
+afterward, the new phone does not know. Its send check stops on "[name] has
+no score yet", so it is loud, not silent; the danger is a captain typing a
+score to get past it instead of pressing Left the round again. On the sheet
+side a blank box gives the team par (Seats formula), so blanks are safe.
+Captain's instruction: press it on the TENTH HOLE YOUR TEAM PLAYS, not the
+hole numbered 10.
+
+Note: items 4 and 5 pull against each other. Item 4 shortens the scroll but
 does not shrink the fixed tray, which already covers about a third of a
-400x800 screen; item 3 makes the tray taller.
+400x800 screen; item 5 makes the tray taller. Item 2 is the fix for that.
