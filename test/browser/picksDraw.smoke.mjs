@@ -80,20 +80,23 @@ for (const [letter, holes] of Object.entries(DRAWS)) {
   ok(!/Every birdie counts/.test(await p.innerText("body")), `${letter}: the old line is gone`);
   ok(!/easy street|ecstacy/i.test(await p.innerText("body")), `${letter}: no Easy Street and no misspelled Ecstacy anywhere`);
   ok(await p.$eval("#slots .lead", l => l.compareDocumentPosition(document.querySelector("#slots .hole")) & 4) > 0, `${letter}: headline above the first hole`);
-  if (holes.includes(4)) ok(/pays 36 times in 100/.test(txt), `${letter}: hole 4 pays 36 in 100`);
-  if (holes.includes(5)) ok(/pays 42 times in 100/.test(txt), `${letter}: hole 5 pays 42 in 100`);
+  if (holes.includes(4)) ok(/scores 36 times in 100/.test(txt), `${letter}: hole 4 scores 36 in 100`);
+  if (holes.includes(5)) ok(/scores 42 times in 100/.test(txt), `${letter}: hole 5 scores 42 in 100`);
   if (holes.includes(11)) ok(/birdie 24 in 100, but bogey costs you — 30 in 100/.test(txt), `${letter}: hole 11 risk and reward`);
   if (holes.includes(12)) ok(/birdie 28 in 100, but bogey costs you — 21 in 100/.test(txt), `${letter}: hole 12 risk and reward`);
-  ok(await p.innerText("#summary") === "0 of 4 picked.", `${letter}: the tray counts from 0 of 4`);
+  ok(await p.innerText("#summary") === "0 of 4 picked — no opponent yet.", `${letter}: the tray counts from 0 of 4`);
 
   const btns = await p.$$("#slots .hole");
   await btns[6].click(); await btns[1].click();
-  ok(await p.innerText("#summary") === "2 of 4 picked.", `${letter}: counter reads 2 of 4 picked`);
+  ok(await p.innerText("#summary") === "2 of 4 picked — no opponent yet.", `${letter}: counter reads 2 of 4 picked`);
   await btns[0].click(); await btns[3].click(); await btns[4].click();   // a fifth drops the oldest
   const picked = await p.$$eval('#slots .hole[aria-pressed="true"]', bs => bs.map(x => Number(x.dataset.hole)));
   ok(picked.length === 4 && !picked.includes(holes[6]), `${letter}: a fifth tap drops the oldest, four stay`);
-  ok(/Now pick your Hit List man/.test(await p.innerText("#summary")), `${letter}: then asks for the Hit List`);
+  ok(await p.innerText("#summary") === "4 of 4 picked — no opponent yet.", `${letter}: four picked, still no opponent`);
+  ok(await p.$eval("#send", x => x.disabled), `${letter}: cannot send without an opponent`);
   await p.click("#oppBox button.who >> nth=0");
+  ok(await p.innerText("#summary") === "4 of 4 picked — opponent set.", `${letter}: then opponent set`);
+  ok(await p.innerText("#oppBox h2") === "HIT LIST" && await p.innerText("#slots h2") === "WATCH THE BIRDIE", `${letter}: section headlines`);
   const opp = await p.$eval("#oppBox button.who[aria-pressed=true]", x => x.firstChild.textContent);
   const want = `${man} — ${picked.sort((a,b)=>a-b).join(", ")}`;
   await p.click("#send"); await p.waitForTimeout(300);
