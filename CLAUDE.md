@@ -48,3 +48,25 @@ is stale and must never be trusted for anything.
   should change with what the man is looking at. That is a change in what the
   page does, not just its wording, so it waits until after Friday's round.
   Parked by Rob on Tue 20 Oct.
+
+## Saturday 24 Oct list (set by Rob on Thu 22 Oct)
+
+Branch `claude/optimistic-tesla-is4mms` holds the header, headline, "scores",
+Rob-only and Hit List counter changes. It was NOT merged Thursday: 14 of 16
+men had already filed, so the freeze override no longer helped anyone.
+Nothing merges to `main` before Saturday. In priority order:
+
+1. Merge the branch.
+2. Two hole buttons per row (4 rows, not 8), and the six Hit List opponents
+   three rows of two. The CSS comment above `.holes` says why holes were one
+   to a row ("but bogey costs you" does not fit); the 11 and 12 buttons need
+   their text stacked under the hole number to fit half width.
+3. Put the message preview back as a line under the counter, not instead of
+   it.
+4. Self-reload for stale pages: fetch `version.js` with `no-store` and reload
+   when its build differs from the page's. GitHub Pages cannot send no-store
+   on the HTML itself (it serves `max-age=600`).
+
+Note: items 2 and 3 pull against each other. Item 2 shortens the scroll but
+does not shrink the fixed tray, which already covers about a third of a
+400x800 screen; item 3 makes the tray taller.
