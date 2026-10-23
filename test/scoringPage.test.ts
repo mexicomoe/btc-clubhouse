@@ -50,7 +50,7 @@ const LIFTED = [
 ].map(varSource).join("\n") + "\n" + [
   "parseCsv", "parseFeed", "isEmptySeat", "displayName", "firstName", "parOf",
   "scoreButtons", "nextHole", "prevHole", "playIndex", "feedSentHoles",
-  "feedHoleLine", "isOut", "playingSeats", "missingMan", "sendBody",
+  "feedHoleLine", "parseStart", "outStretches", "outFrom", "setOut", "isOut", "playingSeats", "missingMan", "sendBody",
   "sendId", "outboxNext", "parseBoards", "prettyCell",
   "cardCell", "mineForTeam", "ackedForTeam", "queueWords",
   "colAt", "boardDone", "podiumClasses", "grossTotal", "titleKey", "orderBoards",
@@ -59,7 +59,7 @@ const LIFTED = [
 const P = new Function(LIFTED + "\nreturn {" + [
   "parseCsv", "parseFeed", "isEmptySeat", "displayName", "firstName", "parOf",
   "scoreButtons", "nextHole", "prevHole", "playIndex", "feedSentHoles",
-  "feedHoleLine", "isOut", "playingSeats", "missingMan", "sendBody",
+  "feedHoleLine", "parseStart", "outStretches", "outFrom", "setOut", "isOut", "playingSeats", "missingMan", "sendBody",
   "sendId", "outboxNext", "parseBoards", "prettyCell",
   "cardCell", "mineForTeam", "ackedForTeam", "queueWords",
   "colAt", "boardDone", "podiumClasses", "grossTotal", "titleKey", "orderBoards",
@@ -123,6 +123,56 @@ test("the page opens a team on its own start hole", () => {
   // starting hole could come from.
   assert.match(PAGE, /openHole\(t\?t\.start:1\)/);
   assert.match(PAGE, /if\(S\.hole==null\) S\.hole=t\.start;/);
+});
+
+test("the start cell is read the ways Rob types it, and never guessed", () => {
+  for (const v of ["10","10th"," 10 ","Back","back 9","B"]) assert.equal(P.parseStart(v), 10, v);
+  for (const v of ["1","1st","Front","front nine"]) assert.equal(P.parseStart(v), 1, v);
+  for (const v of ["","19","1O","?"]) assert.equal(P.parseStart(v), null, v);
+});
+
+test("an unreadable or split start is flagged, not quietly turned into 1", () => {
+  const f = (a:string,b:string) => P.parseFeed([HEAD,
+    [4,a,1,"A",...BLANKS.slice(1).split(",")].join(","),
+    [4,b,2,"B",...BLANKS.slice(1).split(",")].join(",")].join("\n"))[0];
+  assert.deepEqual([f("10th","10").start, f("10th","10").startSure], [10, true]);
+  // One seat blank: the seat that says 10 wins, and it is still sure.
+  assert.deepEqual([f("","10").start, f("","10").startSure], [10, true]);
+  // Nothing readable: opened on the 1st, but marked unsure.
+  assert.deepEqual([f("","").start, f("","").startSure], [1, false]);
+  // Seats that disagree: the first stands, marked unsure. It used to be the
+  // LAST seat that won, silently.
+  assert.deepEqual([f("10","1").start, f("10","1").startSure], [10, false]);
+  assert.match(PAGE, /start hole not clear — tell Rob/);
+});
+
+test("Back in means playing again FROM THIS HOLE, not on every hole", () => {
+  // Team off the 10th. Out at 12, back in at 15: out for 12-14 only.
+  let left:any = {4: P.setOut({}, 4, 12, 10, true)};
+  left = {4: P.setOut(left, 4, 15, 10, false)};
+  assert.deepEqual([10,11,12,13,14,15,16].map(h=>P.isOut(left,4,h,10)),
+    [false,false,true,true,true,false,false]);
+  assert.equal(P.outFrom(left, 4, 13, 10), 12);
+  // Back in on the hole he left at is the undo: nothing left behind.
+  assert.deepEqual(P.setOut({4:[[12,null]]}, 4, 12, 10, false), []);
+  // Out again later: both stretches stand.
+  left = {4: P.setOut(left, 4, 17, 10, true)};
+  assert.equal(P.isOut(left,4,13,10), true);
+  assert.equal(P.isOut(left,4,16,10), false);
+  assert.equal(P.isOut(left,4,1,10), true);
+  // The old way of keeping it — a bare number — still reads as out from there on.
+  assert.equal(P.isOut({4:12}, 4, 3, 10), true);
+  assert.equal(P.isOut({4:12}, 4, 11, 10), false);
+});
+
+test("a missing score says what to do, not only what is wrong", () => {
+  assert.match(PAGE, /has no score for this hole\. If he isn't playing, tap Left the round next to his name\./);
+  assert.match(PAGE, /To go on to the next hole, tap /);
+});
+
+test("a send that never answers is given up on and held, not left hanging", () => {
+  assert.match(PAGE, /^var SEND_TIMEOUT = \d+;$/m);
+  assert.match(fnSource("postOnce"), /setTimeout\([\s\S]*SEND_TIMEOUT/);
 });
 
 test("BLIND and an unfilled seat are both empty seats", () => {

@@ -150,6 +150,7 @@ await p.click(".man:nth-child(1) .scores button:nth-child(4)");   // Loren 5
 await p.click(".man:nth-child(3) .scores button:nth-child(5)");   // Mike 6
 await p.click("#toReview"); await p.waitForTimeout(100);
 ok((await p.innerText("#scoreMsg")).includes("Rich Levy"), "review names the missing man: "+await p.innerText("#scoreMsg"));
+ok((await p.innerText("#scoreMsg")).includes("tap Left the round next to his name"), "and says what to do if he is not playing");
 ok(await p.isVisible("#screenScore"), "review refuses to move on");
 
 await p.click(".man:nth-child(2) .scores button:nth-child(3)");   // Rich 4
@@ -181,12 +182,15 @@ const b2 = new URLSearchParams(sends[1]);
 ok(!b2.has("entry.378353848") && !b2.has("entry.1378388490"), "the man who left went in EMPTY, beside the BLIND");
 await p.click("#holePrev"); await p.waitForTimeout(100);
 ok((await p.$$(".man:nth-child(3) .scores button")).length===0, "still out on hole 11");
-await p.click("#holeNext"); await p.click(".man:nth-child(3) .outBtn"); await p.waitForTimeout(150);
+// "Back in" on the hole he left at is the undo for a mis-tap: every hole back.
+await p.click(".man:nth-child(3) .outBtn"); await p.waitForTimeout(150);
 ok((await p.$$(".man:nth-child(3) .scores button")).length===7, "back in — the mis-tap is undone");
+await p.click("#holeNext"); await p.waitForTimeout(100);
 
 // 10 · a hole already in warns and will not be re-sent
 await p.click("#holePrev"); await p.waitForTimeout(100);
-ok((await p.innerText("#sentWarn")).includes("already sent"), "hole 11 is shown as already in");
+ok(/Hole 11 (is in the sheet|was sent from this phone)/.test(await p.innerText("#sentWarn")), "hole 11 is shown as already in: "+await p.innerText("#sentWarn"));
+ok((await p.innerText("#sentWarn")).includes("To go on to the next hole"), "and it says how to go on, not only what is wrong");
 ok(await p.isDisabled("#toReview"), "and is locked until he says he means to change it");
 ok((await p.$$(".man:nth-child(1) .scores button[disabled]")).length===7, "its buttons are locked too");
 const wasSent = sends.length;
