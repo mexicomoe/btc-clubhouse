@@ -1,0 +1,14 @@
+{
+  "id": "score.html",
+  "name": "TGIF Scores",
+  "short_name": "SCORES",
+  "start_url": "score.html",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#ffffff",
+  "icons": [
+    { "src": "icon-scores-180.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "icon-scores-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-scores-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
