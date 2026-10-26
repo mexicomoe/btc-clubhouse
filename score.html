@@ -4,7 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="TGIF">
+<!-- THE HOME-SCREEN TILE. Without these an iPhone draws a gray letter, and
+     the two pages came out as "C" and "T" — nothing a man can tell apart.
+     The label under the tile matters more than the picture, and must read
+     exactly as Rob's handout names it: PICKS and SCORES. -->
+<meta name="apple-mobile-web-app-title" content="SCORES">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-scores-180.png">
+<link rel="manifest" href="score.webmanifest">
 <meta name="theme-color" content="#ffffff">
 <title>TGIF — Scoring</title>
 <!--
@@ -380,6 +386,8 @@ var LEADERBOARD_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQg-44HCc
 var FEED_EVERY = 60000;
 /* How often a held send is tried again while the page is open. */
 var RETRY_EVERY = 20000;
+/* How long one send may take before it is called no signal and held. */
+var SEND_TIMEOUT = 15000;
 
 /* ==================================================================
  * THE PARTS WITH NO SCREEN IN THEM
@@ -432,9 +440,15 @@ function parseFeed(text){
     var start=parseInt(String(c[1]).trim(),10);
     var seat=parseInt(String(c[2]).trim(),10);
     if(!(team>=1&&team<=6)||!(seat>=1&&seat<=4)) continue;
-    if(start!==1&&start!==10) start=1;
-    if(!teams[team]){ teams[team]={team:team,start:start,seats:[null,null,null,null]}; order.push(team); }
-    teams[team].start=start;
+    start=parseStart(c[1]);
+    if(!teams[team]){ teams[team]={team:team,start:1,startSure:false,seats:[null,null,null,null]}; order.push(team); }
+    /* The first seat that names a start sets it. A later seat that names the
+       OTHER start makes it unsure rather than quietly winning. */
+    var tm=teams[team];
+    if(start!==null){
+      if(!tm.startSeen){ tm.start=start; tm.startSeen=true; tm.startSure=true; }
+      else if(tm.start!==start) tm.startSure=false;
+    }
     var holes=[];
     for(i=0;i<18;i++){
       var v=String(c[4+i]==null?"":c[4+i]).trim();
@@ -445,6 +459,20 @@ function parseFeed(text){
   }
   order.sort(function(a,b){return a-b;});
   return order.map(function(t){return teams[t];});
+}
+
+/**
+ * THE START CELL, AS ROB TYPES IT. By hand, every week, so "10", "10th",
+ * "10 " and "Back" all mean the 10th. Anything it cannot read is null, NOT 1:
+ * a wrong start does not show on the screen, it quietly moves a man who left
+ * the round onto holes he never played. The team is still opened on the 1st,
+ * but its button says the start is not clear.
+ */
+function parseStart(v){
+  var s=String(v==null?"":v).trim().toLowerCase();
+  if(/^(10|10th|back|back ?9|back nine|b|in)$/.test(s)) return 10;
+  if(/^(1|1st|front|front ?9|front nine|f|out)$/.test(s)) return 1;
+  return null;
 }
 
 /** A seat nobody is sitting in. BLIND counts — he has no score to give. */
@@ -524,11 +552,49 @@ function feedHoleLine(team,hole){
   return bits.join(", ");
 }
 
+/**
+ * THE STRETCHES OF HOLES A MAN WAS OUT FOR, as [from, back] pairs: out from
+ * `from`, playing again from `back`, or still out when `back` is null. A bare
+ * number is the old way of keeping it — out from that hole on — and is read
+ * as one open stretch, so a phone mid-round across an update loses nothing.
+ */
+function outStretches(leftAt,seatNo){
+  var v=leftAt&&leftAt[seatNo];
+  if(v==null) return [];
+  if(typeof v==="number") return [[v,null]];
+  return v;
+}
+
+/** The hole he left at, for the stretch this hole is in, or null. */
+function outFrom(leftAt,seatNo,hole,start){
+  var st=outStretches(leftAt,seatNo),at=playIndex(hole,start),i;
+  for(i=0;i<st.length;i++){
+    if(at>=playIndex(st[i][0],start)&&(st[i][1]==null||at<playIndex(st[i][1],start))) return st[i][0];
+  }
+  return null;
+}
+
 /** Is this man out of the round by the time the team reaches this hole? */
-function isOut(leftAt,seatNo,hole,start){
-  var from=leftAt&&leftAt[seatNo];
-  if(!from) return false;
-  return playIndex(hole,start)>=playIndex(from,start);
+function isOut(leftAt,seatNo,hole,start){ return outFrom(leftAt,seatNo,hole,start)!=null; }
+
+/**
+ * LEFT THE ROUND, OR BACK IN, AT ONE HOLE. Returns the new stretches.
+ * "Back in" on the very hole he left at is an undo, and takes the stretch
+ * away. "Back in" anywhere later means what its confirm box says — playing
+ * again FROM HERE — so the holes he was out for stay out. It used to wipe the
+ * lot, and every hole he had missed went back to demanding his score.
+ */
+function setOut(leftAt,seatNo,hole,start,goingOut){
+  var st=outStretches(leftAt,seatNo).map(function(x){ return x.slice(); }),i;
+  if(goingOut){ st.push([hole,null]); return st; }
+  var at=playIndex(hole,start);
+  for(i=0;i<st.length;i++){
+    if(at>=playIndex(st[i][0],start)&&(st[i][1]==null||at<playIndex(st[i][1],start))){
+      if(at===playIndex(st[i][0],start)) st.splice(i,1); else st[i][1]=hole;
+      break;
+    }
+  }
+  return st;
 }
 
 /** The seats that owe a score on this hole. */
@@ -884,7 +950,7 @@ var S={
   role:null,        /* "score" or "watch" */
   hole:null,        /* the hole on screen */
   scores:{},        /* seat -> score, for the hole on screen */
-  leftAt:{},        /* seat -> the hole from which he is out */
+  leftAt:{},        /* seat -> [[from, back], ...], the holes he was out for */
   acked:{},         /* team -> hole -> true, sends this phone saw land */
   mine:{},          /* team -> hole -> seat -> score, what this phone filed */
   unlocked:false,   /* he has said yes to changing a hole already in */
@@ -1035,7 +1101,18 @@ function openBoards(from){
 function postOnce(job){
   var body=new URLSearchParams(),k,b=sendBody(job.team,job.hole,job.scores);
   for(k in b) if(Object.prototype.hasOwnProperty.call(b,k)) body.set(k,b[k]);
-  return fetch(FORM_POST,{method:"POST",mode:"no-cors",body:body,cache:"no-store"});
+  /* A TIME LIMIT, because a phone can leave a request hanging for good — the
+     screen asleep mid-send, a cart in the dead patch. With none, Send stayed
+     on "Sending…" for ever and every later Send was silently refused. Out of
+     time is treated as no signal: the hole stays held and goes again on its
+     own. If the first try did land, the second replaces it with the same
+     numbers, which is harmless while the sheet keeps the latest send. */
+  var ctl=typeof AbortController==="function"?new AbortController():null;
+  return new Promise(function(resolve,reject){
+    var timer=setTimeout(function(){ if(ctl) ctl.abort(); reject(new Error("send timed out")); },SEND_TIMEOUT);
+    fetch(FORM_POST,{method:"POST",mode:"no-cors",body:body,cache:"no-store",signal:ctl?ctl.signal:undefined})
+      .then(function(r){ clearTimeout(timer); resolve(r); },function(e){ clearTimeout(timer); reject(e); });
+  });
 }
 
 /**
@@ -1138,7 +1215,7 @@ function drawPick(){
     var b=document.createElement("button");
     b.className="teamBtn";
     var n=document.createElement("span");n.className="n";
-    n.textContent="TEAM "+t.team+(t.start===10?"  ·  starts on 10":"");
+    n.textContent="TEAM "+t.team+(!t.startSure?"  ·  start hole not clear — tell Rob":t.start===10?"  ·  starts on 10":"");
     var m=document.createElement("span");m.className="m";
     m.textContent=t.seats.filter(function(s){return !isEmptySeat(s);})
       .map(function(s){return displayName(s.name);}).join("  ·  ");
@@ -1171,17 +1248,25 @@ function drawScore(){
   if(already){
     warn.classList.remove("hide");
     var line=feedHoleLine(t,h);
+    /* EVERY WORD HERE ENDS IN WHAT TO DO. A captain shown only what is wrong
+       stops, and his group goes unscored — that is how team 3 was lost on
+       23 October, looking at a locked hole 15 with no way on that he could see.
+       And it says only what is known: in the sheet, or sent from this phone
+       and not yet seen in the sheet, which is not the same thing. */
+    var goOn=" To go on to the next hole, tap \u2192.";
     if(S.unlocked){
-      warn.textContent="Hole "+h+" is being changed. What is in now: "+(line||"—")+".";
+      warn.textContent="Hole "+h+" is being changed. What is in now: "+(line||"—")+". Tap the new scores, then Review.";
     } else if(SHEET_LAST_SEND_WINS){
-      warn.textContent="Hole "+h+" already sent"+(line?": "+line:"")+".";
+      warn.textContent=sent[h]
+        ? "Hole "+h+" is in the sheet: "+line+". To change a score, tap Change hole "+h+"."+goOn
+        : "Hole "+h+" was sent from this phone, but the sheet has not shown it yet. To send it again, tap Change hole "+h+"."+goOn;
       var chg=document.createElement("button");
       chg.className="wide plain";chg.textContent="Change hole "+h;
       chg.addEventListener("click",function(){ S.unlocked=true;drawScore(); });
       warn.appendChild(chg);
     } else {
       warn.textContent="Hole "+h+" already sent"+(line?": "+line:"")+
-        ". Sending it again would ADD to what is there, not replace it — tell Rob instead.";
+        ". Sending it again would ADD to what is there, not replace it — tell Rob instead."+goOn;
     }
   } else warn.classList.add("hide");
 
@@ -1202,7 +1287,7 @@ function drawScore(){
 
     if(out){
       var g=document.createElement("div");g.className="gone";
-      g.textContent="Left the round at hole "+S.leftAt[seat.seat]+" — his box goes in empty.";
+      g.textContent="Left the round at hole "+outFrom(S.leftAt,seat.seat,h,t.start)+" — his box goes in empty.";
       row.appendChild(g);
     } else {
       var grid=document.createElement("div");grid.className="scores";
@@ -1233,15 +1318,15 @@ function drawScore(){
  * buttons on a phone in a moving cart.
  */
 function toggleLeft(seat,isCurrentlyOut){
-  var who=displayName(seat.name);
+  var who=displayName(seat.name),t=myTeam();
   if(isCurrentlyOut){
     if(!confirm(who+" is playing again from hole "+S.hole+"?")) return;
-    delete S.leftAt[seat.seat];
   } else {
     if(!confirm(who+" has left the round? From hole "+S.hole+" on, his box goes in empty.")) return;
-    S.leftAt[seat.seat]=S.hole;
     delete S.scores[seat.seat];
   }
+  var st=setOut(S.leftAt,seat.seat,S.hole,t.start,!isCurrentlyOut);
+  if(st.length) S.leftAt[seat.seat]=st; else delete S.leftAt[seat.seat];
   keep("leftAt",S.leftAt);
   drawScore();
 }
@@ -1377,7 +1462,7 @@ $("holeNext").addEventListener("click",function(){ openHole(nextHole(S.hole)); }
 
 $("toReview").addEventListener("click",function(){
   var t=myTeam(),who=missingMan(t,S.hole,S.scores,S.leftAt);
-  if(who){ $("scoreMsg").textContent=who+" has no score yet."; return; }
+  if(who){ $("scoreMsg").textContent=who+" has no score for this hole. If he isn't playing, tap Left the round next to his name."; return; }
   $("scoreMsg").textContent="";
   drawReview();show("screenReview");
 });
