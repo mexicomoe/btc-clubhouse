@@ -252,9 +252,11 @@ test("making them again gives a different set of teams", () => {
 
 /* ---------- the Pairs log ---------- */
 
-/** A published Pairs log: row 1 the dates, rows 2-25 the seats, every name quoted. */
-function logCsv(cols: { date: string; names: string[] }[]) {
+/** A published Pairs log: column A Rob's seat labels, then row 1 the dates, rows 2-25 the seats. */
+const SEAT_LABELS = Array.from({ length: 24 }, (_, i) => (Math.floor(i / 4) + 1) + "ABCD"[i % 4]);
+function logCsv(cols: { date: string; names: string[] }[], labelHead = "") {
   const q = (x: string) => '"' + x.replace(/"/g, '""') + '"';
+  cols = [{ date: labelHead, names: SEAT_LABELS }, ...cols];
   const rows = [cols.map(c => q(c.date))];
   for (let r = 0; r < 24; r++) rows.push(cols.map(c => q(c.names[r] ?? "")));
   return rows.map(r => r.join(",")).join("\r\n");
@@ -276,6 +278,14 @@ test("the log is read as rounds: a comma in every name, BLIND and blanks dropped
   assert.equal(got.rounds[0].teams.length, 6, "rows 22-25 are a sixth team");
   assert.deepEqual(got.rounds[0].teams[0], ["Surname0, First", "Surname1, First", "Surname2, First"]);
   assert.deepEqual(got.rounds[0].teams[5], ["Surname20, First", "Surname21, First", "Spaced , Out"]);
+});
+
+test("column A, Rob's seat labels, is never a round — even with a date above it", () => {
+  for (const head of ["", "Seat", "10/16/2026"]) {
+    const got = P.parsePairsLog(logCsv([col("10/23/2026", ["ABCD"])], head));
+    assert.deepEqual(got.rounds.map((r: any) => r.week), ["2026-10-23"], "A1 = " + JSON.stringify(head));
+    assert.deepEqual(got.bad, []);
+  }
 });
 
 test("round dates are read in the forms a sheet publishes, and a bad one is reported, not guessed", () => {

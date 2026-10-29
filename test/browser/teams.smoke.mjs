@@ -22,9 +22,10 @@ const stubbed = SRC.replace(/^var ROLL_CSV = "[^"]*";$/m, 'var ROLL_CSV = "https
   .replace(/^var PAIRS_CSV = "[^"]*";$/m, 'var PAIRS_CSV = "https://sheets.invalid/pairs.csv";');
 if (!stubbed.includes("roll.csv") || !stubbed.includes("pairs.csv")) throw new Error("feeds were not stubbed — teams.html has changed shape");
 
-/** A Pairs log: one column per round, rows 2-25 the seats. */
+/** A Pairs log: column A Rob's seat labels, then one column per round, rows 2-25 the seats. */
 const pairsLog = cols => {
   const q = x => '"' + x + '"';
+  cols = [{ date: "", names: Array.from({ length: 24 }, (_, i) => (Math.floor(i / 4) + 1) + "ABCD"[i % 4]) }, ...cols];
   const rows = [cols.map(c => q(c.date))];
   for (let r = 0; r < 24; r++) rows.push(cols.map(c => q(c.names[r] ?? "")));
   return rows.map(r => r.join(",")).join("\n");

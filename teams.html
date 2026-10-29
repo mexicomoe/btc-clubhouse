@@ -372,8 +372,9 @@ function parseLogDate(v){
 }
 
 /**
- * THE LOG, AS ROUNDS. One column per round: its date on row 1, then rows
- * 2-25 as six teams of four (2-5, 6-9, ... 22-25). Blanks and BLINDs are not
+ * THE LOG, AS ROUNDS. Column A is Rob's seat labels (1A, 1B ... 6D) and is
+ * never a round, whatever row 1 says. From column B, one column per round:
+ * its date on row 1, then rows 2-25 as six teams of four (2-5, 6-9, ... 22-25). Blanks and BLINDs are not
  * partners and are dropped. A column whose date can't be read is left out
  * and reported, never guessed at. Oldest round first; a date twice keeps the
  * rightmost column.
@@ -381,7 +382,7 @@ function parseLogDate(v){
 function parsePairsLog(text){
   var rows=parseCsv(text),head=rows[0]||[],byWeek={},bad=[],c,r,cols=0;
   for(r=0;r<rows.length;r++) cols=Math.max(cols,rows[r].length);
-  for(c=0;c<cols;c++){
+  for(c=1;c<cols;c++){
     var teams=[],any=false;
     for(r=1;r<=24;r++){
       var name=String((rows[r]||[])[c]==null?"":rows[r][c]).trim().replace(/\s+/g," ");
