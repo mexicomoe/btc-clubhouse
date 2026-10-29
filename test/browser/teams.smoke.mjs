@@ -4,7 +4,9 @@
  * Every send is intercepted; the roll call is a made-up feed served here.
  * Covers the awkward counts (12, 13, 17, 21, 24, and 25, which must refuse),
  * a feed that will not load, a page with no feed address, swap, lock, and
- * what Copy puts on the clipboard.
+ * what Copy puts on the clipboard. The Pairs log is served here too: the
+ * rule split, the rule broken and said by name, an unplayed round ignored,
+ * and a log that will not load, which must never stop the teams.
  *
  * Not part of `npm test`, like the other browser checks. Run it by hand:
  *
@@ -16,8 +18,18 @@ import { readFileSync } from "fs";
 
 const SRC = readFileSync(new URL("../../teams.html", import.meta.url), "utf8");
 const OUT = process.argv[2] || ".";
-const stubbed = SRC.replace(/^var ROLL_CSV = "[^"]*";$/m, 'var ROLL_CSV = "https://sheets.invalid/roll.csv";');
-if (stubbed === SRC) throw new Error("ROLL_CSV was not stubbed — teams.html has changed shape");
+const stubbed = SRC.replace(/^var ROLL_CSV = "[^"]*";$/m, 'var ROLL_CSV = "https://sheets.invalid/roll.csv";')
+  .replace(/^var PAIRS_CSV = "[^"]*";$/m, 'var PAIRS_CSV = "https://sheets.invalid/pairs.csv";');
+if (!stubbed.includes("roll.csv") || !stubbed.includes("pairs.csv")) throw new Error("feeds were not stubbed — teams.html has changed shape");
+
+/** A Pairs log: one column per round, rows 2-25 the seats. */
+const pairsLog = cols => {
+  const q = x => '"' + x + '"';
+  const rows = [cols.map(c => q(c.date))];
+  for (let r = 0; r < 24; r++) rows.push(cols.map(c => q(c.names[r] ?? "")));
+  return rows.map(r => r.join(",")).join("\n");
+};
+const nm = i => `Surname${String.fromCharCode(65 + (i % 26))}${i >= 26 ? i : ""}, First`;
 
 const roll = n => ["name,index,tee", ...Array.from({ length: n }, (_, i) =>
   `"Surname${String.fromCharCode(65 + (i % 26))}${i >= 26 ? i : ""}, First",${(19 + (15 * i) / Math.max(1, n - 1)).toFixed(1)},IV`)].join("\n");
@@ -26,13 +38,15 @@ const b = await chromium.launch(process.env.CHROME ? { executablePath: process.e
 const fails = [];
 const ok = (c, m) => { if (!c) fails.push(m); console.log((c ? "  ok   " : "  FAIL ") + m); };
 
-async function open(feed, { page = stubbed, offline = false } = {}) {
+async function open(feed, { page = stubbed, offline = false, pairs = "", pairsOffline = false } = {}) {
   const ctx = await b.newContext({ viewport: { width: 400, height: 860 }, deviceScaleFactor: 2 });
   await ctx.route("**/*", route => {
     const u = route.request().url();
     if (u.endsWith("/teams.html")) return route.fulfill({ contentType: "text/html", body: page });
     if (u.includes("roll.csv")) return offline ? route.abort("internetdisconnected")
                                                : route.fulfill({ contentType: "text/csv", body: feed });
+    if (u.includes("pairs.csv")) return pairsOffline ? route.abort("internetdisconnected")
+                                                     : route.fulfill({ contentType: "text/csv", body: pairs });
     return route.fulfill({ status: 404, body: "" });
   });
   // The test page is plain http, where a browser gives no clipboard; GitHub
@@ -94,9 +108,9 @@ for (const [n, T, blinds] of [[12, 3, 0], [13, 4, 3], [17, 5, 3], [21, 6, 3], [2
     ok((await p.innerText("#copied")).includes("Select A4:A27 in Players, press Delete, then click in A4 and paste."), "says where it goes, clear first");
     const order = await p.evaluate(() => !!(document.getElementById("clearFirst").compareDocumentPosition(document.getElementById("copy")) & Node.DOCUMENT_POSITION_FOLLOWING));
     ok(order && (await p.innerText("#clearFirst")) === "Select A4:A27 in Players, press Delete, then click in A4 and paste.", "the clear-first instruction sits above Copy");
-    // memory: next make reports avoided pairings
     await p.click("#again"); await p.waitForTimeout(100);
-    ok(!(await p.innerText("#notes")).includes("recent pairings"), "this week's own copy is not 'recent'");
+    ok(!(await p.innerText("#notes")).includes("recent pairings"), "an empty Pairs log gives no recent pairings");
+    ok((await p.innerText("#notes")).includes("no rounds in the Pairs log before this Friday"), "and says so");
     await p.screenshot({ path: OUT + "/teams-24.png", fullPage: true });
   }
   if (n === 13) {
@@ -146,6 +160,65 @@ console.log("no address set");
   const blank = SRC.replace(/^var ROLL_CSV = "[^"]*";$/m, 'var ROLL_CSV = "";');
   const { ctx, p } = await open("", { page: blank });
   ok((await p.innerText("#status")).includes("address isn't set yet"), "says so, rather than an empty screen");
+  await ctx.close();
+}
+
+console.log("Pairs log: the rule split");
+{
+  // 12 men, the lowest four together the last two rounds; an unplayed round far ahead is ignored.
+  const four = [0, 1, 2, 3].map(nm);
+  const { ctx, p } = await open(roll(12), { pairs: pairsLog([
+    { date: "2026-01-02", names: four }, { date: "2026-01-09", names: four }, { date: "2099-01-02", names: [nm(4), nm(5)] }]) });
+  await p.click("#make"); await p.waitForTimeout(300);
+  const teams = await p.$$eval(".team", ts => ts.map(t => [...t.querySelectorAll(".man .nm")].map(x => x.textContent)));
+  const worst = Math.max(...teams.map(t => t.filter(x => four.includes(x)).length));
+  ok(worst <= 2, "the four are spread, at most two on a team (12 men, 3 teams): " + worst);
+  const notes = await p.innerText("#notes");
+  ok(notes.includes("History: rounds of 2 Jan and 9 Jan."), "names the two rounds read, not the unplayed one");
+  ok(/Avoided \d+ of 6 recent pairings\./.test(notes), "says how many recent pairings were avoided");
+  // 12 men in 3 teams from 4 old partners: one team must hold two of them.
+  ok((notes.match(/Had to allow/g) || []).length === 1 && notes.includes("a 3rd week running"), "the one forced pair said by name");
+  ok(await noScroll(p), "no sideways scroll at 400px with the long lines");
+  await p.screenshot({ path: OUT + "/teams-pairs.png", fullPage: true });
+  await ctx.close();
+}
+
+console.log("Pairs log: lock wins");
+{
+  const two = [nm(0), nm(11)];
+  const { ctx, p } = await open(roll(12), { pairs: pairsLog([{ date: "2026-01-02", names: two }, { date: "2026-01-09", names: two }]) });
+  await p.click("#make"); await p.waitForTimeout(300);
+  // Swap the two together by hand, then lock both and make again.
+  const where = async () => p.$$eval(".team", ts => ts.map(t => [...t.querySelectorAll(".man .nm")].map(x => x.textContent)));
+  let t = await where();
+  const ta = t.findIndex(x => x.includes(two[0])), tb = t.findIndex(x => x.includes(two[1]));
+  ok(ta !== tb, "split to begin with");
+  const seatB = t[tb].indexOf(two[1]), victim = t[ta].findIndex(x => x !== two[0]);
+  await p.locator(".team").nth(ta).locator(".man").nth(victim).click();
+  await p.locator(".team").nth(tb).locator(".man").nth(seatB).click(); await p.waitForTimeout(100);
+  ok((await p.innerText("#notes")).includes("because they were swapped together by hand."), "a hand swap is said");
+  t = await where();
+  for (const n of two) await p.locator(".team").nth(ta).locator(".lock").nth(t[ta].indexOf(n)).click();
+  await p.click("#again"); await p.waitForTimeout(300);
+  ok((await p.innerText("#notes")).includes("because both are locked on this team."), "a lock is named as the cause");
+  await ctx.close();
+}
+
+console.log("Pairs log will not load");
+{
+  const { ctx, p } = await open(roll(12), { pairsOffline: true });
+  await p.click("#make"); await p.waitForTimeout(300);
+  ok((await p.$$(".team")).length === 3, "teams are still made");
+  ok((await p.innerText("#notes")).includes("Couldn't read the Pairs log, so no history was used."), "and it says so");
+  await ctx.close();
+}
+
+console.log("Pairs log address not set");
+{
+  const blank = stubbed.replace(/^var PAIRS_CSV = "[^"]*";$/m, 'var PAIRS_CSV = "";');
+  const { ctx, p } = await open(roll(12), { page: blank });
+  await p.click("#make"); await p.waitForTimeout(300);
+  ok((await p.$$(".team")).length === 3 && (await p.innerText("#notes")).includes("Pairs log address isn't set yet"), "teams made, and it says why no history");
   await ctx.close();
 }
 
