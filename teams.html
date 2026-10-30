@@ -96,13 +96,31 @@ button.big.plain{background:var(--paper);color:var(--ink);}
  */
 var ROLL_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQg-44HCczcIAcyn9_osr4HvnniZba5IV9wKlf-uNFjz_CaGDcYRnqYVz_n4L7dsPdcUJkynwk7lx4d/pub?gid=1365054493&single=true&output=csv";
 
+/**
+ * WHO PLAYED WITH WHOM — the "Pairs log" tab, published as CSV. Row 1 is the
+ * round date, one column per round, newest to the right; rows 2-25 are the
+ * 24 Players seats for that round, raw names, teams the blocks of four.
+ *
+ * THIS SHEET IS THE ONLY SOURCE OF HISTORY. The page used to remember past
+ * weeks in the browser (localStorage), and that is why the rule failed: Rob
+ * made teams on a different device and the page had no history at all. Do
+ * not put localStorage back, as a cache, a fallback or anything else.
+ */
+var PAIRS_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQg-44HCczcIAcyn9_osr4HvnniZba5IV9wKlf-uNFjz_CaGDcYRnqYVz_n4L7dsPdcUJkynwk7lx4d/pub?gid=995129212&single=true&output=csv";
+
 /** Six blocks of four: Seats rows 35-58, six team-board rows, 24 Players slots. */
 var MAX_TEAMS = 6;
 /** How far the repeat preference may trade away evenness, in index strokes. Evenness comes first. */
 var EVEN_SLACK = 0.5;
+/**
+ * THE CEILING ON THE PAIR RULE, in strokes between heaviest and lightest
+ * team. Splitting a barred pair may cost evenness up to here and no further:
+ * past it the pair is allowed and the screen says so. Balanced teams come in
+ * near 0.6; a fairness rule with no ceiling once gave twelve men 6.5.
+ */
+var MAX_DRIFT = 2.0;
 /** Fresh random starts per tap, each improved by swaps until no swap helps. */
 var TRIES = 300;
-var HISTORY_KEY = "clubhouse.teams.history";
 
 /* ---------- reading the feed ---------- */
 
@@ -266,14 +284,23 @@ function unevenness(teams){
   for(i=0;i<w.length;i++) v+=(w[i]-mean)*(w[i]-mean);
   return [Math.max.apply(null,w)-Math.min.apply(null,w),v];
 }
-function lessUneven(a,b){ return a[0]<b[0]-1e-9||(Math.abs(a[0]-b[0])<=1e-9&&a[1]<b[1]-1e-9); }
+/** Is cost a lower than cost b, compared first item first? */
+function lessUneven(a,b){
+  for(var i=0;i<a.length;i++){
+    if(a[i]<b[i]-1e-9) return true;
+    if(a[i]>b[i]+1e-9) return false;
+  }
+  return false;
+}
 
 /**
  * IMPROVE BY SWAPS. Trade any two men on different teams whenever it makes
  * the teams more even, until no trade does. Locked men and BLINDs never move.
+ * Given `bar` (from barTable), fewer barred pairs together comes before evenness.
  */
-function climb(teams,fixedSet){
-  var cur=unevenness(teams),better=true,a,b,i,j,pass=0;
+function climb(teams,fixedSet,bar){
+  var cost=function(ts){ var u=unevenness(ts); return bar?[barredIn(ts,bar)].concat(u):u; };
+  var cur=cost(teams),better=true,a,b,i,j,pass=0;
   while(better&&pass++<60){
     better=false;
     for(a=0;a<teams.length;a++) for(b=a+1;b<teams.length;b++)
@@ -281,7 +308,7 @@ function climb(teams,fixedSet){
         var x=teams[a][i],y=teams[b][j];
         if(fixedSet.indexOf(x)>-1||fixedSet.indexOf(y)>-1) continue;
         teams[a][i]=y; teams[b][j]=x;
-        var u=unevenness(teams);
+        var u=cost(teams);
         if(lessUneven(u,cur)){ cur=u; better=true; }
         else { teams[a][i]=x; teams[b][j]=y; }
       }
@@ -289,32 +316,17 @@ function climb(teams,fixedSet){
   return teams;
 }
 
-/** Every pair of real men on one team, as "name|name" in name order. */
+/** A name as the log and the feed are matched: spaces tidied, case ignored. */
+function nameKey(s){ return String(s==null?"":s).trim().replace(/\s+/g," ").toLowerCase(); }
+
+/** Every pair of real men on one team, as "name|name" (matched form) in name order. */
 function pairKeys(teams){
   var out=[],t,i,j;
   for(t=0;t<teams.length;t++){
-    var real=teams[t].filter(function(m){ return !m.blind; }).map(function(m){ return m.name; }).sort();
+    var real=teams[t].filter(function(m){ return !m.blind; }).map(function(m){ return nameKey(m.name); }).sort();
     for(i=0;i<real.length;i++) for(j=i+1;j<real.length;j++) out.push(real[i]+"|"+real[j]);
   }
   return out;
-}
-
-/**
- * THE RECENT PAIRINGS THAT STILL MATTER: from the last three weeks stored,
- * not counting this week's own (a second Copy on Monday is not "last week"),
- * and only between two men both playing this week.
- */
-function recentPairs(history,week,men){
-  var here={},set={},i,j;
-  for(i=0;i<men.length;i++) here[men[i].name]=true;
-  for(i=0;i<(history||[]).length;i++){
-    var h=history[i]; if(!h||h.week===week) continue;
-    for(j=0;j<(h.pairs||[]).length;j++){
-      var p=h.pairs[j].split("|");
-      if(here[p[0]]&&here[p[1]]) set[h.pairs[j]]=true;
-    }
-  }
-  return set;
 }
 
 function repeatsIn(teams,recent){
@@ -322,31 +334,138 @@ function repeatsIn(teams,recent){
 }
 
 /**
- * MAKE THE TEAMS. TRIES fresh random starts, each improved by swaps until no
- * swap helps, and the most even kept. Among those within EVEN_SLACK strokes
- * of the most even, the one repeating fewest of the last three weeks'
- * pairings wins: a preference, never a rule — it always returns teams.
+ * THE BARRED PAIRS AS A LOOKUP by the men's own names, so the swap search can
+ * count them without building a name key thousands of times a tap.
+ */
+function barTable(men,barred){
+  var bar={},i,j;
+  for(i=0;i<men.length;i++) for(j=0;j<men.length;j++)
+    if(i!==j&&barred[[nameKey(men[i].name),nameKey(men[j].name)].sort().join("|")]){
+      (bar[men[i].name]=bar[men[i].name]||{})[men[j].name]=true;
+    }
+  return bar;
+}
+function barredIn(teams,bar){
+  var n=0,t,i,j;
+  for(t=0;t<teams.length;t++) for(i=0;i<teams[t].length;i++){
+    var b=teams[t][i].blind?null:bar[teams[t][i].name];
+    if(b) for(j=i+1;j<teams[t].length;j++) if(b[teams[t][j].name]) n++;
+  }
+  return n;
+}
+
+/* ---------- the Pairs log ---------- */
+
+/**
+ * A ROUND DATE as the sheet may publish it: 2026-10-23, 10/23/2026, or
+ * "Oct 23, 2026". Anything without a four-digit year is not trusted.
+ * Returns "YYYY-MM-DD" or null.
+ */
+function parseLogDate(v){
+  var s=String(v==null?"":v).trim(),m,y,mo,d;
+  if((m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))){ y=+m[1]; mo=+m[2]; d=+m[3]; }
+  else if((m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/))){ y=+m[3]; mo=+m[1]; d=+m[2]; }
+  else if(/\b\d{4}\b/.test(s)&&!isNaN(Date.parse(s))){ var t=new Date(s); y=t.getFullYear(); mo=t.getMonth()+1; d=t.getDate(); }
+  else return null;
+  if(mo<1||mo>12||d<1||d>31) return null;
+  return y+"-"+(mo<10?"0":"")+mo+"-"+(d<10?"0":"")+d;
+}
+
+/**
+ * THE LOG, AS ROUNDS. Column A is Rob's seat labels (1A, 1B ... 6D) and is
+ * never a round, whatever row 1 says. From column B, one column per round:
+ * its date on row 1, then rows 2-25 as six teams of four (2-5, 6-9, ... 22-25). Blanks and BLINDs are not
+ * partners and are dropped. A column whose date can't be read is left out
+ * and reported, never guessed at. Oldest round first; a date twice keeps the
+ * rightmost column.
+ */
+function parsePairsLog(text){
+  var rows=parseCsv(text),head=rows[0]||[],byWeek={},bad=[],c,r,cols=0;
+  for(r=0;r<rows.length;r++) cols=Math.max(cols,rows[r].length);
+  for(c=1;c<cols;c++){
+    var teams=[],any=false;
+    for(r=1;r<=24;r++){
+      var name=String((rows[r]||[])[c]==null?"":rows[r][c]).trim().replace(/\s+/g," ");
+      var t=Math.floor((r-1)/4); if(!teams[t]) teams[t]=[];
+      if(name===""||/^blind\b/i.test(name)) continue;
+      teams[t].push(name); any=true;
+    }
+    if(!any) continue;
+    var week=parseLogDate(head[c]);
+    if(!week){ if(/\d/.test(String(head[c]||""))) bad.push(String(head[c]).trim()); continue; }
+    byWeek[week]=teams;
+  }
+  var rounds=Object.keys(byWeek).sort().map(function(w){ return {week:w,teams:byWeek[w]}; });
+  return {rounds:rounds,bad:bad};
+}
+
+/**
+ * WHAT THE LOG MEANS FOR THIS WEEK. Only rounds dated before this Friday
+ * count: Rob logs on Monday for the round still to come, so a column dated
+ * this Friday or later is an unplayed round, never "last week". Only pairs
+ * of two men both playing this week matter.
  *
- * `again` picks at random among the best, so a second tap gives a different
- * answer even with no history to steer by. Any man may move anywhere except
- * a locked one.
+ *  · recent — together in either of the last two rounds: the soft preference.
+ *  · barred — together in BOTH of the last two: the rule. One week is fine.
+ *  · weeks  — for each recent pair, how many weeks running it would be if
+ *             they were together again this week, read as far back as the
+ *             log goes. Used only to say so on screen.
+ */
+function pairHistory(rounds,week,men){
+  var here={},played=[],i,j;
+  for(i=0;i<men.length;i++) here[nameKey(men[i].name)]=true;
+  for(i=0;i<(rounds||[]).length;i++) if(rounds[i]&&rounds[i].week<week) played.push(rounds[i]);
+  var sets=played.map(function(r){
+    var s={},keys=pairKeys((r.teams||[]).map(function(t){ return t.map(function(n){ return {name:n}; }); }));
+    for(var k=0;k<keys.length;k++){ var p=keys[k].split("|"); if(here[p[0]]&&here[p[1]]) s[keys[k]]=true; }
+    return s;
+  });
+  var n=sets.length,recent={},barred={},weeks={};
+  for(i=Math.max(0,n-2);i<n;i++) for(var k in sets[i]) recent[k]=true;
+  if(n>=2) for(var b in sets[n-1]) if(sets[n-2][b]) barred[b]=true;
+  for(var p in recent){ var w=1; for(j=n-1;j>=0&&sets[j][p];j--) w++; weeks[p]=w; }
+  return {recent:recent,barred:barred,weeks:weeks,rounds:played.slice(-2).map(function(r){ return r.week; })};
+}
+
+/**
+ * MAKE THE TEAMS. TRIES fresh random starts, each improved by swaps until no
+ * swap helps. In order:
+ *
+ *  1. THE PAIR RULE — fewest barred pairs together, but only among teams
+ *     within MAX_DRIFT strokes (or within EVEN_SLACK of the most even, if
+ *     even that is wider). Past the ceiling, balance wins and the pair is
+ *     allowed. Locks win too.
+ *  2. EVENNESS — within EVEN_SLACK of the most even left.
+ *  3. RECENT PARTNERS — fewest repeats of the last two rounds' pairings.
+ *
+ * It never refuses: every barred pair it had to allow comes back in
+ * `allowed`, with why. `again` picks at random among the best, so a second
+ * tap gives a different answer. Any man may move anywhere except a locked one.
  */
 function makeTeams(men,opts){
   opts=opts||{};
   var T=teamCount(men.length);
-  if(T===0) return {teams:[],repeats:0,recent:0};
+  if(T===0) return {teams:[],repeats:0,recent:0,allowed:{}};
   var deal=dealOrder(men),locks=opts.locks||{},rand=opts.rand||Math.random;
-  var recent=recentPairs(opts.history,opts.week,men),nRecent=Object.keys(recent).length;
+  var ph=opts.pairs||{},recent=ph.recent||{},barred=ph.barred||{},nRecent=Object.keys(recent).length;
+  var bar=Object.keys(barred).length?barTable(men,barred):null;
   var seated=seatFixed(deal,T,locks),fixedSet=[],i,t;
   for(t=0;t<T;t++) for(i=0;i<seated.teams[t].length;i++) fixedSet.push(seated.teams[t][i]);
   var all=[],tries=Math.max(1,opts.tries==null?TRIES:opts.tries);
+  var keep=function(ts){ var c=ts.map(seatOrder); all.push({teams:c,b:repeatsIn(c,barred),r:repeatsIn(c,recent),s:spread(c)}); };
   for(i=0;i<tries;i++){
-    var c=climb(fillSeats(seated.teams,seated.free,rand),fixedSet).map(seatOrder);
-    all.push({teams:c,r:repeatsIn(c,recent),s:spread(c)});
+    var start=fillSeats(seated.teams,seated.free,rand);
+    if(bar) keep(climb(start.map(function(x){ return x.slice(); }),fixedSet,bar));
+    keep(climb(start,fixedSet));
   }
-  var limit=Math.min.apply(null,all.map(function(c){ return c.s; }))+EVEN_SLACK;
-  var cands=all.filter(function(c){ return c.s<=limit+1e-9; });
-  var bestR=Math.min.apply(null,cands.map(function(c){ return c.r; }));
+  var min=function(xs,f){ return Math.min.apply(null,xs.map(f)); };
+  var cap=Math.max(MAX_DRIFT,min(all,function(c){ return c.s; })+EVEN_SLACK);
+  var cands=all.filter(function(c){ return c.s<=cap+1e-9; });
+  var bestB=min(cands,function(c){ return c.b; });
+  cands=cands.filter(function(c){ return c.b===bestB; });
+  var limit=min(cands,function(c){ return c.s; })+EVEN_SLACK;
+  cands=cands.filter(function(c){ return c.s<=limit+1e-9; });
+  var bestR=min(cands,function(c){ return c.r; });
   var best=cands.filter(function(c){ return c.r===bestR; });
   var pick;
   if(opts.again){
@@ -357,7 +476,15 @@ function makeTeams(men,opts){
   } else {
     pick=best.slice().sort(function(a,b){ return a.s-b.s; })[0];
   }
-  return {teams:pick.teams,repeats:pick.r,recent:nRecent};
+  // Why each barred pair still together is there: both locked on one team,
+  // or splitting it was only found past the ceiling, or not found at all.
+  var lockedKeys={},allowed={},past=min(all,function(c){ return c.b; })<bestB;
+  pairKeys(seated.teams.map(function(tm){ return tm.filter(function(m){ return !m.blind&&locks[m.name]!=null; }); }))
+    .forEach(function(k){ lockedKeys[k]=true; });
+  pairKeys(pick.teams).forEach(function(k){
+    if(barred[k]) allowed[k]=lockedKeys[k]?"lock":past?"balance":"stuck";
+  });
+  return {teams:pick.teams,repeats:pick.r,recent:nRecent,allowed:allowed};
 }
 
 /** Swap two men between (or within) teams, then re-letter both teams. */
@@ -399,26 +526,61 @@ function weekKey(now){
   return d.toISOString().slice(0,10);
 }
 
-/** This week's pairings in, the same week's older copy out, the newest three kept. */
-function rememberWeek(history,week,teams){
-  var h=(history||[]).filter(function(x){ return x&&x.week!==week; });
-  h.push({week:week,pairs:pairKeys(teams)});
-  h.sort(function(a,b){ return a.week<b.week?-1:a.week>b.week?1:0; });
-  return h.slice(-3);
+/* ---------- what the history says, in words ---------- */
+
+/** "2026-10-23" as "23 Oct". */
+function shortDate(w){
+  return +w.slice(8,10)+" "+["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][+w.slice(5,7)-1];
+}
+function ordinal(n){
+  var t=n%100,s=(t>=11&&t<=13)?"th":["th","st","nd","rd"][n%10]||"th";
+  return n+s;
 }
 
-/* ---------- the phone's memory, guarded ----------
-   Storage throws in a private window and comes back empty after a history
-   clear. Without it the page still makes even teams. */
-function loadHistory(){
-  try { var v=JSON.parse(localStorage.getItem(HISTORY_KEY)||"[]"); return Array.isArray(v)?v:[]; }
-  catch(e){ return []; }
+/**
+ * WHICH ROUNDS WERE READ — the staleness guard. If Rob forgets to log a week
+ * this line shows an old date, where the browser memory used to fail silently.
+ */
+function historyLine(log,ph){
+  if(!log||log.state==="unset") return "History: the Pairs log address isn't set yet, so no history was used.";
+  if(log.state==="fail") return "Couldn't read the Pairs log, so no history was used. The teams are even; partners weren't checked.";
+  var r=ph.rounds,out;
+  if(r.length===0) out="History: no rounds in the Pairs log before this Friday, so no history was used.";
+  else if(r.length===1) out="History: round of "+shortDate(r[0])+" only. The two-week rule needs two.";
+  else out="History: rounds of "+shortDate(r[0])+" and "+shortDate(r[1])+".";
+  if(log.bad&&log.bad.length) out+=" Couldn't read the date on "+(log.bad.length===1?"one column":log.bad.length+" columns")+
+    " of the Pairs log ("+log.bad.join("; ")+"), so "+(log.bad.length===1?"it was":"they were")+" left out.";
+  return out;
 }
-function saveHistory(h){ try { localStorage.setItem(HISTORY_KEY,JSON.stringify(h)); } catch(e){} }
+
+/**
+ * EVERY BARRED PAIR ON THE TEAMS AS THEY STAND, in words — after a hand swap
+ * too. `why` is makeTeams' reason; a pair it didn't make was put there by
+ * hand, unless both men are locked on that team.
+ */
+function allowedLines(teams,ph,why,locks){
+  var shown={},out=[],t,i,j;
+  for(t=0;t<teams.length;t++){
+    var real=teams[t].filter(function(m){ return !m.blind; });
+    for(i=0;i<real.length;i++) for(j=i+1;j<real.length;j++){
+      var a=real[i],b=real[j],k=[nameKey(a.name),nameKey(b.name)].sort().join("|");
+      if(!ph.barred[k]||shown[k]) continue;
+      shown[k]=true;
+      var w=locks&&locks[a.name]===t&&locks[b.name]===t?"lock":(why&&why[k])||"hand";
+      out.push("Had to allow "+a.name+" & "+b.name+" — together a "+ordinal(ph.weeks[k]||3)+" week running, "+({
+        lock:"because both are locked on this team.",
+        balance:"because splitting them pushed the gap past "+MAX_DRIFT.toFixed(1)+" strokes.",
+        stuck:"because no way to split them was found.",
+        hand:"because they were swapped together by hand."
+      })[w]);
+    }
+  }
+  return out;
+}
 
 /* ---------- the screen ---------- */
 
-var S={men:[],teams:[],locks:{},sel:null,result:null};
+var S={men:[],teams:[],locks:{},sel:null,result:null,log:null,ph:null};
 var $=function(id){ return document.getElementById(id); };
 var fmt=function(v){ return v==null?"no index":(v<0?"+"+(-v).toFixed(1):v.toFixed(1)); };
 
@@ -479,25 +641,28 @@ function drawNotes(){
   if(!S.teams.length) return;
   var blinds=0; S.teams.forEach(function(t){ t.forEach(function(m){ if(m.blind) blinds++; }); });
   if(blinds) add(blinds===1?"1 BLIND fills an empty seat.":blinds+" BLINDs fill the empty seats, one per team.");
-  var r=S.result;
-  if(r&&r.recent) add("Avoided "+(r.recent-repeatsIn(S.teams,recentPairs(loadHistory(),weekKey(),S.men)))+" of "+r.recent+" recent pairings.");
+  var ph=S.ph,nRecent=ph?Object.keys(ph.recent).length:0;
+  if(nRecent) add("Avoided "+(nRecent-repeatsIn(S.teams,ph.recent))+" of "+nRecent+" recent pairings.");
+  if(ph) allowedLines(S.teams,ph,S.result&&S.result.allowed,S.locks).forEach(add);
+  add(historyLine(S.log,ph||{rounds:[]}));
   add("Gap between the heaviest and lightest team: "+spread(S.teams).toFixed(1)+" strokes"+
     (blinds?", counted man for man so a team with a BLIND isn't counted light.":"."));
 }
 
 function make(again){
-  var res=makeTeams(S.men,{locks:S.locks,history:loadHistory(),week:weekKey(),again:again,current:S.teams});
+  S.ph=S.log&&S.log.state==="ok"?pairHistory(S.log.rounds,weekKey(),S.men):null;
+  var res=makeTeams(S.men,{locks:S.locks,pairs:S.ph||undefined,again:again,current:S.teams});
   S.teams=res.teams; S.result=res; S.sel=null; S.locks=relock();
   $("make").classList.add("hide"); $("after").classList.remove("hide"); $("copied").textContent="";
   drawTeams();
 }
 
-$("make").addEventListener("click",function(){ make(false); });
-$("again").addEventListener("click",function(){ make(true); });
+// A tap before the Pairs log is in waits for it (eight seconds at most).
+$("make").addEventListener("click",function(){ pairsRead.then(function(){ make(false); }); });
+$("again").addEventListener("click",function(){ pairsRead.then(function(){ make(true); }); });
 
 $("copy").addEventListener("click",function(){
   var text=copyText(S.teams);
-  saveHistory(rememberWeek(loadHistory(),weekKey(),S.teams));
   var done=function(){ $("copied").textContent="Copied. Select A4:A27 in Players, press Delete, then click in A4 and paste."; };
   var fallback=function(){
     try {
@@ -545,6 +710,31 @@ function readRoll(){
     say("Couldn't reach the roll call. Check the signal, then reload this page.",true);
   });
 }
+
+/**
+ * READ THE PAIRS LOG, the same way: cache-busted and no-store. It never
+ * blocks — if it can't be read, the teams are still made, evenly, and the
+ * screen says no history was used.
+ */
+function readPairs(){
+  if(!/^https?:\/\/\S+$/.test(PAIRS_CSV)){ S.log={state:"unset"}; return Promise.resolve(); }
+  var url=PAIRS_CSV+(PAIRS_CSV.indexOf("?")<0?"?":"&")+"cachebust="+Date.now();
+  var ctl=window.AbortController?new AbortController():null;
+  var stop=ctl?setTimeout(function(){ ctl.abort(); },8000):null;
+  return fetch(url,{cache:"no-store",signal:ctl?ctl.signal:undefined}).then(function(r){
+    if(stop) clearTimeout(stop);
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    return r.text();
+  }).then(function(text){
+    if(/^\s*</.test(text)) throw new Error("not a CSV");
+    var got=parsePairsLog(text);
+    S.log={state:"ok",rounds:got.rounds,bad:got.bad};
+  }).catch(function(){
+    if(stop) clearTimeout(stop);
+    S.log={state:"fail"};
+  });
+}
+var pairsRead=readPairs();
 readRoll();
 </script>
 </body>

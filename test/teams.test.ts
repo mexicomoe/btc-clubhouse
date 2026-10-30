@@ -12,6 +12,9 @@
  *  · locks kept through a reshuffle, swaps re-lettered
  *  · Copy: 24 lines, team then seat, names exactly as the feed spelled them
  *  · recent partners leaned away from, and never a refusal over it
+ *  · the Pairs log: no two men together three weeks running, unless a lock
+ *    or the 2.0-stroke ceiling forces it, and then said by name
+ *  · no browser memory anywhere: the sheet is the only history
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -36,11 +39,12 @@ function varSource(name: string): string {
 }
 
 const FNS = ["parseCsv", "parseIndex", "parseRoll", "teamCount", "dealOrder", "teamTotal",
-  "teamWeight", "spread", "seatOrder", "seatFixed", "fillSeats", "unevenness", "lessUneven", "climb", "pairKeys",
-  "recentPairs", "repeatsIn", "makeTeams", "swapMen", "copyText", "weekKey", "rememberWeek"];
+  "teamWeight", "spread", "seatOrder", "seatFixed", "fillSeats", "unevenness", "lessUneven", "climb", "nameKey",
+  "pairKeys", "repeatsIn", "barTable", "barredIn", "parseLogDate", "parsePairsLog", "pairHistory", "makeTeams", "swapMen", "copyText",
+  "weekKey", "shortDate", "ordinal", "historyLine", "allowedLines"];
 const P = new Function(
-  ["ROLL_CSV", "MAX_TEAMS", "EVEN_SLACK", "TRIES"].map(varSource).join("\n") + "\n" +
-  FNS.map(fnSource).join("\n") + "\nreturn {MAX_TEAMS,ROLL_CSV," + FNS.join(",") + "};")() as any;
+  ["ROLL_CSV", "PAIRS_CSV", "MAX_TEAMS", "EVEN_SLACK", "MAX_DRIFT", "TRIES"].map(varSource).join("\n") + "\n" +
+  FNS.map(fnSource).join("\n") + "\nreturn {MAX_TEAMS,MAX_DRIFT,ROLL_CSV," + FNS.join(",") + "};")() as any;
 
 /** A seeded random source, so a reshuffle is the same reshuffle every run. */
 function seeded(seed: number) {
@@ -246,43 +250,201 @@ test("making them again gives a different set of teams", () => {
   assert.notDeepEqual(names(again).sort(), names(first).sort());
 });
 
-/* ---------- last week's partners ---------- */
+/* ---------- the Pairs log ---------- */
 
-test("recent partners are leaned away from", () => {
-  const men = field(16);
-  const lastWeek = P.makeTeams(men, { rand: seeded(1) }).teams;
-  const history = P.rememberWeek([], "2026-10-16", lastWeek);
-  const r = P.makeTeams(men, { history, week: "2026-10-23", rand: seeded(3) });
+/** A published Pairs log: column A Rob's seat labels, then row 1 the dates, rows 2-25 the seats. */
+const SEAT_LABELS = Array.from({ length: 24 }, (_, i) => (Math.floor(i / 4) + 1) + "ABCD"[i % 4]);
+function logCsv(cols: { date: string; names: string[] }[], labelHead = "") {
+  const q = (x: string) => '"' + x.replace(/"/g, '""') + '"';
+  cols = [{ date: labelHead, names: SEAT_LABELS }, ...cols];
+  const rows = [cols.map(c => q(c.date))];
+  for (let r = 0; r < 24; r++) rows.push(cols.map(c => q(c.names[r] ?? "")));
+  return rows.map(r => r.join(",")).join("\r\n");
+}
+/** Teams of letters, e.g. ["ABCD","EFGH"], as a column of "Man, X" names. */
+const col = (date: string, teams: string[]) =>
+  ({ date, names: teams.flatMap(t => t.padEnd(4, " ").split("").map(ch => ch === " " ? "" : ch === "*" ? "BLIND" : "Man, " + ch)) });
+const key = (a: string, b: string) => [P.nameKey("Man, " + a), P.nameKey("Man, " + b)].sort().join("|");
+const together = (teams: any[], a: string, b: string) =>
+  teams.some((t: any[]) => t.some(m => m.name === "Man, " + a) && t.some(m => m.name === "Man, " + b));
+const men = (spec: Record<string, number>) => Object.entries(spec).map(([k, v]) => ({ name: "Man, " + k, index: v, tee: "IV" }));
+
+test("the log is read as rounds: a comma in every name, BLIND and blanks dropped, six teams to row 25", () => {
+  const names = Array.from({ length: 24 }, (_, i) => "Surname" + i + ", First");
+  names[3] = "BLIND"; names[22] = ""; names[23] = "  Spaced ,  Out ";
+  const got = P.parsePairsLog(logCsv([{ date: "10/16/2026", names }]));
+  assert.equal(got.rounds.length, 1);
+  assert.equal(got.rounds[0].week, "2026-10-16");
+  assert.equal(got.rounds[0].teams.length, 6, "rows 22-25 are a sixth team");
+  assert.deepEqual(got.rounds[0].teams[0], ["Surname0, First", "Surname1, First", "Surname2, First"]);
+  assert.deepEqual(got.rounds[0].teams[5], ["Surname20, First", "Surname21, First", "Spaced , Out"]);
+});
+
+test("column A, Rob's seat labels, is never a round — even with a date above it", () => {
+  for (const head of ["", "Seat", "10/16/2026"]) {
+    const got = P.parsePairsLog(logCsv([col("10/23/2026", ["ABCD"])], head));
+    assert.deepEqual(got.rounds.map((r: any) => r.week), ["2026-10-23"], "A1 = " + JSON.stringify(head));
+    assert.deepEqual(got.bad, []);
+  }
+});
+
+test("round dates are read in the forms a sheet publishes, and a bad one is reported, not guessed", () => {
+  assert.equal(P.parseLogDate("2026-10-23"), "2026-10-23");
+  assert.equal(P.parseLogDate("10/23/2026"), "2026-10-23");
+  assert.equal(P.parseLogDate("Oct 23, 2026"), "2026-10-23");
+  assert.equal(P.parseLogDate("Fri 23 Oct"), null, "no year, not trusted");
+  assert.equal(P.parseLogDate(""), null);
+  const got = P.parsePairsLog(logCsv([col("Seat", ["ABCD"]), col("23/10", ["ABCD"]), col("2026-10-23", ["EFGH"])]));
+  assert.deepEqual(got.bad, ["23/10"], "a label column with no digits is not a round, and not a complaint");
+  assert.deepEqual(got.rounds.map((r: any) => r.week), ["2026-10-23"]);
+});
+
+test("rounds come out oldest first, whatever the column order", () => {
+  const got = P.parsePairsLog(logCsv([col("2026-10-23", ["ABCD"]), col("2026-10-09", ["ABCD"]), col("2026-10-16", ["ABCD"])]));
+  assert.deepEqual(got.rounds.map((r: any) => r.week), ["2026-10-09", "2026-10-16", "2026-10-23"]);
+});
+
+test("a column dated this Friday or later is an unplayed round and does not count", () => {
+  const { rounds } = P.parsePairsLog(logCsv([
+    col("2026-10-16", ["ABCD"]), col("2026-10-23", ["ABCD"]), col("2026-10-30", ["ABCD"]), col("2026-11-06", ["ABCD"])]));
+  const ph = P.pairHistory(rounds, "2026-10-30", field(8));
+  assert.deepEqual(ph.rounds, ["2026-10-16", "2026-10-23"]);
+  assert.ok(ph.barred[key("A", "B")]);
+});
+
+test("barred only if together in BOTH of the last two rounds; one week is fine", () => {
+  const { rounds } = P.parsePairsLog(logCsv([
+    col("2026-10-09", ["EFGH"]),
+    col("2026-10-16", ["ABCD", "EFGH"]),
+    col("2026-10-23", ["ABEF", "CDGH"]),
+  ]));
+  const ph = P.pairHistory(rounds, "2026-10-30", field(8));
+  assert.deepEqual(Object.keys(ph.barred).sort(), [key("A", "B"), key("C", "D"), key("E", "F"), key("G", "H")].sort());
+  assert.ok(ph.recent[key("A", "C")] && !ph.barred[key("A", "C")], "together once: recent, not barred");
+  assert.ok(!ph.recent[key("A", "H")]);
+  assert.equal(ph.weeks[key("A", "B")], 3, "two weeks logged, so this would be the third");
+  assert.equal(ph.weeks[key("E", "F")], 4, "three weeks logged");
+  assert.equal(ph.weeks[key("A", "C")], 1, "apart last week, so the run starts again");
+});
+
+test("only pairs of two men both playing this week count", () => {
+  const { rounds } = P.parsePairsLog(logCsv([col("2026-10-16", ["ABYZ"]), col("2026-10-23", ["ABYZ"])]));
+  const ph = P.pairHistory(rounds, "2026-10-30", field(8));
+  assert.deepEqual(Object.keys(ph.barred), [key("A", "B")]);
+});
+
+test("names match across the feed and the log despite case and spacing", () => {
+  const { rounds } = P.parsePairsLog(logCsv([
+    { date: "2026-10-16", names: ["SMITH,  Joe", "jones, bob"] }, { date: "2026-10-23", names: ["Smith, Joe ", "Jones, Bob"] }]));
+  const ph = P.pairHistory(rounds, "2026-10-30", [{ name: "Smith, Joe", index: 20 }, { name: "Jones, Bob", index: 21 }]);
+  assert.equal(Object.keys(ph.barred).length, 1);
+});
+
+test("with one round logged nobody is barred, but last week's partners are still leaned away from", () => {
+  const { rounds } = P.parsePairsLog(logCsv([col("2026-10-23", ["ABCD", "EFGH"])]));
+  const ph = P.pairHistory(rounds, "2026-10-30", field(8));
+  assert.equal(Object.keys(ph.barred).length, 0);
+  assert.equal(Object.keys(ph.recent).length, 12);
+});
+
+/* ---------- the rule at work ---------- */
+
+test("a barred pair is split when it costs little", () => {
+  // Rob's spread of indexes; A and B were together the last two weeks.
+  const m = field(16);
+  const { rounds } = P.parsePairsLog(logCsv([col("2026-10-16", ["ABCD", "EFGH", "IJKL", "MNOP"]), col("2026-10-23", ["ABEF", "CDGH", "IJMN", "KLOP"])]));
+  const ph = P.pairHistory(rounds, "2026-10-30", m);
+  for (let s = 1; s <= 5; s++) {
+    const r = P.makeTeams(m, { pairs: ph, rand: seeded(s) });
+    assert.equal(Object.keys(r.allowed).length, 0, "seed " + s);
+    for (const [a, b] of [["A", "B"], ["I", "J"], ["K", "L"], ["O", "P"]]) assert.ok(!together(r.teams, a, b), a + b + " seed " + s);
+    assert.ok(P.spread(r.teams) <= P.MAX_DRIFT + 1e-9);
+  }
+});
+
+test("the ceiling: split at exactly 2.0 strokes, allowed past it", () => {
+  const log = P.parsePairsLog(logCsv([col("2026-10-16", ["XY"]), col("2026-10-23", ["XY"])]));
+  // Splitting X and Y costs a 2.0 gap: split.
+  const at = men({ X: 19, Y: 21, C: 20, D: 20, E: 20, F: 20, G: 20, H: 20 });
+  const r1 = P.makeTeams(at, { pairs: P.pairHistory(log.rounds, "2026-10-30", at), rand: seeded(2) });
+  assert.ok(!together(r1.teams, "X", "Y"));
+  assert.equal(P.spread(r1.teams), 2);
+  // 2.2: balance wins, the pair is allowed, and why is recorded.
+  const past = men({ X: 18.9, Y: 21.1, C: 20, D: 20, E: 20, F: 20, G: 20, H: 20 });
+  const r2 = P.makeTeams(past, { pairs: P.pairHistory(log.rounds, "2026-10-30", past), rand: seeded(2) });
+  assert.ok(together(r2.teams, "X", "Y"));
+  assert.equal(P.spread(r2.teams), 0);
+  assert.deepEqual(r2.allowed, { [key("X", "Y")]: "balance" });
+});
+
+test("Rob's 6.5-stroke failure can't come back through the pair rule", () => {
+  // The 38.9 man is the one far out: barring him from the three lowest must
+  // not drag the field to a lopsided split.
+  const m = men({ Z: 38.9, A: 19, B: 19.5, C: 20, D: 24, E: 25, F: 25.5, G: 26, H: 26.5, I: 27, J: 27.5, K: 28 });
+  const { rounds } = P.parsePairsLog(logCsv([col("2026-10-16", ["ZABC"]), col("2026-10-23", ["ZABC"])]));
+  const r = P.makeTeams(m, { pairs: P.pairHistory(rounds, "2026-10-30", m), rand: seeded(4) });
+  assert.ok(P.spread(r.teams) <= P.MAX_DRIFT + 1e-9, "spread " + P.spread(r.teams));
+});
+
+test("locks win over the rule, and the lock is named as the cause", () => {
+  const m = field(8);
+  const { rounds } = P.parsePairsLog(logCsv([col("2026-10-16", ["AB"]), col("2026-10-23", ["AB"])]));
+  const r = P.makeTeams(m, { pairs: P.pairHistory(rounds, "2026-10-30", m), locks: { "Man, A": 1, "Man, B": 1 }, rand: seeded(1) });
+  assert.ok(together(r.teams, "A", "B"));
+  assert.deepEqual(r.allowed, { [key("A", "B")]: "lock" });
+});
+
+test("when there is no way round it, teams are still made and the pair is named", () => {
+  const m = field(4);
+  const { rounds } = P.parsePairsLog(logCsv([col("2026-10-16", ["ABCD"]), col("2026-10-23", ["ABCD"])]));
+  const r = P.makeTeams(m, { pairs: P.pairHistory(rounds, "2026-10-30", m), tries: 5 });
+  assert.equal(r.teams.length, 1);
+  assert.equal(Object.keys(r.allowed).length, 6);
+  assert.ok(Object.values(r.allowed).every(v => v === "stuck"));
+});
+
+test("recent partners are still leaned away from, under the rule", () => {
+  const m = field(16);
+  const lastWeek = P.makeTeams(m, { rand: seeded(1) }).teams;
+  const names = lastWeek.flat().map((x: any) => x.name);
+  const { rounds } = P.parsePairsLog(logCsv([{ date: "2026-10-23", names }]));
+  const r = P.makeTeams(m, { pairs: P.pairHistory(rounds, "2026-10-30", m), rand: seeded(3) });
   assert.equal(r.recent, 24, "16 men in 4 teams make 24 pairings");
   assert.ok(r.repeats <= 6, "repeats: " + r.repeats);
-  // Evenness first: within EVEN_SLACK of the most even found without history.
   assert.ok(P.spread(r.teams) <= P.spread(lastWeek) + 0.5 + 1e-9);
 });
 
-test("this week's own copy is not counted as last week", () => {
-  const men = field(16);
-  const teams = P.makeTeams(men, { tries: 1 }).teams;
-  const history = P.rememberWeek([], "2026-10-23", teams);
-  assert.equal(P.makeTeams(men, { history, week: "2026-10-23", tries: 0 }).recent, 0);
-});
-
-test("only pairings between two men playing this week count", () => {
-  const history = [{ week: "2026-10-16", pairs: ["Man, A|Man, B", "Man, A|Gone, Man"] }];
-  const r = P.makeTeams(field(16), { history, week: "2026-10-23", tries: 0 });
-  assert.equal(r.recent, 1);
-});
-
-test("three weeks are kept, and a second Copy in a week replaces the first", () => {
-  const t = P.makeTeams(field(8), { tries: 1 }).teams;
-  let h: any[] = [];
-  for (const w of ["2026-10-02", "2026-10-09", "2026-10-16", "2026-10-23", "2026-10-23"]) h = P.rememberWeek(h, w, t);
-  assert.deepEqual(h.map(x => x.week), ["2026-10-09", "2026-10-16", "2026-10-23"]);
-});
-
-test("with no memory at all it still makes teams", () => {
-  for (const history of [undefined, [], [null], [{}]]) {
-    assert.equal(P.makeTeams(field(12), { history, tries: 5 }).teams.length, 3);
+test("with no history at all, or a broken one, it still makes teams", () => {
+  for (const pairs of [undefined, {}, P.pairHistory([], "2026-10-30", field(12)), P.pairHistory([null, {}], "2026-10-30", field(12))]) {
+    assert.equal(P.makeTeams(field(12), { pairs, tries: 5 }).teams.length, 3);
   }
+  assert.deepEqual(P.parsePairsLog("").rounds, []);
+  assert.deepEqual(P.parsePairsLog("<!DOCTYPE html><html>Sign in</html>").rounds, []);
+});
+
+/* ---------- what the screen says ---------- */
+
+test("the history line names the rounds read, or says plainly that none were", () => {
+  const ph = (r: string[]) => ({ rounds: r });
+  assert.equal(P.historyLine({ state: "ok", bad: [] }, ph(["2026-10-16", "2026-10-23"])), "History: rounds of 16 Oct and 23 Oct.");
+  assert.match(P.historyLine({ state: "ok", bad: [] }, ph(["2026-10-23"])), /^History: round of 23 Oct only\. The two-week rule needs two\.$/);
+  assert.match(P.historyLine({ state: "ok", bad: [] }, ph([])), /no rounds in the Pairs log before this Friday/);
+  assert.match(P.historyLine({ state: "fail" }, ph([])), /^Couldn't read the Pairs log, so no history was used/);
+  assert.match(P.historyLine({ state: "unset" }, ph([])), /address isn't set yet/);
+  assert.match(P.historyLine({ state: "ok", bad: ["23/10"] }, ph(["2026-10-16", "2026-10-23"])), /Couldn't read the date on one column of the Pairs log \(23\/10\)/);
+});
+
+test("an allowed pair is said by name, with weeks running and why — a hand swap included", () => {
+  const m = field(8);
+  const { rounds } = P.parsePairsLog(logCsv([col("2026-10-09", ["AB"]), col("2026-10-16", ["AB"]), col("2026-10-23", ["AB"])]));
+  const ph = P.pairHistory(rounds, "2026-10-30", m);
+  const teams = [[m[0], m[1], m[2], m[3]], [m[4], m[5], m[6], m[7]]];
+  assert.deepEqual(P.allowedLines(teams, ph, { [key("A", "B")]: "balance" }, {}),
+    ["Had to allow Man, A & Man, B — together a 4th week running, because splitting them pushed the gap past 2.0 strokes."]);
+  assert.match(P.allowedLines(teams, ph, {}, {})[0], /because they were swapped together by hand\.$/);
+  assert.match(P.allowedLines(teams, ph, {}, { "Man, A": 0, "Man, B": 0 })[0], /because both are locked on this team\.$/);
+  assert.deepEqual(P.allowedLines([[m[0], m[2]], [m[1], m[3]]], ph, {}, {}), []);
+  assert.deepEqual([1, 2, 3, 4, 11, 12, 13, 21, 22].map(P.ordinal), ["1st", "2nd", "3rd", "4th", "11th", "12th", "13th", "21st", "22nd"]);
 });
 
 /* ---------- the Friday these teams are for ---------- */
@@ -298,11 +460,10 @@ test("the week is the coming Friday, in Florida time", () => {
 
 /* ---------- the guarded memory, and the eyesight floors ---------- */
 
-test("every storage read and write is wrapped", () => {
-  const uses = PAGE.match(/localStorage\.[a-zA-Z]+\(/g) || [];
-  assert.equal(uses.length, 2);
-  assert.match(fnSource("loadHistory"), /try \{[\s\S]*localStorage\.getItem[\s\S]*catch/);
-  assert.match(fnSource("saveHistory"), /try \{ localStorage\.setItem[\s\S]*catch/);
+test("no browser memory: the Pairs log is the only history", () => {
+  const code = PAGE.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+  assert.doesNotMatch(code, /localStorage|sessionStorage|indexedDB/);
+  assert.match(PAGE, /not put localStorage back/);
 });
 
 test("nothing is under 18px", () => {
