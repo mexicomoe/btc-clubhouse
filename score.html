@@ -743,13 +743,14 @@ function prettyCell(v){
  * sheet gives them. That is the whole of what the page knows about them.
  *
  *  · THE TEAM GAME: first row green, second yellow, gated on its own Thru.
+ *  · THE PAIRS GAME: the same. On a Twosomes week it IS the team board.
  *  · HIT LIST: no Thru of its own, so it waits on CLUBHOUSE — the same field
  *    of men. Green only, and EVERY row level with the first on Score: ties at
  *    the top are the normal case there, and one green row would look broken.
  *    The sheet already sorts it best-first, so "level with the first" needs
  *    no idea of whether lower or higher is better.
  */
-var PODIUM_BOARDS = {"THE TEAM GAME":{}, "HIT LIST":{doneBy:"CLUBHOUSE", tiesOn:"score"}};
+var PODIUM_BOARDS = {"THE TEAM GAME":{}, "THE PAIRS GAME":{}, "HIT LIST":{doneBy:"CLUBHOUSE", tiesOn:"score"}};
 
 /**
  * THE ORDER THE BOARDS ARE DRAWN IN. The named boards first, in this order;
