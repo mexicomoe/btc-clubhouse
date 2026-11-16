@@ -46,13 +46,14 @@ function varSource(name: string): string {
 }
 
 const LIFTED = [
-  "FORM_TEAM", "FORM_HOLE", "FORM_SEAT", "PAR", "PODIUM_BOARDS", "BOARD_ORDER",
+  "FORM_TEAM", "FORM_HOLE", "FORM_SEAT", "PAR", "CONFIRM_AFTER", "PODIUM_BOARDS", "BOARD_ORDER",
 ].map(varSource).join("\n") + "\n" + [
   "parseCsv", "parseFeed", "isEmptySeat", "displayName", "firstName", "parOf",
   "scoreButtons", "nextHole", "prevHole", "playIndex", "feedSentHoles",
   "feedHoleLine", "parseStart", "outStretches", "outFrom", "setOut", "isOut", "playingSeats", "missingMan", "sendBody",
   "sendId", "outboxNext", "parseBoards", "prettyCell",
   "cardCell", "mineForTeam", "ackedForTeam", "queueWords",
+  "readBack", "sheetLine", "sheetWords",
   "colAt", "boardDone", "podiumClasses", "grossTotal", "titleKey", "orderBoards",
 ].map(fnSource).join("\n");
 
@@ -62,6 +63,7 @@ const P = new Function(LIFTED + "\nreturn {" + [
   "feedHoleLine", "parseStart", "outStretches", "outFrom", "setOut", "isOut", "playingSeats", "missingMan", "sendBody",
   "sendId", "outboxNext", "parseBoards", "prettyCell",
   "cardCell", "mineForTeam", "ackedForTeam", "queueWords",
+  "readBack", "sheetLine", "sheetWords",
   "colAt", "boardDone", "podiumClasses", "grossTotal", "titleKey", "orderBoards",
 ].join(",") + "};")() as any;
 
@@ -893,4 +895,57 @@ test("picks.html is untouched by any of this", () => {
   const PICKS = readFileSync(new URL("../picks.html", import.meta.url), "utf8");
   assert.match(PICKS, /1FAIpQLSdbtFLO94Gq1RYC2-YJm-pDK1OMuBy8kzdkvY7MvfmOh8Fnuw/);
   assert.equal(PICKS.indexOf("1FAIpQLSemQD14"), -1);
+});
+
+/* ---------- read-back: the sheet is the receipt ---------- */
+
+const RB_FEED = (h1: string[]) => P.parseFeed(
+  "team,start,seat,name," + Array.from({length: 18}, (_, i) => "h" + (i + 1)).join(",") + "\n" +
+  ["\"Tanenbaum, Rob\"", "\"Schwartz, Harvey\"", "\"Horvitz, Stu\"", ""].map((nm, i) =>
+    "1,1," + (i + 1) + "," + nm + "," + (h1[i] ?? "") + ",".repeat(17)).join("\n"))[0];
+const TEN = 600000;
+const SENT = {team: 1, hole: 1, scores: {1: 5, 2: 6, 3: 4}, at: 1000};
+
+test("a hole is confirmed only when the sheet shows the numbers this phone sent", () => {
+  assert.equal(P.readBack(SENT, RB_FEED(["5", "6", "4"]), 0), "in");
+  // Came back, not in the feed yet, and the feed has not been read late enough.
+  assert.equal(P.readBack(SENT, RB_FEED([]), 0), "waiting");
+  assert.equal(P.readBack(SENT, RB_FEED([]), 1000 + TEN - 1), "waiting");
+  // A fresh read ten minutes on and still nothing: it never landed.
+  assert.equal(P.readBack(SENT, RB_FEED([]), 1000 + TEN), "missing");
+  // No feed for the team at all is not proof of anything until it is late.
+  assert.equal(P.readBack(SENT, undefined, 0), "waiting");
+});
+
+test("a hole Rob changed on the sheet is never called missing", () => {
+  // "missing" is what offers Send again, and sending again would put the old
+  // numbers back over his correction. Different numbers are "differs".
+  assert.equal(P.readBack(SENT, RB_FEED(["5", "7", "4"]), 1000 + TEN), "differs");
+  assert.equal(P.readBack(SENT, RB_FEED(["5", "7", "4"]), 0), "waiting");
+  // One man's score in the sheet and the others not is still not "in".
+  assert.equal(P.readBack(SENT, RB_FEED(["5"]), 1000 + TEN), "differs");
+});
+
+test("the page never sends a hole again on its own", () => {
+  // checkSheet reads and says. Only the Send again button queues anything.
+  assert.doesNotMatch(fnSource("checkSheet"), /queueSend|postOnce|drainOutbox/);
+  assert.match(fnSource("sendMissing"), /w\.state==="missing"/);
+  assert.match(PAGE, /\$\("sheetAgain"\)\.addEventListener\("click",function\(\)\{ sendMissing\(\); \}\);/);
+  // The stored copy of the feed proves nothing about now.
+  assert.match(fnSource("checkSheet"), /S\.fresh\?S\.stamp:0/);
+  // Every send that comes back is watched, and every feed read checks them.
+  assert.match(fnSource("markDone"), /S\.watch\.push\(/);
+  assert.match(fnSource("fetchFeed"), /checkSheet\(\);/);
+});
+
+test("the receipt line counts what the sheet has shown", () => {
+  assert.equal(P.sheetLine(0, 0, []), "");
+  assert.equal(P.sheetLine(12, 12, []), "The sheet has all 12 of your holes.");
+  assert.equal(P.sheetLine(11, 12, [12]),
+    "The sheet has 11 of your 12 holes. Hole 12 is on the way \u2014 it takes about 5 minutes.");
+  assert.equal(P.sheetLine(9, 12, [12, 11]),
+    "The sheet has 9 of your 12 holes. Holes 11, 12 are on the way \u2014 it takes about 5 minutes.");
+  assert.equal(P.sheetWords([7], []), "Hole 7 is NOT in the sheet. Tap Send again.");
+  assert.match(P.sheetWords([], [3]), /^Hole 3: the sheet shows different numbers/);
+  assert.equal(P.sheetWords([], []), "");
 });
