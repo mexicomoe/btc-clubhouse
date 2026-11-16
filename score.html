@@ -91,6 +91,13 @@ header{
   background:var(--waitfill);color:var(--wait);font-size:19px;font-weight:800;
 }
 
+/* The sheet does not have a hole this phone sent. Same amber, said in words. */
+#sheetBar{
+  margin:8px 0 0;padding:12px;border:3px solid var(--wait);
+  background:var(--waitfill);color:var(--wait);font-size:19px;font-weight:800;
+}
+#sheetLine{font-size:18px;font-weight:700;margin:6px 0;}
+
 /* ---------- buttons ---------- */
 button{
   /* NOT the `font:` shorthand. `inherit` is not a legal family inside it, so
@@ -208,6 +215,8 @@ footer{margin:22px 0 10px;border-top:3px solid var(--ink);padding-top:12px;}
 </header>
 
 <div id="queueBar" class="hide"></div>
+<div id="sheetBar" class="hide"><span id="sheetWords"></span>
+  <button id="sheetAgain" class="wide go hide">Send again</button></div>
 
 <!-- 1 · WHICH TEAM. His own name on the button is the whole identification. -->
 <section id="screenPick" class="hide">
@@ -236,6 +245,7 @@ footer{margin:22px 0 10px;border-top:3px solid var(--ink);padding-top:12px;}
   <div id="menList"></div>
   <button id="toReview" class="wide go">Review</button>
   <p id="scoreMsg"></p>
+  <p id="sheetLine"></p>
   <div id="gridWrap">
     <div class="gridRow" id="gridTop"></div>
     <div class="gridRow" id="gridBot"></div>
@@ -388,6 +398,9 @@ var FEED_EVERY = 60000;
 var RETRY_EVERY = 20000;
 /* How long one send may take before it is called no signal and held. */
 var SEND_TIMEOUT = 15000;
+/* How long the sheet is given to show a hole before the page says it is not
+   there. The published feed runs about five minutes behind, so ten. */
+var CONFIRM_AFTER = 600000;
 
 /* ==================================================================
  * THE PARTS WITH NO SCREEN IN THEM
@@ -900,6 +913,64 @@ function outboxNext(queue){
   return best;
 }
 
+/**
+ * READ-BACK: IS A HOLE THIS PHONE SENT ACTUALLY IN THE SHEET?
+ *
+ * "Sent" only ever meant the request came back. Google's answer cannot be
+ * read from a web page, so a send Google threw away looks the same as one it
+ * took. The feed is the only real receipt, and this is the page reading it.
+ *
+ *   "in"      the sheet shows the numbers this phone sent
+ *   "waiting" too soon to say — the feed runs about five minutes behind
+ *   "missing" the feed was read fresh, long enough after, and the hole is
+ *             not there at all
+ *   "differs" the sheet has the hole, with other numbers. Somebody changed
+ *             it — Rob on the sheet, or another phone. THE SHEET WINS, and
+ *             this is never sent again on its own: sending it would put the
+ *             old numbers back over a correction.
+ *
+ * `feedAt` is when the feed was last read FROM THE NETWORK, or 0. The phone's
+ * own stored copy of the feed proves nothing about now.
+ */
+function readBack(item,team,feedAt){
+  var s,any=false,same=!!team;
+  for(s=1;s<=4;s++){
+    if(!item.scores||item.scores[s]==null) continue;
+    any=true;
+    var seat=team?team.seats[s-1]:null;
+    if(!seat||seat.holes[item.hole-1]==null||Number(seat.holes[item.hole-1])!==Number(item.scores[s])) same=false;
+  }
+  if(!any||same) return "in";
+  if(!(feedAt>=item.at+CONFIRM_AFTER)) return "waiting";
+  return feedSentHoles(team)[item.hole]?"differs":"missing";
+}
+
+/**
+ * THE STANDING LINE UNDER THE SCORE BUTTONS: how many of this phone's holes
+ * the sheet has shown. It is the receipt a captain reads on the 18th green.
+ * `sent` is how many holes this phone saw go, `have` how many of those the
+ * sheet has shown, `waiting` the hole numbers still inside the five minutes.
+ */
+function sheetLine(have,sent,waiting){
+  if(!sent) return "";
+  if(have>=sent) return sent===1?"The sheet has your 1 hole.":"The sheet has all "+sent+" of your holes.";
+  waiting=(waiting||[]).slice().sort(function(a,b){return a-b;});
+  return "The sheet has "+have+" of your "+sent+" holes."+(!waiting.length?"":
+    (waiting.length===1?" Hole "+waiting[0]+" is":" Holes "+waiting.join(", ")+" are")+
+    " on the way \u2014 it takes about 5 minutes.");
+}
+
+/** What the sheet bar says about holes the sheet does not have right. */
+function sheetWords(missing,differs){
+  var by=function(a,b){return a-b;},bits=[];
+  missing=(missing||[]).slice().sort(by); differs=(differs||[]).slice().sort(by);
+  if(missing.length) bits.push((missing.length===1?"Hole "+missing[0]+" is":"Holes "+missing.join(", ")+" are")+
+    " NOT in the sheet. Tap Send again.");
+  if(differs.length) bits.push((differs.length===1?"Hole "+differs[0]:"Holes "+differs.join(", "))+
+    ": the sheet shows different numbers from the ones this phone sent. The sheet counts. Check the card.");
+  return bits.join(" ");
+}
+
 /* ==================================================================
  * THE SCREEN
  * ================================================================== */
@@ -954,6 +1025,7 @@ var S={
   leftAt:{},        /* seat -> [[from, back], ...], the holes he was out for */
   acked:{},         /* team -> hole -> true, sends this phone saw land */
   mine:{},          /* team -> hole -> seat -> score, what this phone filed */
+  watch:[],         /* sends that came back, not yet seen in the sheet */
   unlocked:false,   /* he has said yes to changing a hole already in */
   boards:[],        /* the leaderboard, as parsed */
   boardAt:0,        /* when it was last read */
@@ -1005,6 +1077,7 @@ function fetchFeed(){
     if(!teams.length) throw new Error("feed empty");
     S.feed=teams; S.stamp=Date.now(); S.fresh=true;
     keep("feed",{text:text,at:S.stamp});
+    checkSheet();
     return true;
   }).catch(function(){ return false; });
 }
@@ -1144,13 +1217,62 @@ function markDone(job){
   setOutbox(q);
   if(!S.acked[job.team]) S.acked[job.team]={};
   S.acked[job.team][job.hole]=true; keep("ackedBy",S.acked);
+  /* Came back is not the same as landed. Watch it until the sheet shows it. */
+  S.watch=S.watch.filter(function(w){return !(w.team===job.team&&w.hole===job.hole);});
+  S.watch.push({team:job.team,hole:job.hole,scores:job.scores,at:Date.now(),state:"waiting"});
+  keep("watch",S.watch);
+}
+
+/**
+ * CHECK THE WATCHED HOLES AGAINST THE FEED. Run after every read of the feed.
+ * A hole the sheet shows is dropped from the watch. Nothing is ever sent from
+ * here: a hole that is missing is SAID, with a button, and the captain sends
+ * it. A phone that re-sent on its own would put this morning's test scores
+ * back into a sheet Rob had just cleared.
+ */
+function checkSheet(){
+  var left=[],i;
+  for(i=0;i<S.watch.length;i++){
+    var w=S.watch[i],st=readBack(w,teamOf(w.team),S.fresh?S.stamp:0);
+    if(st==="in") continue;
+    w.state=st; left.push(w);
+  }
+  S.watch=left; keep("watch",S.watch);
+  drawSheet();
+}
+
+function watchHoles(state){
+  return S.watch.filter(function(w){return w.team===S.team&&w.state===state;})
+    .map(function(w){return w.hole;});
+}
+
+function drawSheet(){
+  var bar=$("sheetBar"),missing=watchHoles("missing"),differs=watchHoles("differs");
+  var words=S.team==null?"":sheetWords(missing,differs);
+  bar.classList.toggle("hide",!words);
+  $("sheetWords").textContent=words;
+  $("sheetAgain").classList.toggle("hide",!missing.length);
+  var sent=0,h,a=ackedForTeam(S.acked,S.team);
+  for(h in a) if(Object.prototype.hasOwnProperty.call(a,h)) sent++;
+  var open=S.watch.filter(function(w){return w.team===S.team;}).length;
+  $("sheetLine").textContent=S.team==null?"":sheetLine(sent-open,sent,watchHoles("waiting"));
+}
+
+/** SEND AGAIN, on his tap: every hole on this team the sheet does not have. */
+function sendMissing(){
+  S.watch.filter(function(w){return w.team===S.team&&w.state==="missing";})
+    .forEach(function(w){ queueSend(w.team,w.hole,w.scores); });
+  S.watch=S.watch.filter(function(w){return !(w.team===S.team&&w.state==="missing");});
+  keep("watch",S.watch);
+  drawQueueBar(); drawSheet();
+  return drainOutbox();
 }
 
 function drainOutbox(){
   var job=outboxNext(outbox());
   if(!job) { drawQueueBar(); return Promise.resolve(); }
   return postOnce(job).then(function(){
-    markDone(job); drawQueueBar(); drawGrid();
+    markDone(job); drawQueueBar(); drawGrid(); drawSheet();
     return drainOutbox();
   }).catch(function(){ drawQueueBar(); });
 }
@@ -1456,7 +1578,7 @@ $("roleNo").addEventListener("click",function(){
   S.role="watch";keep("role","watch");
   drawCard();show("screenCard");
 });
-$("roleBack").addEventListener("click",function(){ S.team=null;keep("team",null);drawHeader();drawQueueBar();drawPick();show("screenPick"); });
+$("roleBack").addEventListener("click",function(){ S.team=null;keep("team",null);drawHeader();drawQueueBar();drawSheet();drawPick();show("screenPick"); });
 
 $("holePrev").addEventListener("click",function(){ openHole(prevHole(S.hole)); });
 $("holeNext").addEventListener("click",function(){ openHole(nextHole(S.hole)); });
@@ -1493,13 +1615,15 @@ $("doSend").addEventListener("click",function(){
     openHole(nextHole(hole));
     $("scoreMsg").textContent=word;
     drawQueueBar();
+    drawSheet();
     show("screenScore");
   });
 });
 
+$("sheetAgain").addEventListener("click",function(){ sendMissing(); });
 $("scoreToCard").addEventListener("click",function(){ drawCard();show("screenCard"); });
 $("cardToScore").addEventListener("click",function(){ drawScore();show("screenScore"); });
-$("cardTeam").addEventListener("click",function(){ S.team=null;keep("team",null);drawHeader();drawQueueBar();drawPick();show("screenPick"); });
+$("cardTeam").addEventListener("click",function(){ S.team=null;keep("team",null);drawHeader();drawQueueBar();drawSheet();drawPick();show("screenPick"); });
 
 /**
  * A MISSING LOGO IS NOT AN ERROR ANYBODY SHOULD SEE. Either image failing
@@ -1557,11 +1681,13 @@ function restore(){
      dropped, not guessed at; the feed still greys every hole the sheet has. */
   S.acked=recall("ackedBy",{})||{};
   S.mine=recall("mine",{})||{};
+  S.watch=recall("watch",[])||[];
 }
 
 function land(){
   drawHeader();
   drawQueueBar();
+  drawSheet();
   if(S.team==null||!myTeam()){ drawPick();show("screenPick");return; }
   if(S.role==="watch"){ drawCard();show("screenCard");return; }
   if(S.role==="score"){
