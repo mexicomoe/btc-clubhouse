@@ -188,6 +188,12 @@ th.nm,td.nm{text-align:left;width:86px;padding-left:4px;font-size:18px;
 thead th{background:var(--ink);color:var(--paper);}
 tr.par td,tr.par th{font-weight:600;}
 td.mine{background:var(--waitfill);color:var(--wait);}
+td.net-eagle{background:#2e9e4f;}
+td.net-birdie{background:#7ccf8a;}
+td.net-par{background:#d6f2d9;}
+td.net-bogey{background:#ffe066;}
+td.net-double{background:#ffb3ab;}
+td.net-triple{background:#f0625a;}
 /* The out / in / total table under the card. Four columns, so it never needs
    the width the eighteen holes are already using. */
 table.sums th:not(.nm),table.sums td:not(.nm){width:22%;}
@@ -1578,6 +1584,12 @@ function drawCard(){
         var cell=cardCell(seat,h,mine);
         td.textContent=cell.v;
         if(cell.mine){ td.className="mine"; anyMine=true; }
+        else if(cell.v!==""){
+          /* ONE MEANING PER CELL. Amber is "on this phone, not in the sheet
+             yet" and it wins; a score is only coloured once the sheet has it. */
+          var nn=netName(parseInt(cell.v,10),parOf(h),seat.strokes?seat.strokes[h-1]:null);
+          if(nn) td.className="net-"+nn;
+        }
         tr.appendChild(td);
       }
       body.appendChild(tr);

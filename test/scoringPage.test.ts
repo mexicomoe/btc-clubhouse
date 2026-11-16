@@ -993,3 +993,24 @@ test("colour is never the only signal, and the type on it stays black", () => {
   for (const k of ["eagle", "birdie", "par", "bogey", "double", "triple"])
     assert.match(PAGE, new RegExp("button\\.on\\.net-" + k + "\\{background:#[0-9a-f]{6};\\}"));
 });
+
+/* ---------- the card, coloured by net ---------- */
+
+test("a card cell is coloured by net only once the sheet has the hole", () => {
+  const draw = fnSource("drawCard");
+  // Amber means "on this phone, not in the sheet yet", and it wins: the net
+  // colour is in the else branch, so a cell never carries both meanings.
+  assert.match(draw, /if\(cell\.mine\)\{ td\.className="mine"; anyMine=true; \}\s*else if\(cell\.v!==""\)\{/);
+  assert.match(draw, /netName\(parseInt\(cell\.v,10\),parOf\(h\),seat\.strokes\?seat\.strokes\[h-1\]:null\)/);
+  assert.match(draw, /if\(nn\) td\.className="net-"\+nn;/);
+  // The six shades are the buttons' shades, one for one.
+  for (const k of ["eagle", "birdie", "par", "bogey", "double", "triple"]) {
+    const btn = PAGE.match(new RegExp("button\\.on\\.net-" + k + "\\{background:(#[0-9a-f]{6});\\}"));
+    const td = PAGE.match(new RegExp("td\\.net-" + k + "\\{background:(#[0-9a-f]{6});\\}"));
+    assert.ok(btn && td, k + " is missing a shade");
+    assert.equal(td![1], btn![1], k + " is one colour on the buttons and another on the card");
+  }
+  // The gross totals are never coloured: a total is not a net result.
+  const sums = draw.slice(draw.indexOf("OUT, IN AND THE ROUND"));
+  assert.doesNotMatch(sums, /net-/);
+});
