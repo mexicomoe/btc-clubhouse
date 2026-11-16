@@ -112,6 +112,18 @@ button{
 }
 button:disabled{opacity:.35;}
 button.on{background:var(--ink);color:var(--paper);}
+/* THE TAPPED SCORE, COLOURED BY NET. Black type on every one of them, and
+   every shade light enough for black to read in the sun. The heavy ring is
+   what says "this one is picked"; the colour says how good it was; the word
+   under the buttons says it again for a man who cannot tell red from green. */
+button.on[class*="net-"]{color:var(--ink);box-shadow:inset 0 0 0 3px var(--ink);}
+button.on.net-eagle{background:#2e9e4f;}
+button.on.net-birdie{background:#7ccf8a;}
+button.on.net-par{background:#d6f2d9;}
+button.on.net-bogey{background:#ffe066;}
+button.on.net-double{background:#ffb3ab;}
+button.on.net-triple{background:#f0625a;}
+.netWord{font-size:18px;font-weight:800;margin:8px 0 0;}
 button.wide,a.wide{display:block;width:100%;margin:10px 0;min-height:60px;font-size:22px;}
 /* The leaderboard is a LINK, not a button, because it leaves the page: an
    anchor with target=_blank is the one thing iOS will never treat as a popup
@@ -468,7 +480,19 @@ function parseFeed(text){
       var n=v===""?null:parseInt(v,10);
       holes.push(isNaN(n)?null:n);
     }
-    teams[team].seats[seat-1]={seat:seat,name:String(c[3]||"").trim(),holes:holes};
+    /* STROKES, IF THE FEED CARRIES THEM: eighteen more columns after h18,
+       the dots this man gets on each hole. An older feed has none, and then
+       there is simply no colour — the page never guesses a man's strokes. */
+    var strokes=null;
+    if(c.length>=40){
+      strokes=[];
+      for(i=0;i<18;i++){
+        var sv=String(c[22+i]==null?"":c[22+i]).trim();
+        var sn=sv===""?null:parseInt(sv,10);
+        strokes.push(isNaN(sn)?null:sn);
+      }
+    }
+    teams[team].seats[seat-1]={seat:seat,name:String(c[3]||"").trim(),holes:holes,strokes:strokes};
   }
   order.sort(function(a,b){return a-b;});
   return order.map(function(t){return teams[t];});
@@ -538,6 +562,33 @@ function prevHole(h){ return h===1?18:h-1; }
  * has to know what came first — chiefly a man who left the round — asks this.
  */
 function playIndex(hole,start){ return ((hole-start)%18+18)%18; }
+
+/**
+ * WHAT A SCORE IS, NET, AS A WORD. Gross less the man's strokes on the hole,
+ * against par. Null when his strokes are not known — no word and no colour
+ * is better than the wrong one.
+ *
+ * NET, NOT GROSS, and decided on the numbers: across 4,194 holes of this
+ * group, gross would turn the screen yellow or red 86 holes in 100 and never
+ * once show an eagle. Net is 57 green to 43 warm, and net is what every
+ * contest here is scored on.
+ */
+function netName(gross,par,strokes){
+  if(gross==null||strokes==null||isNaN(strokes)) return null;
+  var d=gross-strokes-par;
+  if(d<=-2) return "eagle";
+  if(d===-1) return "birdie";
+  if(d===0) return "par";
+  if(d===1) return "bogey";
+  if(d===2) return "double";
+  return "triple";
+}
+
+/** The same thing as he reads it. Colour is never the only signal. */
+function netWords(name){
+  return {eagle:"Net eagle or better",birdie:"Net birdie",par:"Net par",bogey:"Net bogey",
+          double:"Net double bogey",triple:"Net triple or worse"}[name]||"";
+}
 
 /** Which holes the feed says this team has already filed. */
 function feedSentHoles(team){
@@ -1418,7 +1469,10 @@ function drawScore(){
         var b=document.createElement("button");
         b.textContent=String(n);
         b.disabled=!!locked;
-        if(S.scores[seat.seat]===n) b.className="on";
+        if(S.scores[seat.seat]===n){
+          var nn=netName(n,par,seat.strokes?seat.strokes[h-1]:null);
+          b.className=nn?"on net-"+nn:"on";
+        }
         b.addEventListener("click",function(){
           S.scores[seat.seat]=(S.scores[seat.seat]===n?null:n);
           if(S.scores[seat.seat]==null) delete S.scores[seat.seat];
@@ -1427,6 +1481,12 @@ function drawScore(){
         grid.appendChild(b);
       });
       row.appendChild(grid);
+      var picked=S.scores[seat.seat];
+      var word=netWords(netName(picked,par,seat.strokes?seat.strokes[h-1]:null));
+      if(word){
+        var nw=document.createElement("div");nw.className="netWord";nw.textContent=word;
+        row.appendChild(nw);
+      }
     }
     box.appendChild(row);
   });
