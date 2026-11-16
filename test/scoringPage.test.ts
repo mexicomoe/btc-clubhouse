@@ -53,7 +53,7 @@ const LIFTED = [
   "feedHoleLine", "parseStart", "outStretches", "outFrom", "setOut", "isOut", "playingSeats", "missingMan", "sendBody",
   "sendId", "outboxNext", "parseBoards", "prettyCell",
   "cardCell", "mineForTeam", "ackedForTeam", "queueWords",
-  "readBack", "sheetLine", "sheetWords",
+  "readBack", "sheetLine", "sheetWords", "netName", "netWords",
   "colAt", "boardDone", "podiumClasses", "grossTotal", "titleKey", "orderBoards",
 ].map(fnSource).join("\n");
 
@@ -63,7 +63,7 @@ const P = new Function(LIFTED + "\nreturn {" + [
   "feedHoleLine", "parseStart", "outStretches", "outFrom", "setOut", "isOut", "playingSeats", "missingMan", "sendBody",
   "sendId", "outboxNext", "parseBoards", "prettyCell",
   "cardCell", "mineForTeam", "ackedForTeam", "queueWords",
-  "readBack", "sheetLine", "sheetWords",
+  "readBack", "sheetLine", "sheetWords", "netName", "netWords",
   "colAt", "boardDone", "podiumClasses", "grossTotal", "titleKey", "orderBoards",
 ].join(",") + "};")() as any;
 
@@ -948,4 +948,48 @@ test("the receipt line counts what the sheet has shown", () => {
   assert.equal(P.sheetWords([7], []), "Hole 7 is NOT in the sheet. Tap Send again.");
   assert.match(P.sheetWords([], [3]), /^Hole 3: the sheet shows different numbers/);
   assert.equal(P.sheetWords([], []), "");
+});
+
+/* ---------- the tapped score, coloured by net ---------- */
+
+test("a score is named by NET, and not at all when the strokes are unknown", () => {
+  // Par 4, one stroke: a gross 5 is a net par, a gross 4 a net birdie.
+  assert.equal(P.netName(5, 4, 1), "par");
+  assert.equal(P.netName(4, 4, 1), "birdie");
+  assert.equal(P.netName(3, 4, 1), "eagle");
+  assert.equal(P.netName(2, 4, 1), "eagle");       // better than eagle is still dark green
+  assert.equal(P.netName(6, 4, 1), "bogey");
+  assert.equal(P.netName(7, 4, 1), "double");
+  assert.equal(P.netName(8, 4, 1), "triple");
+  assert.equal(P.netName(9, 4, 1), "triple");
+  // Two strokes on a par 5, and none at all.
+  assert.equal(P.netName(7, 5, 2), "par");
+  assert.equal(P.netName(4, 4, 0), "par");
+  // No strokes known: no name, so no colour and no word. Never a guess.
+  assert.equal(P.netName(5, 4, null), null);
+  assert.equal(P.netName(5, 4, undefined), null);
+  assert.equal(P.netName(null, 4, 1), null);
+  assert.equal(P.netWords(null), "");
+  assert.equal(P.netWords("birdie"), "Net birdie");
+});
+
+test("the feed's strokes are read when it has them and left alone when it does not", () => {
+  const hd = "team,start,seat,name," + Array.from({length: 18}, (_, i) => "h" + (i + 1)).join(",");
+  const old = P.parseFeed(hd + "\n1,1,1,\"Tanenbaum, Rob\"," + ",".repeat(17));
+  assert.equal(old[0].seats[0].strokes, null);
+  const sd = hd + "," + Array.from({length: 18}, (_, i) => "s" + (i + 1)).join(",");
+  const strokes = [1,1,1,2,2,1,1,1,1,1,1,1,1,1,1,1,1,2];
+  const now = P.parseFeed(sd + "\n1,1,1,\"Mallace, Bob\"," + ",".repeat(17) + "," + strokes.join(","));
+  assert.deepEqual(now[0].seats[0].strokes, strokes);
+  assert.deepEqual(now[0].seats[0].holes, Array(18).fill(null));
+  // A blank stroke cell is unknown, not zero.
+  const gap = P.parseFeed(sd + "\n1,1,1,\"Mallace, Bob\"," + ",".repeat(17) + "," + ",".repeat(17));
+  assert.equal(gap[0].seats[0].strokes[0], null);
+});
+
+test("colour is never the only signal, and the type on it stays black", () => {
+  assert.match(PAGE, /button\.on\[class\*="net-"\]\{color:var\(--ink\);/);
+  assert.match(PAGE, /nw\.className="netWord"/);
+  for (const k of ["eagle", "birdie", "par", "bogey", "double", "triple"])
+    assert.match(PAGE, new RegExp("button\\.on\\.net-" + k + "\\{background:#[0-9a-f]{6};\\}"));
 });
